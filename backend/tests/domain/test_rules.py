@@ -3,7 +3,6 @@ import pytest
 from agrosense.domain.entities import Observation, StatusSemantic, Tree
 from agrosense.domain.errors import (
     DeathViolationError,
-    NonContiguousCensusError,
 )
 from agrosense.domain.rules import (
     STAGNATION_THRESHOLD_M,
@@ -49,25 +48,74 @@ def test_dead_tree_frozen_passes():
     assert warnings == []
 
 
-def test_dead_tree_revives_raises():
+def test_dead_revives_warns_not_raises():
+    """Ruling replanteo: 'Muerto'->'Vivo' es practica de restauracion
+    (6/856 casos reales); es warning, no error."""
     tree = make_tree()
     obs = [make_obs(1, 0.2, False), make_obs(2, 0.3, True)]
-    with pytest.raises(DeathViolationError):
-        validate_tree_observations(tree, obs)
+    warnings = validate_tree_observations(tree, obs)
+    assert len(warnings) == 1
+    assert "replanteo" in str(warnings[0])
+
+
+def test_revival_then_healthy_continues():
+    """Tras el 'revive' la serie sigue validandose como viva."""
+    tree = make_tree()
+    obs = [
+        make_obs(1, 0.2, True),
+        make_obs(2, 0.25, False),
+        make_obs(3, 0.5, True),
+        make_obs(4, 0.8, True),
+    ]
+    warnings = validate_tree_observations(tree, obs)
+    assert len(warnings) == 1
+
+
+def test_revival_warning_counts_as_death_then_life():
+    """El warning de revival aparece UNA vez por transicion M->V."""
+    tree = make_tree()
+    obs = [
+        make_obs(1, 0.2, True),
+        make_obs(2, 0.25, False),
+        make_obs(3, 0.5, True),
+        make_obs(4, 0.8, False),
+    ]
+    warnings = validate_tree_observations(tree, obs)
+    assert len(warnings) == 1  # un solo revive (M2->M3)
 
 
 def test_dead_tree_grows_raises():
+    """Invariante dura inequivoca: muerto hasta el final con altura creciendo."""
     tree = make_tree()
-    obs = [make_obs(1, 0.2, True), make_obs(2, 0.25, False), make_obs(3, 0.5, False)]
+    obs = [make_obs(1, 0.2, True), make_obs(2, 0.25, False), make_obs(3, 0.5, False),
+           make_obs(4, 0.5, False)]
     with pytest.raises(DeathViolationError):
         validate_tree_observations(tree, obs)
 
 
-def test_census_gap_raises():
+def test_dead_grows_mid_series_warns():
+    """FR_1_45 real: M2-Muerto 0.72, M3-Muerto 1.2, M4-Vivo 1.55.
+    Muerto->muerto con altura saltando y luego revive = replanteo mal
+    registrado (1/856): warning, no error."""
     tree = make_tree()
-    obs = [make_obs(1, 0.2, True), make_obs(3, 0.4, True)]
-    with pytest.raises(NonContiguousCensusError):
-        validate_tree_observations(tree, obs)
+    obs = [
+        make_obs(1, 0.25, True),
+        make_obs(2, 0.72, False),
+        make_obs(3, 1.20, False),
+        make_obs(4, 1.55, True),
+    ]
+    warnings = validate_tree_observations(tree, obs)
+    assert len(warnings) == 1  # el revival (M3->M4)
+
+
+def test_census_gap_warns_not_raises():
+    """Ruling logistica de campo: hueco de censo (1/856 casos reales,
+    patron [M1, M4]) es warning, no error."""
+    tree = make_tree()
+    obs = [make_obs(1, 0.2, True), make_obs(4, 0.4, True)]
+    warnings = validate_tree_observations(tree, obs)
+    assert len(warnings) == 1
+    assert "no contiguo" in str(warnings[0])
 
 
 def test_first_census_late_is_contiguous():

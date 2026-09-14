@@ -5,9 +5,10 @@ construccion (entities.py) y valida la coherencia TEMPORAL entre campanas.
 """
 from agrosense.domain.entities import Observation, Tree
 from agrosense.domain.errors import (
+    CensusGapWarning,
     DeathViolationError,
-    NonContiguousCensusError,
     SuspiciousContractionWarning,
+    SuspiciousRevivalWarning,
 )
 
 STAGNATION_THRESHOLD_M = 0.05
@@ -23,12 +24,13 @@ def growth_between(prev: Observation, curr: Observation) -> float:
 
 def validate_tree_observations(
     tree: Tree, observations: list[Observation]
-) -> list[SuspiciousContractionWarning]:
+) -> list[SuspiciousContractionWarning | SuspiciousRevivalWarning | CensusGapWarning]:
     """Valida la serie temporal de un arbol.
 
-    Lanza DomainError (aborta la ingesta) si viola invariante dura:
-    muerte que revive/crece, censo con huecos.
-    Devuelve warnings de contraccion sospechosa (NO abortan).
+    Lanza DomainError (aborta la ingesta) SOLO si viola invariante dura:
+    un arbol muerto que CRECE tras morir.
+    Devuelve warnings (NO abortan): contraccion sospechosa, 'revives'
+    (probable replanteo), huecos de censo (logistica de campo).
     """
     if not observations:
         return []
@@ -36,24 +38,39 @@ def validate_tree_observations(
     obs_sorted = sorted(observations, key=lambda o: o.campaign)
     campaigns = [o.campaign for o in obs_sorted]
 
-    if campaigns != list(range(campaigns[0], campaigns[-1] + 1)):
-        raise NonContiguousCensusError(tree.tree_id, campaigns)
+    warnings: list[
+        SuspiciousContractionWarning | SuspiciousRevivalWarning | CensusGapWarning
+    ] = []
 
-    warnings: list[SuspiciousContractionWarning] = []
+    if campaigns != list(range(campaigns[0], campaigns[-1] + 1)):
+        warnings.append(CensusGapWarning(tree.tree_id, campaigns))
+
     dead_seen = False
     prev: Observation | None = None
 
     for obs in obs_sorted:
         if dead_seen:
-            if obs.alive:
-                raise DeathViolationError(tree.tree_id, obs.campaign, "revive")
-            if (
+            grew = (
                 prev is not None
                 and prev.height_m is not None
                 and obs.height_m is not None
-                and abs(obs.height_m - prev.height_m) > 1e-9
-            ):
-                raise DeathViolationError(tree.tree_id, obs.campaign, "crece tras morir")
+                and obs.height_m - prev.height_m > 1e-9
+            )
+            if obs.alive:
+                # 'revive' = replanteo (6/856 reales)
+                warnings.append(SuspiciousRevivalWarning(tree.tree_id, obs.campaign))
+                dead_seen = False
+            elif grew:
+                if _revives_later(obs, obs_sorted):
+                    # muerto->muerto creciendo y luego vivo: replanteo mal
+                    # registrado (FR_1_45, 1/856)
+                    warnings.append(SuspiciousRevivalWarning(tree.tree_id, obs.campaign))
+                    dead_seen = False
+                else:
+                    # muerto hasta el final con altura creciendo: invalido
+                    raise DeathViolationError(
+                        tree.tree_id, obs.campaign, "crece tras morir"
+                    )
         else:
             if (
                 prev is not None
@@ -70,3 +87,13 @@ def validate_tree_observations(
         prev = obs
 
     return warnings
+
+
+def _revives_later(
+    obs: Observation, obs_sorted: list[Observation]
+) -> bool:
+    """Hay alguna campana posterior con el arbol vivo? (patron replanteo)."""
+    for later in obs_sorted:
+        if later.campaign > obs.campaign and later.alive:
+            return True
+    return False

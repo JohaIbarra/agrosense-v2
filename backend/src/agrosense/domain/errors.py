@@ -59,3 +59,34 @@ class SuspiciousContractionWarning(Exception):
             f"Arbol {tree_id} 'encoge' {contraction_m:.3f} m hasta campana {campaign} "
             f"(error de medicion de campo documentado)"
         )
+
+
+class SuspiciousRevivalWarning(Exception):
+    """No es error: 'Muerto' en campana k y 'Vivo' en k+1 es REPLANTEO
+    (practica estandar de restauracion: el individuo muerto se reemplaza
+    y el registro de campo reusa el ID; la altura salta). 6/856 casos en
+    el dataset de referencia. La ingesta CONTINUA; el arbol queda flaggeado
+    para revision (y para el modelo de mortalidad es etiqueta ambigua)."""
+
+    def __init__(self, tree_id: str, campaign: int):
+        self.tree_id = tree_id
+        self.campaign = campaign
+        super().__init__(
+            f"Arbol {tree_id} figura 'Muerto' en campana {campaign - 1} y 'Vivo' "
+            f"en {campaign}: posible replanteo o error de registro; revisar"
+        )
+
+
+class CensusGapWarning(Exception):
+    """No es error: el arbol fue censado, se salto campanas y reaparecio
+    (logistica de campo: equipo no encuentra/accede al individuo).
+    1/856 casos en el dataset de referencia ([M1, M4]). La ingesta CONTINUA;
+    el analisis posterior debe tolerar huecos en la serie."""
+
+    def __init__(self, tree_id: str, campaigns: list[int]):
+        self.tree_id = tree_id
+        self.campaigns = campaigns
+        super().__init__(
+            f"Arbol {tree_id} con censo no contiguo: {sorted(campaigns)} "
+            f"(se salto campanas entre el primer y ultimo censo)"
+        )
