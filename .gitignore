@@ -45,3 +45,7 @@ coverage/
 # Bases de datos locales
 *.sqlite
 *.db
+
+# Python build artifacts
+*.egg-info/
+backend/build/
