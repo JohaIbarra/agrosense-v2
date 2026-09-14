@@ -1,0 +1,47 @@
+# Dependencias / entornos virtuales
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+node_modules/
+
+# Build outputs
+dist/
+build/
+.next/
+.vite/
+
+# Datos: NUNCA entran al repo (regla de v1)
+data/raw/
+data/processed/
+*.xlsx
+*.csv
+*.pkl
+*.joblib
+ml_artifacts/
+
+# ML outputs
+ml_outputs/
+*.png.lock
+
+# Secrets / config local
+.env
+.env.*
+*.local
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+coverage/
+
+# Bases de datos locales
+*.sqlite
+*.db
