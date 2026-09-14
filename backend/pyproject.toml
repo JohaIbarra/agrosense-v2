@@ -1,0 +1,34 @@
+[project]
+name = "agrosense"
+version = "0.1.0"
+description = "AgroSense AI v2 - plataforma de analisis de restauracion ecologica"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas==2.2.2",
+    "pydantic==2.9.2",
+    "openpyxl==3.1.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.3",
+    "ruff==0.6.9",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP"]

@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: agrosense
+Version: 0.1.0
+Summary: AgroSense AI v2 - plataforma de analisis de restauracion ecologica
+Requires-Python: >=3.12
+Requires-Dist: pandas==2.2.2
+Requires-Dist: pydantic==2.9.2
+Requires-Dist: openpyxl==3.1.5
+Provides-Extra: dev
+Requires-Dist: pytest==8.3.3; extra == "dev"
+Requires-Dist: ruff==0.6.9; extra == "dev"
