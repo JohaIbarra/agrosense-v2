@@ -11,11 +11,17 @@ import pandas as pd
 
 from agrosense.adapters.ingester.column_mapping import (
     campaign_columns,
+    fixed_columns,
     is_blank,
     parse_alive,
 )
 from agrosense.domain.entities import Observation, StatusSemantic, Tree
-from agrosense.domain.errors import SpeciesMismatchError, SuspiciousContractionWarning
+from agrosense.domain.errors import (
+    CensusGapWarning,
+    SpeciesMismatchError,
+    SuspiciousContractionWarning,
+    SuspiciousRevivalWarning,
+)
 from agrosense.domain.rules import validate_tree_observations
 
 CAMPAIGNS = (1, 2, 3, 4)
@@ -32,26 +38,44 @@ def _to_str(v) -> str | None:
     return s or None
 
 
-def wide_to_long(
-    df: pd.DataFrame,
-) -> tuple[list[Tree], list[Observation], list[SuspiciousContractionWarning]]:
+DomainWarning = SuspiciousContractionWarning | SuspiciousRevivalWarning | CensusGapWarning
+
+
+def wide_to_long(df: pd.DataFrame) -> tuple[list[Tree], list[Observation], list[DomainWarning]]:
     columns = list(df.columns)
 
-    fixed_map: dict[str, str] = {}
-    for real, canonical, campaign in _iter_aliases():
-        if campaign is None and real in columns:
-            fixed_map[canonical] = real
+    fixed_map = fixed_columns(columns)
+    if "tree_id" not in fixed_map or "species" not in fixed_map:
+        raise ValueError(
+            "El archivo no tiene las columnas de identidad del arbol "
+            f"(ID_MUEST / Especie_M1). Columnas encontradas: {columns[:10]}..."
+        )
 
     per_campaign = campaign_columns(columns)
 
     trees: list[Tree] = []
     observations: list[Observation] = []
-    all_warnings: list[SuspiciousContractionWarning] = []
+    all_warnings: list[
+        SuspiciousContractionWarning | SuspiciousRevivalWarning | CensusGapWarning
+    ] = []
     species_by_tree: dict[str, str] = {}
 
     for _, row in df.iterrows():
-        tree_id = str(row[fixed_map["tree_id"]]).strip()
-        species = str(row[fixed_map["species"]]).strip()
+        raw_tree_id = row[fixed_map["tree_id"]]
+        if is_blank(raw_tree_id):
+            raise ValueError(
+                f"Fila con tree_id vacio (ID_MUEST en blanco); "
+                f"no se puede identificar al arbol. Fila: {row.name}"
+            )
+        tree_id = str(raw_tree_id).strip()
+
+        raw_species = row[fixed_map["species"]]
+        if is_blank(raw_species):
+            raise ValueError(
+                f"Arbol {tree_id} sin especie registrada; la identidad del "
+                f"arbol requiere especie"
+            )
+        species = str(raw_species).strip()
 
         if tree_id in species_by_tree and species_by_tree[tree_id] != species:
             raise SpeciesMismatchError(tree_id, species, species_by_tree[tree_id])
@@ -121,9 +145,3 @@ def wide_to_long(
         observations.extend(tree_obs)
 
     return trees, observations, all_warnings
-
-
-def _iter_aliases():
-    from agrosense.adapters.ingester import column_mapping as _cm
-
-    return _cm._ALIASES

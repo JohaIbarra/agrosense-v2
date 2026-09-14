@@ -52,6 +52,15 @@ def campaign_columns(df_columns: list[str]) -> dict[str, dict[int, str]]:
     return result
 
 
+def fixed_columns(df_columns: list[str]) -> dict[str, str]:
+    """Devuelve {canonico: nombre_real} para columnas fijas por arbol."""
+    result: dict[str, str] = {}
+    for real, canonical, campaign in _ALIASES:
+        if campaign is None and real in df_columns:
+            result[canonical] = real
+    return result
+
+
 def parse_alive(raw) -> bool | None:
     """'Vivo'->True, 'Muerto'->False, blanco->None. Nunca lanza."""
     if is_blank(raw):
