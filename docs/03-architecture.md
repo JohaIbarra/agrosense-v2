@@ -60,3 +60,21 @@ agrosense-v2/
   en spike). Si crece: job queue (requisito futuro, ADR nuevo).
 - Archivos crudos: storage local del servicio → S3-compatible si el
   proveedor lo exige (seam: interfaces de storage).
+
+## Evolución ML prevista (deep learning)
+
+Escenario roadmap: modelos DL (p.ej. visión por computador con imágenes de
+dron/satélite). Cubierto por diseño, sin cambios presentes:
+
+- **Entrenamiento SIEMPRE offline** (local/Colab/GPU puntual): el cómputo
+  va a los datos, no al revés. Solo inferencia vive en el monolito (CPU,
+  ms para dataset pequeño).
+- `ml/` es agnóstico al framework: sklearn hoy, PyTorch/ONNX mañana, la
+  misma interfaz de inferencia y el mismo ML eval gate (group split por
+  árbol, cero leakage, artefacto versionado, preprocessing compartido).
+- Extracción de `ml/` como servicio independiente SOLO si la inferencia
+  deja de ser acotada (lotes de imágenes): sería ADR-005, escrito cuando
+  exista el requisito real, no antes.
+- Con los datos tabulares actuales (856 árboles, 4 monitoreos), DL de
+  series temporales no es viable (insuficientes puntos por árbol); el
+  escenario DL realista es nueva modalidad de datos (imágenes).
