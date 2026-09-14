@@ -1,4 +1,3 @@
-import math
 
 from agrosense.adapters.ingester.column_mapping import (
     MAPPING_VERSION,
