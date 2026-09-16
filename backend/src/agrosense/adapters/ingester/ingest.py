@@ -11,14 +11,20 @@ import pandas as pd
 from agrosense.adapters.ingester.column_mapping import MAPPING_VERSION
 from agrosense.adapters.ingester.wide_to_long import wide_to_long
 from agrosense.domain.entities import Observation, Tree
-from agrosense.domain.errors import SuspiciousContractionWarning
+from agrosense.domain.errors import (
+    CensusGapWarning,
+    SuspiciousContractionWarning,
+    SuspiciousRevivalWarning,
+)
+
+DomainWarning = SuspiciousContractionWarning | SuspiciousRevivalWarning | CensusGapWarning
 
 
 @dataclass
 class IngestResult:
     trees: list[Tree]
     observations: list[Observation]
-    warnings: list[SuspiciousContractionWarning] = field(default_factory=list)
+    warnings: list[DomainWarning] = field(default_factory=list)  # type: ignore[type-arg]
     mapping_version: str = MAPPING_VERSION
 
 
