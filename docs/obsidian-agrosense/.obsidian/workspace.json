@@ -1,0 +1,232 @@
+{
+  "main": {
+    "id": "00367106fbe56b61",
+    "type": "split",
+    "children": [
+      {
+        "id": "78a6acbfba0ae605",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "867615cb2bf2f173",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Vista gráfica"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "2b034f585451ce2a",
+    "type": "split",
+    "children": [
+      {
+        "id": "d1d3c4ab7b026820",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "c88339b905ac0b5e",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Explorador de archivos"
+            }
+          },
+          {
+            "id": "8ff2a60349474d67",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Buscar"
+            }
+          },
+          {
+            "id": "db7e7fb4ab93917a",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Marcadores"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 200
+  },
+  "right": {
+    "id": "24db685921e24496",
+    "type": "split",
+    "children": [
+      {
+        "id": "8ea8d2f52a37a696",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "5630349f82c3e2c4",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Enlaces entrantes"
+            }
+          },
+          {
+            "id": "88615bc43a61c4ff",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Enlaces salientes"
+            }
+          },
+          {
+            "id": "f541345ab277aaef",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Etiquetas"
+            }
+          },
+          {
+            "id": "92d427a482d6c59a",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Todas las propiedades"
+            }
+          },
+          {
+            "id": "f30a59d1db705002",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Esquema"
+            }
+          },
+          {
+            "id": "1c785e6d358a1e62",
+            "type": "leaf",
+            "state": {
+              "type": "file-properties",
+              "state": {},
+              "icon": "lucide-info",
+              "title": "Propiedades del archivo"
+            }
+          }
+        ],
+        "currentTab": 5
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Abrir selector rápido": false,
+      "graph:Abrir vista gráfica": false,
+      "canvas:Crear nuevo lienzo": false,
+      "daily-notes:Abrir la nota de hoy": false,
+      "templates:Insertar plantilla": false,
+      "command-palette:Abrir paleta de comandos": false,
+      "bases:Crear nueva base": false
+    }
+  },
+  "active": "867615cb2bf2f173",
+  "lastOpenFiles": [
+    "01-Proyecto/Overview.md",
+    "04-ML/Resumen ML.md",
+    "00-Inicio/Hoja de Ruta.md",
+    "01-Proyecto/Roadmap.md",
+    "Plantillas/Slice Plan.md",
+    "07-Decisiones/ADR-002 - Database.md",
+    "Stack.md",
+    "02-Arquitectura/Sistema.md",
+    "Slice {{prev}}.md",
+    "06-Slices/Slice 5 - Analítica de Crecimiento.md",
+    "06-Slices/Slice 4 - Detección de Estancados.md",
+    "06-Slices/Slice 3 - Riesgo de Mortalidad.md",
+    "Plantillas/ADR Template.md",
+    "Plantillas/Daily Note.md",
+    "05-Tecnico/Base de Datos.md",
+    "05-Tecnico/Comandos.md",
+    "07-Decisiones/ADR-004 - Ingesta de Datos.md",
+    "07-Decisiones/ADR-003 - Arquitectura.md",
+    "07-Decisiones/ADR-001 - Stack.md",
+    "06-Slices/Slice 2 - Persistencia y API.md",
+    "06-Slices/Slice 1 - Fundación de Datos.md",
+    "05-Tecnico/Setup Técnico.md",
+    "03-Dominio/Modelo de Dominio.md",
+    "Plantillas",
+    "08-Journal",
+    "07-Decisiones",
+    "06-Slices",
+    "05-Tecnico",
+    "04-ML",
+    "03-Dominio",
+    "02-Arquitectura",
+    "01-Proyecto",
+    "00-Inicio",
+    "Sin título.canvas",
+    "Bienvenido.md"
+  ]
+}
