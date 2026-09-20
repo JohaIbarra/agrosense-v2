@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 
 from agrosense.application.dtos import UploadResult, WarningDTO
+from agrosense.application.errors import AppError
 from agrosense.application.ports import CampaignSource
 from agrosense.domain.errors import (
     CensusGapWarning,
@@ -40,8 +41,9 @@ def _map_warning(w: Exception) -> WarningDTO:
                 tree_id=getattr(w, "tree_id", ""),
                 message=str(w),
             )
-    # Tipo desconocido: no se silencia y no se filtra el internals al usuario
-    raise ValueError(f"Tipo de warning no reconocido: {type(w).__name__}")
+    # Tipo desconocido: es un bug nuestro, no un error del usuario. RuntimeError
+    # para que no se confunda con un fallo de operacion y salga como 500.
+    raise RuntimeError(f"Tipo de warning no reconocido: {type(w).__name__}")
 
 
 def upload_campaign(
@@ -55,14 +57,14 @@ def upload_campaign(
     """Sube y valida una campana de monitoreo a un proyecto existente.
 
     Raises:
-        ValueError("PROJECT_NOT_FOUND"): si el project_id no existe.
-        ValueError("INVALID_FILE"): si el source no puede leer el archivo.
-        ValueError("DUPLICATE_FILE"): si ese archivo ya fue ingresado.
+        AppError("PROJECT_NOT_FOUND"): si el project_id no existe.
+        AppError("INVALID_FILE"): si el source no puede leer el archivo.
+        AppError("DUPLICATE_FILE"): si ese archivo ya fue ingresado.
         DomainError: si un invariante de dominio falla (el caller lo mapea).
     """
     # 1. Proyecto primero: no se parsea un archivo que no tiene donde ir
     if project_repo.get(project_id) is None:
-        raise ValueError("PROJECT_NOT_FOUND")
+        raise AppError("PROJECT_NOT_FOUND", f"El proyecto {project_id} no existe.")
 
     # 2. Hash del archivo CRUDO, antes de parsear
     sha256 = hashlib.sha256(content).hexdigest()

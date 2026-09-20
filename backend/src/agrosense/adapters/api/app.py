@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from agrosense.adapters.api.errors import domain_error_handler
+from agrosense.adapters.api.errors import domain_error_handler, unhandled_error_handler
+from agrosense.adapters.api.middleware import BodySizeLimitMiddleware
 from agrosense.domain.errors import DomainError
 
 
@@ -22,9 +23,16 @@ def create_app() -> FastAPI:
     # Mapeo global: DomainError → 422 con contexto accionable
     app.add_exception_handler(DomainError, domain_error_handler)  # type: ignore[arg-type]
 
+    # Red de seguridad: ningun fallo sale sin la forma {code, message}
+    app.add_exception_handler(Exception, unhandled_error_handler)
+
     # Rutas del slice 2 (UC1/UC2 + reads)
-    from agrosense.adapters.api.routes.projects import router
+    from agrosense.adapters.api.routes.projects import MAX_UPLOAD_BYTES, router
 
     app.include_router(router)
+
+    # Techo del cuerpo ANTES de que el parser de multipart toque disco.
+    # Se anade el ultimo para que quede el mas externo de la pila.
+    app.add_middleware(BodySizeLimitMiddleware, max_bytes=MAX_UPLOAD_BYTES)
 
     return app

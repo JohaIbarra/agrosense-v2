@@ -7,20 +7,36 @@ dependencies = [
     "pandas==2.2.2",
     "pydantic==2.9.2",
     "openpyxl==3.1.5",
-    "fastapi==0.115.0",
+    # Versiones fijadas tras el escaneo de pip-audit del gate de fase 7
+    # (hallazgo R5). fastapi 0.115.0 topaba starlette<0.39.0, lo que dejaba
+    # inalcanzable el arreglo del DoS por multipart sin acotar.
+    "fastapi==0.141.1",
+    "starlette==1.6.0",
     "uvicorn[standard]==0.30.6",
     "sqlalchemy==2.0.35",
     "alembic==1.13.3",
     "psycopg[binary]==3.2.3",
-    "python-multipart==0.0.9",
-    "python-dotenv==1.0.1",
+    "python-multipart==0.0.32",
+    "python-dotenv==1.2.3",
+    # openpyxl elige su backend XML segun si puede importar lxml, asi que
+    # declararlo es lo que hace que el parser probado sea el de produccion.
+    "lxml==6.1.0",
+    # Transitivas fijadas por seguridad: no son imports nuestros, pero el
+    # escaneo del cierre (requirements.lock.txt) las encontro con avisos
+    # abiertos. anyio ademas es el threadpool donde corre el upload.
+    "anyio==4.15.1",
+    "idna==3.20",
+    "certifi==2026.7.22",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest==8.3.3",
+    "pytest==9.1.1",
     "ruff==0.6.9",
     "httpx==0.27.2",
+    # Gate 5 de AGENTS.md ("dependencies checked for known vulnerabilities")
+    # ejecutable: pip-audit -r requirements.lock.txt (el CIERRE, no las raices).
+    "pip-audit==2.10.1",
 ]
 
 [build-system]

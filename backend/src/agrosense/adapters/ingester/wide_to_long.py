@@ -15,6 +15,7 @@ from agrosense.adapters.ingester.column_mapping import (
     is_blank,
     parse_alive,
 )
+from agrosense.application.errors import AppError
 from agrosense.domain.entities import Observation, StatusSemantic, Tree
 from agrosense.domain.errors import (
     CensusGapWarning,
@@ -46,9 +47,10 @@ def wide_to_long(df: pd.DataFrame) -> tuple[list[Tree], list[Observation], list[
 
     fixed_map = fixed_columns(columns)
     if "tree_id" not in fixed_map or "species" not in fixed_map:
-        raise ValueError(
+        raise AppError(
+            "INVALID_FILE",
             "El archivo no tiene las columnas de identidad del arbol "
-            f"(ID_MUEST / Especie_M1). Columnas encontradas: {columns[:10]}..."
+            f"(ID_MUEST / Especie_M1). Columnas encontradas: {columns[:10]}...",
         )
 
     per_campaign = campaign_columns(columns)
@@ -63,17 +65,19 @@ def wide_to_long(df: pd.DataFrame) -> tuple[list[Tree], list[Observation], list[
     for _, row in df.iterrows():
         raw_tree_id = row[fixed_map["tree_id"]]
         if is_blank(raw_tree_id):
-            raise ValueError(
+            raise AppError(
+                "INVALID_FILE",
                 f"Fila con tree_id vacio (ID_MUEST en blanco); "
-                f"no se puede identificar al arbol. Fila: {row.name}"
+                f"no se puede identificar al arbol. Fila: {row.name}",
             )
         tree_id = str(raw_tree_id).strip()
 
         raw_species = row[fixed_map["species"]]
         if is_blank(raw_species):
-            raise ValueError(
+            raise AppError(
+                "INVALID_FILE",
                 f"Arbol {tree_id} sin especie registrada; la identidad del "
-                f"arbol requiere especie"
+                f"arbol requiere especie",
             )
         species = str(raw_species).strip()
 

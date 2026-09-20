@@ -14,6 +14,7 @@ Contratos:
 """
 from __future__ import annotations
 
+import os
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
@@ -33,12 +34,60 @@ from agrosense.adapters.api.schemas import (
 from agrosense.adapters.db.repository import CampaignRepository, ProjectRepository
 from agrosense.adapters.ingester.excel_source import ExcelCampaignSource
 from agrosense.application.dtos import ProjectSummary, UploadResult
+from agrosense.application.errors import AppError
 from agrosense.application.use_cases.create_project import create_project
 from agrosense.application.use_cases.upload_campaign import upload_campaign
 
 router = APIRouter()
 
 SessionDep = Annotated[Session, Depends(get_session)]
+
+# Techo del cuerpo del upload (AGENTS.md: "file uploads are validated").
+# El dataset de referencia pesa ~200 KB; 10 MB deja margen de sobra para
+# proyectos mayores sin permitir que una sola request agote la RAM del
+# free tier. Las guardas de FORMATO (zip, bomba) viven en el adapter que
+# entiende el formato, no aqui.
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+_CHUNK_BYTES = 1024 * 1024
+
+# Ancho de la columna `campaign_files.filename`
+_FILENAME_MAX = 500
+
+
+def _read_capped(upload: UploadFile) -> bytes:
+    """Lee el cuerpo abortando en cuanto supera el techo.
+
+    Se lee por trozos a proposito: confiar en `Content-Length` deja que el
+    cliente mienta, y `await file.read()` sin limite era el hallazgo R4.
+    """
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = upload.file.read(_CHUNK_BYTES)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > MAX_UPLOAD_BYTES:
+            raise AppError(
+                "FILE_TOO_LARGE",
+                f"El archivo supera el limite de {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.",
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def _safe_filename(raw: str | None) -> str:
+    """Deja el nombre en algo seguro de persistir, sin perder la provenance.
+
+    Quita componentes de ruta y caracteres de control, y lo acota al ancho de
+    la columna (en Postgres un nombre mas largo seria un 500 por truncamiento).
+    No se escapa HTML: la respuesta es JSON y escapar es trabajo de quien
+    renderice.
+    """
+    name = (raw or "").replace("\\", "/")
+    name = os.path.basename(name)
+    name = "".join(ch for ch in name if ch.isprintable())
+    return name.strip()[:_FILENAME_MAX] or "upload.xlsx"
 
 
 # ── Mapeo DTO de application/ -> schema del contrato (ADR-003) ─────────────
@@ -115,18 +164,26 @@ def get_project_endpoint(project_id: int, session: SessionDep) -> ProjectRespons
     response_model=UploadResultResponse,
     status_code=201,
 )
-async def upload_campaign_endpoint(
+def upload_campaign_endpoint(
     project_id: int,
     file: UploadFile,
     session: SessionDep,
 ) -> UploadResultResponse:
-    content = await file.read()
+    """Sube una campaña de monitoreo.
+
+    Es `def` y no `async def` a propósito (hallazgo R3): el parseo y las
+    escrituras son bloqueantes y duran decenas de segundos. FastAPI solo
+    despacha al threadpool los endpoints síncronos; como corrutina, este
+    trabajo congelaba el event loop y el worker dejaba de atender cualquier
+    otra request. Es la tercera lección de v1 en AGENTS.md.
+    """
     proj_repo = ProjectRepository(session)
     camp_repo = CampaignRepository(session)
     try:
+        content = _read_capped(file)
         dto = upload_campaign(
             project_id=project_id,
-            filename=file.filename or "upload.xlsx",
+            filename=_safe_filename(file.filename),
             content=content,
             project_repo=proj_repo,
             campaign_repo=camp_repo,

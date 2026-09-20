@@ -90,3 +90,24 @@ class CensusGapWarning(Exception):
             f"Arbol {tree_id} con censo no contiguo: {sorted(campaigns)} "
             f"(se salto campanas entre el primer y ultimo censo)"
         )
+
+
+class TreeIdentityMismatchError(DomainError):
+    """Un tree_id cambia un atributo de IDENTIDAD entre cargas.
+
+    docs/02-domain.md §2.4: un tree_id no puede cambiar de especie, parcela
+    ni coordenadas — es la coherencia de identificacion de campo. Si el
+    archivo corregido dice otra cosa, o el archivo esta mal o el ID se
+    reutilizo para otro individuo; en ambos casos hay que mirarlo, no
+    sobrescribir.
+
+    Para la ESPECIE existe SPECIES_MISMATCH, que ya esta en el contrato.
+    """
+
+    def __init__(self, tree_id: str, field: str, stored, incoming):
+        super().__init__(
+            "TREE_IDENTITY_MISMATCH",
+            f"Arbol {tree_id}: {field} cambia de {stored!r} a {incoming!r} "
+            f"respecto a lo ya cargado. La identidad del arbol no cambia entre "
+            f"campanas; revise el archivo o el identificador.",
+        )

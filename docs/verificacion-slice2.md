@@ -140,3 +140,91 @@ mover la ingesta a job asíncrono vía ADR-005).
 `AGENTS.md` pide errores accionables para un ingeniero de campo. Los errores
 que nacen en las routes sí lo cumplen (`"Proyecto 999999 no existe"`); los que
 nacen como `ValueError(codigo)` en repos y use cases, no. Registrado como **#H**.
+
+---
+
+# Segunda verificación — corrección de los bloqueantes R1-R5
+
+Ejecutada el **2026-09-20**, tras la corrección de los bloqueantes que el gate
+de fase 7 encontró (`docs/revision-slice2.md`). Misma regla: ninguna
+afirmación sin el comando corrido.
+
+## Gates
+
+```
+ruff check src tests                      -> All checks passed
+pytest                                    -> 166 passed, 4 deselected (81s, sin red)
+pytest -m supabase                        -> 4 passed (26s, Supabase real)
+pip-audit -r requirements.lock.txt        -> No known vulnerabilities found (64 paquetes)
+pip wheel .                               -> agrosense-0.1.0-py3-none-any.whl
+alembic check                             -> No new upgrade operations detected
+```
+
+Los 13 tests nuevos de regresión se verificaron en rojo-verde: al revertir los
+seis arreglos en una copia, **8 tests fallan**; al restaurarlos, vuelven a
+pasar. Un test verde que no falla sin su arreglo no protege nada — así se
+descubrió que el test de bomba zip de la primera pasada pasaba por un motivo
+equivocado.
+
+## E2E contra Supabase real
+
+```
+R1 — ciclo de corrección
+  primer upload                       201   81.3s   trees=856
+  mismo archivo (mismo sha)           409    4.8s   DUPLICATE_FILE
+  archivo corregido (sha distinto)    201    7.4s   trees=856
+  campañas del proyecto                 2
+  árboles (sin duplicar)              856
+
+R1 — identidad divergente se rechaza
+  archivo que cambia la especie       422    3.7s   SPECIES_MISMATCH
+  campañas tras el rechazo              2           (no se creó ninguna)
+
+R2 — el filename no elige el status
+  bad.xlsx                            400   INVALID_FILE
+  PROJECT_NOT_FOUND.xlsx              400   INVALID_FILE
+  DUPLICATE_FILE.xlsx                 400   INVALID_FILE
+  mensaje: "No se pudo leer el archivo como Excel. Verifique que sea un .xlsx…"
+
+R4 — se acota el coste, no solo el contenedor
+  hoja de 12M celdas en 4.865 bytes   400    3.2s   INVALID_FILE
+  cuerpo de 11 MB (techo 10 MB)       413    0.006s FILE_TOO_LARGE
+```
+
+El 413 en 6 milisegundos es la prueba de que el middleware corta por
+`Content-Length` antes de que el parser de multipart escriba nada a disco: en
+la implementación anterior el techo se aplicaba después de recibir el cuerpo
+entero.
+
+## Dos mediciones que corrigen afirmaciones anteriores
+
+**El primer upload sigue en ~81s.** La hipótesis de que quitar
+`return_defaults=True` atacaba la causa de #G era falsa: el primer upload no se
+movió (79.7s → 78.6s → 81.3s, dentro del ruido de red). Lo que sí baja es la
+re-subida, a ~5-7s, porque ya no inserta árboles. #G sigue abierto y su
+diagnóstico está corregido en `docs/deuda-tecnica.md`.
+
+**La primera versión de la guarda de hoja costaba más que el parseo.**
+`load_workbook(read_only=True)` + `ws.max_row` tardaba **1.36s** sobre el
+dataset real, contra **1.19s** del `pd.read_excel` que protegía. Se reescribió
+para leer el elemento `<dimension>` directamente de la cabecera del XML:
+**0.016s**, 85x más rápido. Una guarda que cuesta más que lo que protege no es
+una guarda.
+
+## Tercera pasada y cierre
+
+La revisión acotada final derribó la guarda de coste de R4 (validaba una
+declaración que pandas ignora). Se sustituyó `pd.read_excel` por un lector que
+cuenta celdas mientras las materializa. Cifras finales:
+
+```
+ruff check src tests                → All checks passed
+pytest                              → 169 passed, 4 deselected (25s)
+pytest -m supabase                  → 4 passed (19s)
+pip-audit -r requirements.lock.txt  → No known vulnerabilities found
+pip wheel .                         → agrosense-0.1.0-py3-none-any.whl
+alembic check                       → No new upgrade operations detected
+```
+
+El dataset de referencia sigue dando **856 / 3146 / 340 / 19 warnings**,
+idéntico al E2E del slice 1, y ahora en 0.39s en vez de 1.19s.

@@ -16,8 +16,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 
-@pytest.fixture()
-def client():
+def _build_client(raise_server_exceptions: bool):
     from agrosense.adapters.api.app import create_app
     from agrosense.adapters.api.deps import get_session
     from agrosense.adapters.db.models import Base
@@ -40,6 +39,19 @@ def client():
             s.close()
 
     app.dependency_overrides[get_session] = _override
+    return TestClient(app, raise_server_exceptions=raise_server_exceptions)
 
-    with TestClient(app, raise_server_exceptions=True) as c:
+
+@pytest.fixture()
+def client():
+    with _build_client(raise_server_exceptions=True) as c:
+        yield c
+
+
+@pytest.fixture()
+def lenient_client():
+    """Como `client`, pero deja que el handler de 500 responda en vez de
+    re-lanzar. Necesario para verificar que una excepcion no mapeada sale
+    como {code, message} y no como stack trace."""
+    with _build_client(raise_server_exceptions=False) as c:
         yield c

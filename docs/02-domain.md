@@ -89,7 +89,14 @@ qué umbrales — parametrizable por proyecto).
 
 ## 5. Errores de dominio (mensajes accionables)
 
-- `SPECIES_MISMATCH`: árbol cambió de especie entre campañas.
+- `SPECIES_MISMATCH`: árbol cambió de especie entre campañas — o entre un
+  archivo y el que lo corrige.
+- `TREE_IDENTITY_MISMATCH`: árbol cambió de parcela o coordenadas respecto a
+  lo ya cargado. Añadido el 2026-09-20 al implementar la corrección por
+  re-subida: la invariante §2.4 ya existía, pero solo se validaba *dentro* de
+  un archivo; al permitir varias cargas por proyecto hizo falta el mismo
+  chequeo *entre* cargas. No es dominio nuevo, es la misma regla aplicada al
+  caso que el slice 2 destapó.
 - `DEATH_VIOLATION`: árbol muerto revive o crece post-mortem.
 - `NEGATIVE_MEASUREMENT`: altura/copa < 0.
 - `NON_CONTIGUOUS_CENSUS`: censo con huecos.
@@ -102,3 +109,13 @@ qué umbrales — parametrizable por proyecto).
 - Forecasts precisos por árbol (señal insuficiente, ver discovery §6).
 - Edición de datos cargados: el dataset crudo es inmutable; los errores
   se corrigen re-subiendo la campaña (auditable).
+
+  **Semántica de la re-subida** (decidida el 2026-09-20, ver
+  `docs/revision-slice2.md` #R1):
+  - mismo archivo (mismo SHA-256) → se rechaza, no se crea campaña;
+  - archivo distinto → campaña **nueva**; la anterior no se toca ni se borra;
+  - los **valores** de las observaciones se corrigen: manda el más reciente;
+  - los atributos **descriptivos** del árbol (familia, nombre común, gremio,
+    localidad, elevación) también se corrigen;
+  - los atributos de **identidad** (especie, parcela, coordenadas) **no** se
+    corrigen: divergir es un error de dominio y rechaza la carga entera.

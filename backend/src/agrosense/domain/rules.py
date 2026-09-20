@@ -7,8 +7,10 @@ from agrosense.domain.entities import Observation, Tree
 from agrosense.domain.errors import (
     CensusGapWarning,
     DeathViolationError,
+    SpeciesMismatchError,
     SuspiciousContractionWarning,
     SuspiciousRevivalWarning,
+    TreeIdentityMismatchError,
 )
 
 STAGNATION_THRESHOLD_M = 0.05
@@ -97,3 +99,32 @@ def _revives_later(
         if later.campaign > obs.campaign and later.alive:
             return True
     return False
+
+
+# Atributos que FIJAN la identidad del arbol (docs/02-domain.md §2.4).
+# El resto (familia, nombre comun, gremio, localidad, elevacion) son
+# descriptivos: se corrigen con el archivo mas reciente.
+IDENTITY_FIELDS = ("plot_id", "coord_x", "coord_y")
+
+
+def validate_tree_identity(stored, incoming: Tree) -> None:
+    """Compara un arbol ya persistido con el que trae una carga nueva.
+
+    `stored` solo necesita exponer los atributos por nombre, asi que sirve
+    tanto una entidad de dominio como una fila del ORM: el dominio no
+    aprende nada de la persistencia.
+
+    Raises:
+        SpeciesMismatchError: si cambia la especie.
+        TreeIdentityMismatchError: si cambia parcela o coordenadas.
+    """
+    if stored.species != incoming.species:
+        raise SpeciesMismatchError(
+            tree_id=incoming.tree_id, found=incoming.species, expected=stored.species
+        )
+
+    for field in IDENTITY_FIELDS:
+        antes = getattr(stored, field)
+        ahora = getattr(incoming, field)
+        if antes != ahora:
+            raise TreeIdentityMismatchError(incoming.tree_id, field, antes, ahora)
