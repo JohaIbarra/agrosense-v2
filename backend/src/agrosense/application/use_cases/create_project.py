@@ -1,9 +1,11 @@
-"""UC1: Crear proyecto de restauración.
+"""UC1: Crear proyecto de restauracion.
 
-application/ orquesta dominio + repos sin tocar HTTP ni SQL directamente.
-El caller (API route) es responsable de mapear errores al protocolo HTTP.
+application/ orquesta dominio + repos sin tocar HTTP ni SQL. Devuelve un
+DTO propio (ADR-003): el mapeo a la respuesta HTTP es trabajo del adapter.
 """
-from agrosense.adapters.api.schemas import ProjectResponse
+from __future__ import annotations
+
+from agrosense.application.dtos import ProjectSummary
 
 
 def create_project(
@@ -11,14 +13,14 @@ def create_project(
     name: str,
     locality: str | None,
     description: str | None,
-) -> ProjectResponse:
-    """Registra un nuevo proyecto de restauración.
+) -> ProjectSummary:
+    """Registra un nuevo proyecto de restauracion.
 
     Raises:
         ValueError("DUPLICATE_NAME"): si ya existe un proyecto con ese nombre.
     """
     proj = repo.create(name=name, locality=locality, description=description)
-    return ProjectResponse(
+    return ProjectSummary(
         id=proj.id,
         name=proj.name,
         locality=proj.locality,

@@ -28,8 +28,11 @@ from agrosense.adapters.api.schemas import (
     ProjectResponse,
     TreeRowResponse,
     UploadResultResponse,
+    WarningItem,
 )
 from agrosense.adapters.db.repository import CampaignRepository, ProjectRepository
+from agrosense.adapters.ingester.excel_source import ExcelCampaignSource
+from agrosense.application.dtos import ProjectSummary, UploadResult
 from agrosense.application.use_cases.create_project import create_project
 from agrosense.application.use_cases.upload_campaign import upload_campaign
 
@@ -38,13 +41,42 @@ router = APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 
 
+# ── Mapeo DTO de application/ -> schema del contrato (ADR-003) ─────────────
+# El use case no conoce estos schemas; traducir es trabajo del adapter.
+
+def _to_project_response(dto: ProjectSummary) -> ProjectResponse:
+    return ProjectResponse(
+        id=dto.id,
+        name=dto.name,
+        locality=dto.locality,
+        description=dto.description,
+        created_at=dto.created_at,
+        campaigns_count=dto.campaigns_count,
+    )
+
+
+def _to_upload_response(dto: UploadResult) -> UploadResultResponse:
+    return UploadResultResponse(
+        valid=dto.valid,
+        campaign_id=dto.campaign_id,
+        trees=dto.trees,
+        observations=dto.observations,
+        deaths=dto.deaths,
+        warnings=[
+            WarningItem(type=w.type, tree_id=w.tree_id, message=w.message)
+            for w in dto.warnings
+        ],
+        errors=[],
+    )
+
+
 # ── UC1: Crear proyecto ────────────────────────────────────────────────────
 
 @router.post("/projects", response_model=ProjectResponse, status_code=201)
 def create_project_endpoint(body: ProjectCreate, session: SessionDep) -> ProjectResponse:
     repo = ProjectRepository(session)
     try:
-        return create_project(
+        dto = create_project(
             repo=repo,
             name=body.name,
             locality=body.locality,
@@ -52,6 +84,7 @@ def create_project_endpoint(body: ProjectCreate, session: SessionDep) -> Project
         )
     except ValueError as exc:
         raise_for_value_error(exc)
+    return _to_project_response(dto)
 
 
 # ── Leer proyecto ──────────────────────────────────────────────────────────
@@ -91,16 +124,18 @@ async def upload_campaign_endpoint(
     proj_repo = ProjectRepository(session)
     camp_repo = CampaignRepository(session)
     try:
-        return upload_campaign(
+        dto = upload_campaign(
             project_id=project_id,
             filename=file.filename or "upload.xlsx",
             content=content,
             project_repo=proj_repo,
             campaign_repo=camp_repo,
+            source=ExcelCampaignSource(),
         )
     except ValueError as exc:
         raise_for_value_error(exc)
     # DomainError sube al handler global registrado en app.py → 422
+    return _to_upload_response(dto)
 
 
 # ── Listar campañas ────────────────────────────────────────────────────────

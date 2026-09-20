@@ -1,138 +1,246 @@
-"""Tests de repositorios contra Supabase REAL (integration).
+"""Tests de repositorios contra SQLite local (fixture `session`).
 
-Cada test limpia lo que crea (DELETE por name/unique conocido).
-Requiere .env con DATABASE_URL — skip con mensaje claro si falta.
+Corren SIEMPRE, en cada `pytest`: no dependen de DATABASE_URL ni de la red.
+El equivalente contra Postgres real es `tests/smoke/test_supabase_smoke.py`
+(marcado `supabase`), que verifica lo unico que SQLite no puede: que la
+migracion aplicada en Supabase coincide con estos models.
 """
-import os
+from pathlib import Path
 
 import pytest
 
-from agrosense.adapters.db.models import ObservationRow, Project, TreeRow
+from agrosense.adapters.db.models import CampaignFile, ObservationRow, TreeRow
 from agrosense.adapters.db.repository import CampaignRepository, ProjectRepository
+from agrosense.application.dtos import CampaignData
+from agrosense.domain.entities import Observation, StatusSemantic, Tree
 
-pytestmark = pytest.mark.skipif(
-    not os.environ.get("DATABASE_URL"),
-    reason="DATABASE_URL ausente (backend/.env)",
-)
-
-
-@pytest.fixture()
-def session():
-    from agrosense.adapters.db.session import get_session_factory
-
-    factory = get_session_factory()
-    s = factory()
-    yield s
-    s.rollback()
-    s.close()
+DATASET = Path(__file__).parents[2] / "data" / "raw" / "anexo1.xlsx"
 
 
-@pytest.fixture()
-def cleanup_project(session):
-    """Garantiza que el proyecto de test no sobrevive al test."""
-    name = "repo-test-project"
-    yield name
-    proj = session.query(Project).filter_by(name=name).first()
-    if proj:
-        session.delete(proj)
-        session.commit()
+def sample_campaign() -> CampaignData:
+    """Campana minima: 2 arboles, 3 observaciones, 1 muerte."""
+
+    def obs(tree_id: str, campaign: int, alive: bool) -> Observation:
+        return Observation(
+            tree_id=tree_id,
+            campaign=campaign,
+            height_m=1.2,
+            crown_diameter_m=0.8,
+            dap_cm=None,
+            dap_status=StatusSemantic.BAJO_UMBRAL_DAP,
+            phytosanitary="Sano",
+            alive=alive,
+            colonization=None,
+        )
+
+    return CampaignData(
+        trees=[
+            Tree(tree_id="T1", species="Cedrela odorata", locality="Guayabal"),
+            Tree(tree_id="T2", species="Inga edulis", locality="Guayabal"),
+        ],
+        observations=[obs("T1", 1, True), obs("T1", 2, True), obs("T2", 1, False)],
+        warnings=[],
+        mapping_version="test-1",
+    )
 
 
 class TestProjectRepository:
-    def test_create_and_get(self, session, cleanup_project):
+    def test_create_and_get(self, session):
         repo = ProjectRepository(session)
-        p = repo.create(name=cleanup_project, locality="Guayabal", description=None)
+        p = repo.create(name="repo-test-project", locality="Guayabal", description=None)
         assert p.id > 0
-        assert p.name == cleanup_project
+        assert p.name == "repo-test-project"
 
         fetched = repo.get(p.id)
         assert fetched is not None
         assert fetched.locality == "Guayabal"
 
-    def test_duplicate_name_rejected(self, session, cleanup_project):
+    def test_duplicate_name_rejected(self, session):
         repo = ProjectRepository(session)
-        repo.create(name=cleanup_project, locality=None, description=None)
+        repo.create(name="repo-test-project", locality=None, description=None)
         with pytest.raises(ValueError, match="DUPLICATE_NAME"):
-            repo.create(name=cleanup_project, locality=None, description=None)
+            repo.create(name="repo-test-project", locality=None, description=None)
 
-    def test_list_all_contains_created(self, session, cleanup_project):
+    def test_list_all_contains_created(self, session):
         repo = ProjectRepository(session)
-        repo.create(name=cleanup_project, locality=None, description=None)
+        repo.create(name="repo-test-project", locality=None, description=None)
         names = [p.name for p in repo.list_all()]
-        assert cleanup_project in names
+        assert "repo-test-project" in names
 
     def test_get_missing_returns_none(self, session):
         repo = ProjectRepository(session)
         assert repo.get(999_999_999) is None
 
+    def test_campaigns_count_starts_at_zero(self, session):
+        repo = ProjectRepository(session)
+        p = repo.create(name="sin-campanas", locality=None, description=None)
+        assert repo.campaigns_count(p.id) == 0
 
-class TestCampaignRepository:
-    def test_save_ingest_real_dataset(self, session):
-        """Ingesta el dataset de referencia COMPLETO en un proyecto de test."""
-        from pathlib import Path
+
+class TestCampaignRepositoryReads:
+    """Lecturas que alimentan los GET del contrato (UC3 / UC7)."""
+
+    @pytest.fixture()
+    def project_with_campaign(self, session):
+        prepo = ProjectRepository(session)
+        proj = prepo.create(name="lecturas", locality=None, description=None)
+        CampaignRepository(session).save_ingest(
+            project_id=proj.id,
+            result=sample_campaign(),
+            filename="m1.xlsx",
+            sha256="c" * 64,
+        )
+        return proj
+
+    def test_get_campaigns_returns_provenance(self, session, project_with_campaign):
+        repo = ProjectRepository(session)
+        campaigns = repo.get_campaigns(project_with_campaign.id)
+        assert len(campaigns) == 1
+        assert campaigns[0].filename == "m1.xlsx"
+        assert campaigns[0].sha256 == "c" * 64
+        assert campaigns[0].mapping_version == "test-1"
+
+    def test_get_trees_is_paginated(self, session, project_with_campaign):
+        repo = ProjectRepository(session)
+        assert len(repo.get_trees(project_with_campaign.id)) == 2
+        assert len(repo.get_trees(project_with_campaign.id, limit=1)) == 1
+        assert len(repo.get_trees(project_with_campaign.id, limit=1, offset=1)) == 1
+        assert repo.get_trees(project_with_campaign.id, offset=99) == []
+
+    def test_get_observations_ordered_by_campaign(self, session, project_with_campaign):
+        repo = ProjectRepository(session)
+        tree = next(
+            t for t in repo.get_trees(project_with_campaign.id) if t.tree_id == "T1"
+        )
+        obs = repo.get_observations(tree.id)
+        assert [o.campaign for o in obs] == [1, 2]
+
+    def test_get_tree_row_is_scoped_to_project(self, session, project_with_campaign):
+        """Un arbol de otro proyecto no se puede leer por id (aislamiento)."""
+        repo = ProjectRepository(session)
+        tree = repo.get_trees(project_with_campaign.id)[0]
+        other = repo.create(name="otro", locality=None, description=None)
+        assert repo.get_tree_row(project_with_campaign.id, tree.id) is not None
+        assert repo.get_tree_row(other.id, tree.id) is None
+
+
+class TestCampaignRepositoryWrites:
+    def test_save_ingest_persists_trees_and_observations(self, session):
+        prepo = ProjectRepository(session)
+        proj = prepo.create(name="escritura", locality=None, description=None)
+
+        stats = CampaignRepository(session).save_ingest(
+            project_id=proj.id,
+            result=sample_campaign(),
+            filename="m1.xlsx",
+            sha256="d" * 64,
+        )
+        assert stats["trees"] == 2
+        assert stats["observations"] == 3
+        assert stats["deaths"] == 1
+        assert stats["campaign_id"] is not None
+
+        assert session.query(TreeRow).filter_by(project_id=proj.id).count() == 2
+        assert (
+            session.query(ObservationRow).join(TreeRow).filter(
+                TreeRow.project_id == proj.id
+            ).count()
+            == 3
+        )
+
+    def test_duplicate_sha_rejected(self, session):
+        """Provenance: el mismo archivo no se ingesta dos veces al proyecto."""
+        prepo = ProjectRepository(session)
+        proj = prepo.create(name="repo-test-dup", locality=None, description=None)
+        crepo = CampaignRepository(session)
+
+        crepo.save_ingest(proj.id, sample_campaign(), "f.xlsx", "b" * 64)
+        with pytest.raises(ValueError, match="DUPLICATE_FILE"):
+            crepo.save_ingest(proj.id, sample_campaign(), "f.xlsx", "b" * 64)
+
+    def test_same_sha_allowed_in_another_project(self, session):
+        """El unique es (project_id, sha256): otro proyecto puede subir el mismo archivo."""
+        prepo = ProjectRepository(session)
+        a = prepo.create(name="proy-a", locality=None, description=None)
+        b = prepo.create(name="proy-b", locality=None, description=None)
+        crepo = CampaignRepository(session)
+
+        crepo.save_ingest(a.id, sample_campaign(), "f.xlsx", "e" * 64)
+        stats = crepo.save_ingest(b.id, sample_campaign(), "f.xlsx", "e" * 64)
+        assert stats["trees"] == 2
+
+    def test_deleting_project_cascades(self, session):
+        """Sin huerfanos: borrar el proyecto se lleva arboles y observaciones."""
+        prepo = ProjectRepository(session)
+        proj = prepo.create(name="cascada", locality=None, description=None)
+        CampaignRepository(session).save_ingest(
+            proj.id, sample_campaign(), "f.xlsx", "f" * 64
+        )
+
+        session.delete(proj)
+        session.commit()
+
+        assert session.query(TreeRow).count() == 0
+        assert session.query(ObservationRow).count() == 0
+        assert session.query(CampaignFile).count() == 0
+
+    def test_save_ingest_of_real_dataset(self, session):
+        """Dataset de referencia completo: 856 arboles, 3146 observaciones."""
+        if not DATASET.exists():
+            pytest.skip("dataset de referencia local ausente")
 
         import pandas as pd
 
         from agrosense.adapters.ingester.ingest import ingest_wide
 
-        ref = Path(__file__).parents[2] / "data" / "raw" / "anexo1.xlsx"
-        if not ref.exists():
-            pytest.skip("dataset de referencia local ausente")
-
         prepo = ProjectRepository(session)
-        # idempotente: si un run anterior se interrumpio antes del cleanup
-        old = session.query(Project).filter_by(name="repo-test-campaign-full").first()
-        if old:
-            session.delete(old)
-            session.commit()
-        proj = prepo.create(name="repo-test-campaign-full", locality=None, description=None)
-        try:
-            df = pd.read_excel(ref, sheet_name="Monitoreo_4")
-            result = ingest_wide(df)
+        proj = prepo.create(name="dataset-real", locality=None, description=None)
+        result = ingest_wide(pd.read_excel(DATASET, sheet_name="Monitoreo_4"))
 
-            crepo = CampaignRepository(session)
-            stats = crepo.save_ingest(
-                project_id=proj.id,
-                result=result,
-                filename="anexo1.xlsx",
-                sha256="a" * 64,  # sha de test
-            )
-            assert stats["trees"] == 856
-            assert stats["observations"] == 3146
-            assert stats["deaths"] == 340
+        stats = CampaignRepository(session).save_ingest(
+            project_id=proj.id,
+            result=result,
+            filename="anexo1.xlsx",
+            sha256="a" * 64,
+        )
+        assert stats["trees"] == 856
+        assert stats["observations"] == 3146
+        assert stats["deaths"] == 340
 
-            # persistencia real verificable
-            n_trees = session.query(TreeRow).filter_by(project_id=proj.id).count()
-            n_obs = (
-                session.query(ObservationRow)
-                .join(TreeRow)
-                .filter(TreeRow.project_id == proj.id)
-                .count()
-            )
-            assert n_trees == 856
-            assert n_obs == 3146
-        finally:
-            session.delete(proj)  # cascade limpia trees/observations
-            session.commit()
+        assert session.query(TreeRow).filter_by(project_id=proj.id).count() == 856
+        assert (
+            session.query(ObservationRow).join(TreeRow).filter(
+                TreeRow.project_id == proj.id
+            ).count()
+            == 3146
+        )
 
-    def test_duplicate_sha_rejected(self, session):
-        """Provenance: el mismo archivo no se ingesta dos veces al proyecto."""
-        from agrosense.adapters.ingester.ingest import IngestResult
-        from agrosense.domain.entities import Tree
-
+    def test_failed_ingest_leaves_nothing_behind(self, session):
+        """ADR-004: sin persistencia parcial. Si la escritura falla, rollback total."""
         prepo = ProjectRepository(session)
-        proj = prepo.create(name="repo-test-dup", locality=None, description=None)
-        try:
-            result = IngestResult(
-                trees=[Tree(tree_id="T1", species="S")],
-                observations=[],
-                warnings=[],
-                mapping_version="test",
+        proj = prepo.create(name="atomico", locality=None, description=None)
+
+        data = sample_campaign()
+        # Observacion que apunta a un arbol inexistente: revienta a mitad del guardado
+        data.observations.append(
+            Observation(
+                tree_id="FANTASMA",
+                campaign=1,
+                height_m=1.0,
+                crown_diameter_m=None,
+                dap_cm=None,
+                dap_status=StatusSemantic.SIN_CENSO,
+                phytosanitary=None,
+                alive=True,
+                colonization=None,
             )
-            crepo = CampaignRepository(session)
-            crepo.save_ingest(proj.id, result, "f.xlsx", "b" * 64)
-            with pytest.raises(ValueError, match="DUPLICATE_FILE"):
-                crepo.save_ingest(proj.id, result, "f.xlsx", "b" * 64)
-        finally:
-            session.delete(proj)
-            session.commit()
+        )
+
+        with pytest.raises(Exception):
+            CampaignRepository(session).save_ingest(
+                proj.id, data, "roto.xlsx", "9" * 64
+            )
+
+        assert session.query(TreeRow).filter_by(project_id=proj.id).count() == 0
+        assert session.query(ObservationRow).count() == 0
+        assert session.query(CampaignFile).count() == 0

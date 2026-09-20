@@ -7,6 +7,14 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+# Semantica explicita en el OpenAPI: el frontend y el modelo de mortalidad
+# consumen este numero y no significa lo que el nombre sugiere.
+_DEATHS_DESC = (
+    "Registros de observación con estado muerto en la campaña. NO es el número de "
+    "árboles muertos distintos: un árbol que muere en M2 aporta un registro por cada "
+    "campaña posterior. Para mortalidad por árbol ver docs/deuda-tecnica.md #F."
+)
+
 # ── UC1: proyectos ─────────────────────────────────────────────
 
 
@@ -46,7 +54,7 @@ class UploadResultResponse(BaseModel):
     campaign_id: int | None
     trees: int
     observations: int
-    deaths: int
+    deaths: int = Field(description=_DEATHS_DESC)
     warnings: list[WarningItem]
     errors: list[ErrorItem]
 
@@ -59,7 +67,7 @@ class CampaignResponse(BaseModel):
     ingested_at: datetime
     trees: int
     observations: int
-    deaths: int
+    deaths: int = Field(description=_DEATHS_DESC)
 
 
 class TreeRowResponse(BaseModel):

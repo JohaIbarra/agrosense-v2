@@ -13,7 +13,7 @@ from agrosense.adapters.db.models import (
     Project,
     TreeRow,
 )
-from agrosense.adapters.ingester.ingest import IngestResult
+from agrosense.application.dtos import CampaignData
 
 
 class ProjectRepository:
@@ -89,11 +89,11 @@ class CampaignRepository:
     def save_ingest(
         self,
         project_id: int,
-        result: IngestResult,
+        result: CampaignData,
         filename: str,
         sha256: str,
     ) -> dict:
-        """Persiste el IngestResult completo en UNA transaccion.
+        """Persiste la CampaignData completa en UNA transaccion.
 
         Lanza ValueError('DUPLICATE_FILE') si el mismo sha256 ya fue
         ingresado al proyecto (provenance).

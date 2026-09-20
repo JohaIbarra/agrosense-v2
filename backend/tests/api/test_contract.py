@@ -6,6 +6,7 @@ forma, validaciones y tipos de error ANTES de que exista implementacion.
 import pytest
 
 from agrosense.adapters.api.schemas import (
+    CampaignResponse,
     ErrorItem,
     ProjectCreate,
     ProjectResponse,
@@ -92,3 +93,16 @@ def test_upload_result_invalid_shape():
     )
     assert r.valid is False
     assert r.errors[0].code == "DEATH_VIOLATION"
+
+
+def test_deaths_semantics_are_documented_in_the_contract():
+    """Hallazgo F: `deaths` cuenta observaciones, no árboles distintos.
+
+    El nombre es ambiguo y el frontend (y la épica de mortalidad) consumen
+    el número desde el OpenAPI: la semántica viaja en el contrato, no en un
+    comentario del backend.
+    """
+    for model in (UploadResultResponse, CampaignResponse):
+        desc = model.model_fields["deaths"].description
+        assert desc, f"{model.__name__}.deaths sin descripción en el OpenAPI"
+        assert "NO es el número de árboles muertos distintos" in desc

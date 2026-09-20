@@ -11,7 +11,7 @@ dependencies = [
     "uvicorn[standard]==0.30.6",
     "sqlalchemy==2.0.35",
     "alembic==1.13.3",
-    "psycopg2-binary==2.9.9",
+    "psycopg[binary]==3.2.3",
     "python-multipart==0.0.9",
     "python-dotenv==1.0.1",
 ]
@@ -33,6 +33,12 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+# La corrida por defecto es local y offline: SQLite en memoria.
+# El smoke contra Supabase se pide a proposito con `pytest -m supabase`.
+addopts = ["-m", "not supabase", "--strict-markers"]
+markers = [
+    "supabase: toca la instancia real de Supabase (requiere DATABASE_URL y red). Excluido por defecto.",
+]
 
 [tool.ruff]
 line-length = 100

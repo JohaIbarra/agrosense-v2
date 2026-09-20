@@ -1,57 +1,46 @@
-"""UC2: Cargar campaña de monitoreo (archivo Excel) a un proyecto.
+"""UC2: Cargar campana de monitoreo a un proyecto.
 
 Flujo:
-    1. Verificar que el proyecto exista.
-    2. Calcular sha256 del archivo (provenance).
-    3. Leer el Excel con pandas (solo la hoja Monitoreo_4).
-    4. Transformar ancho → long + validar invariantes de dominio (ingest_wide).
-    5. Persistir vía campaign_repo (transaccional — sin persistencia parcial).
-    6. Mapear warnings del ingester al schema WarningItem del contrato.
-    7. Devolver UploadResultResponse.
+    1. Verificar que el proyecto exista (antes de leer nada).
+    2. Calcular sha256 del archivo crudo (provenance, AGENTS.md).
+    3. Delegar el parseo al puerto CampaignSource -> CampaignData.
+    4. Persistir via campaign_repo (transaccional, sin persistencia parcial).
+    5. Mapear los warnings de dominio al DTO de aplicacion.
 
-El caller (API route) mapea ValueError y DomainError a respuestas HTTP.
-Esta capa no importa fastapi ni sqlalchemy.
+Esta capa no sabe de Excel, HTTP ni SQL: recibe el parser como puerto y
+los repos por parametro. El caller mapea ValueError y DomainError al
+protocolo que corresponda.
 """
 from __future__ import annotations
 
 import hashlib
-import io
 
-import pandas as pd
-
-from agrosense.adapters.api.schemas import UploadResultResponse, WarningItem
-from agrosense.adapters.ingester.ingest import ingest_wide
+from agrosense.application.dtos import UploadResult, WarningDTO
+from agrosense.application.ports import CampaignSource
 from agrosense.domain.errors import (
     CensusGapWarning,
     SuspiciousContractionWarning,
     SuspiciousRevivalWarning,
 )
 
-# Hoja del dataset de campo (ADR-004 + AGENTS.md)
-_SHEET_NAME = "Monitoreo_4"
+# Vocabulario estable del contrato (schemas.WarningItem.type)
+_WARNING_TYPES: tuple[tuple[type[Exception], str], ...] = (
+    (SuspiciousContractionWarning, "contraction"),
+    (SuspiciousRevivalWarning, "revival"),
+    (CensusGapWarning, "census_gap"),
+)
 
 
-def _map_warning(w) -> WarningItem:
-    """Convierte los 3 tipos de DomainWarning al WarningItem del contrato."""
-    if isinstance(w, SuspiciousContractionWarning):
-        return WarningItem(
-            type="contraction",
-            tree_id=w.tree_id,
-            message=str(w),
-        )
-    if isinstance(w, SuspiciousRevivalWarning):
-        return WarningItem(
-            type="revival",
-            tree_id=w.tree_id,
-            message=str(w),
-        )
-    if isinstance(w, CensusGapWarning):
-        return WarningItem(
-            type="census_gap",
-            tree_id=w.tree_id,
-            message=str(w),
-        )
-    # Tipo de warning desconocido — no silenciar, no exponer internals
+def _map_warning(w: Exception) -> WarningDTO:
+    """Convierte un warning de dominio al DTO del contrato."""
+    for warning_cls, type_name in _WARNING_TYPES:
+        if isinstance(w, warning_cls):
+            return WarningDTO(
+                type=type_name,
+                tree_id=getattr(w, "tree_id", ""),
+                message=str(w),
+            )
+    # Tipo desconocido: no se silencia y no se filtra el internals al usuario
     raise ValueError(f"Tipo de warning no reconocido: {type(w).__name__}")
 
 
@@ -61,50 +50,40 @@ def upload_campaign(
     content: bytes,
     project_repo,
     campaign_repo,
-) -> UploadResultResponse:
-    """Sube y valida una campaña de monitoreo a un proyecto existente.
+    source: CampaignSource,
+) -> UploadResult:
+    """Sube y valida una campana de monitoreo a un proyecto existente.
 
     Raises:
         ValueError("PROJECT_NOT_FOUND"): si el project_id no existe.
-        ValueError("INVALID_FILE"): si los bytes no son un Excel legible.
+        ValueError("INVALID_FILE"): si el source no puede leer el archivo.
         ValueError("DUPLICATE_FILE"): si ese archivo ya fue ingresado.
-        DomainError: si algún invariante de dominio falla (el caller HTTP lo mapea a 422).
+        DomainError: si un invariante de dominio falla (el caller lo mapea).
     """
-    # 1. Verificar proyecto
-    project = project_repo.get(project_id)
-    if project is None:
+    # 1. Proyecto primero: no se parsea un archivo que no tiene donde ir
+    if project_repo.get(project_id) is None:
         raise ValueError("PROJECT_NOT_FOUND")
 
-    # 2. sha256 de provenance (antes de parsear — el hash es del archivo crudo)
+    # 2. Hash del archivo CRUDO, antes de parsear
     sha256 = hashlib.sha256(content).hexdigest()
 
-    # 3. Leer Excel
-    try:
-        df = pd.read_excel(io.BytesIO(content), sheet_name=_SHEET_NAME)
-    except Exception as exc:
-        raise ValueError(f"INVALID_FILE: no se pudo leer '{filename}' como Excel: {exc}") from exc
+    # 3. El puerto decide como leerlo (DomainError sube sin envolver)
+    data = source.read(content, filename)
 
-    # 4. Transformar + validar invariantes de dominio (DomainError sube sin wrap)
-    result = ingest_wide(df)
-
-    # 5. Persistir (transaccional — ValueError("DUPLICATE_FILE") si sha256 ya existe)
+    # 4. Persistencia transaccional
     stats = campaign_repo.save_ingest(
         project_id=project_id,
-        result=result,
+        result=data,
         filename=filename,
         sha256=sha256,
     )
 
-    # 6. Mapear warnings
-    warning_items = [_map_warning(w) for w in result.warnings]
-
-    # 7. Respuesta
-    return UploadResultResponse(
+    # 5. Warnings -> DTO
+    return UploadResult(
         valid=True,
         campaign_id=stats["campaign_id"],
         trees=stats["trees"],
         observations=stats["observations"],
         deaths=stats["deaths"],
-        warnings=warning_items,
-        errors=[],
+        warnings=[_map_warning(w) for w in data.warnings],
     )
