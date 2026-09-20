@@ -87,16 +87,72 @@ un campo más al upload. La ingesta reporta lo que ingirió; la analítica calcu
 **Riesgo si se ignora:** alguien grafica "340 muertes de 856 árboles" (40%) y
 contradice el 16% del discovery en la misma pantalla.
 
+## G — El upload de una campaña tarda 79.7s contra Supabase
+
+**Estado:** deuda con gate duro. **Dueño:** fase 9 (deploy) — bloquea.
+
+Medido en la demostración de Task 6 (`docs/verificacion-slice2.md`): subir el
+dataset de referencia (856 árboles, 3146 observaciones) por la API real tardó
+**79.7s**. `docs/03-architecture.md` fija el presupuesto en **<5s para ~1k
+árboles**; son 16x.
+
+**Causa:** no es el parseo — el mismo ingest sobre SQLite corre en ~2s. Son
+~900 round-trips al session pooler, porque `bulk_save_objects(...,
+return_defaults=True)` necesita el id de cada árbol para enlazar sus
+observaciones.
+
+**Por qué no se cierra ahora:** el flujo es funcionalmente correcto y el gate
+del slice 2 es de comportamiento, no de rendimiento. Optimizar la escritura es
+un cambio con su propio ciclo TDD.
+
+**Gate para cerrarlo:** antes del deploy. Un request síncrono de 80s excede el
+timeout de proxy de la mayoría de free tiers, así que esto **rompe el producto
+desplegado**, no solo lo hace lento. Dos salidas:
+
+1. Insertar los árboles en una sola sentencia y resolver los ids con un
+   `SELECT` por `tree_id` (barato, no cambia arquitectura).
+2. Mover la ingesta a job asíncrono — es el "job queue (requisito futuro, ADR
+   nuevo)" que `docs/03-architecture.md` ya anticipó. Sería ADR-005.
+
+Empezar por (1): si baja de 5s, (2) no hace falta y el ADR no se escribe.
+
+## H — Errores cuyo mensaje es el propio código
+
+**Estado:** deuda menor. **Dueño:** cierre de la épica de UI, o antes si molesta.
+
+`AGENTS.md` pide mensajes accionables para un ingeniero de campo sin ayuda
+técnica. Se cumple a medias:
+
+```json
+{"detail": {"code": "PROJECT_NOT_FOUND", "message": "Proyecto 999999 no existe"}}   ← route, bien
+{"detail": {"code": "DUPLICATE_NAME",    "message": "DUPLICATE_NAME"}}              ← ValueError, mal
+```
+
+Los errores que nacen como `ValueError("CODIGO")` en repos y use cases llegan
+al cliente con el código repetido como mensaje. Afecta a `DUPLICATE_NAME`,
+`DUPLICATE_FILE` y al `PROJECT_NOT_FOUND` que lanza UC2.
+
+**Arreglo:** que el `ValueError` lleve el texto accionable
+(`ValueError("DUPLICATE_NAME: ya existe un proyecto llamado 'X'")`) — el mapeo
+de `errors.py` ya busca el código por prefijo, así que no hay que tocarlo.
+
 ---
 
-## Desalineaciones de documentación (pendientes, no bloquean código)
+## Desalineaciones de documentación
+
+Resueltas en el gate de Task 6 (2026-09-20):
+
+- ~~`README.md` decía "Fase 1 (Discovery) completada"~~ → estado real por slice
+  y sección "Cómo correr".
+- ~~`docs/briefing_opus.md` listaba como commiteado lo que no lo estaba~~ →
+  reescrito contra el repo real.
+
+Pendientes (no bloquean código):
 
 - `docs/superpowers/plans/2026-09-14-slice2-persistencia-api.md` dice "Neon" en
-  todo el texto; ADR-002 fue revisado a Supabase **después** de escribirlo.
-- `docs/briefing_opus.md` lista bajo "commiteado en master" archivos de la
-  Task 5 que siguen sin commitear, y reporta "92 tests en 12s" (hoy son 133
-  locales en ~45s).
-- `README.md` sigue diciendo que el estado es "Fase 1 (Discovery) completada";
-  van dos slices. Actualizarlo es parte del gate de Task 6.
+  todo el texto; ADR-002 fue revisado a Supabase **después** de escribirlo. El
+  plan ya se ejecutó, así que es un documento histórico: corregirlo reescribiría
+  el registro de lo que se decidió entonces. Se deja como está, anotado aquí.
 - `ProjectRepository.list_all()` existe sin endpoint `GET /projects` que lo
-  exponga: la futura pantalla de proyectos no tiene de dónde listar.
+  exponga: la futura pantalla de proyectos no tiene de dónde listar. Se resuelve
+  en el slice que estrene la UI de proyectos, con su test de contrato.
