@@ -7,7 +7,7 @@ import os
 
 import pytest
 
-from agrosense.adapters.db.models import Base, ObservationRow, Project, TreeRow
+from agrosense.adapters.db.models import ObservationRow, Project, TreeRow
 from agrosense.adapters.db.repository import CampaignRepository, ProjectRepository
 
 pytestmark = pytest.mark.skipif(
@@ -72,6 +72,7 @@ class TestCampaignRepository:
         from pathlib import Path
 
         import pandas as pd
+
         from agrosense.adapters.ingester.ingest import ingest_wide
 
         ref = Path(__file__).parents[2] / "data" / "raw" / "anexo1.xlsx"

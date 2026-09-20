@@ -7,7 +7,6 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-
 # ── UC1: proyectos ─────────────────────────────────────────────
 
 
@@ -64,6 +63,7 @@ class CampaignResponse(BaseModel):
 
 
 class TreeRowResponse(BaseModel):
+    id: int
     tree_id: str
     species: str
     family: str | None
@@ -71,3 +71,14 @@ class TreeRowResponse(BaseModel):
     guild: str | None
     locality: str | None
     elevation_m: float | None
+
+
+class ObservationResponse(BaseModel):
+    campaign: int
+    height_m: float | None
+    crown_diameter_m: float | None
+    dap_cm: float | None
+    dap_status: str
+    phytosanitary: str | None
+    alive: bool | None
+    colonization: str | None

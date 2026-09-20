@@ -3,7 +3,7 @@
 Derivados del dominio (docs/02-domain.md): Project 1-N CampaignFile,
 Project 1-N TreeRow, TreeRow 1-N ObservationRow.
 """
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     JSON,
@@ -11,7 +11,6 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
-    Index,
     Integer,
     String,
     Text,
@@ -25,7 +24,7 @@ class Base(DeclarativeBase):
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Project(Base):

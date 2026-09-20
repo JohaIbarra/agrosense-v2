@@ -7,7 +7,12 @@ la operacion completa.
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from agrosense.adapters.db.models import CampaignFile, ObservationRow, Project, TreeRow
+from agrosense.adapters.db.models import (
+    CampaignFile,
+    ObservationRow,
+    Project,
+    TreeRow,
+)
 from agrosense.adapters.ingester.ingest import IngestResult
 
 
@@ -34,6 +39,47 @@ class ProjectRepository:
         return self._s.execute(
             select(func.count()).where(CampaignFile.project_id == project_id)
         ).scalar_one()
+
+    def get_campaigns(self, project_id: int) -> list[CampaignFile]:
+        return list(
+            self._s.scalars(
+                select(CampaignFile)
+                .where(CampaignFile.project_id == project_id)
+                .order_by(CampaignFile.ingested_at)
+            ).all()
+        )
+
+    def get_trees(
+        self, project_id: int, limit: int = 100, offset: int = 0
+    ) -> list[TreeRow]:
+        return list(
+            self._s.scalars(
+                select(TreeRow)
+                .where(TreeRow.project_id == project_id)
+                .order_by(TreeRow.id)
+                .limit(limit)
+                .offset(offset)
+            ).all()
+        )
+
+    def get_observations(self, tree_row_id: int) -> list[ObservationRow]:
+        return list(
+            self._s.scalars(
+                select(ObservationRow)
+                .where(ObservationRow.tree_row_id == tree_row_id)
+                .order_by(ObservationRow.campaign)
+            ).all()
+        )
+
+    def get_tree_row(
+        self, project_id: int, tree_row_id: int
+    ) -> TreeRow | None:
+        return self._s.scalar(
+            select(TreeRow).where(
+                TreeRow.id == tree_row_id,
+                TreeRow.project_id == project_id,
+            )
+        )
 
 
 class CampaignRepository:
