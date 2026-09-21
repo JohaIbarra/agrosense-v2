@@ -81,3 +81,73 @@ class UploadResult:
     observations: int
     deaths: int
     warnings: list[WarningDTO] = field(default_factory=list)
+
+
+# ── Slice 5: analitica de los modelos mixtos ───────────────────────────────
+
+
+@dataclass(frozen=True)
+class RiskDTO:
+    """Efecto de un nivel (especie o parcela) sobre UN desenlace.
+
+    Todo lo que sale de aqui hacia la UI esta en escala de **odds ratio**;
+    el log-odds viaja aparte (`ci95_log_odds`) solo para trazabilidad contra
+    los CSV del modelo mixto. La regla de conversion es fija:
+    `or = exp(efecto)`, `or_lo = exp(lo)`, `or_hi = exp(hi)`.
+
+    `interpretation` es la frase que se muestra al ingeniero de campo; se
+    arma en `application/` y no en la route porque decidir que significa un
+    IC que cruza 1 es negocio, no presentacion.
+    """
+
+    odds_ratio: float | None
+    or_ci95: tuple[float, float] | None
+    ci95_log_odds: tuple[float, float] | None
+    significant: bool | None
+    interpretation: str
+
+
+@dataclass(frozen=True)
+class SpeciesAnalyticsDTO:
+    species: str
+    stall_risk: RiskDTO
+    mortality_risk: RiskDTO
+    n_observations: int | None
+    n_trees: int | None
+    gremio: str | None
+
+
+@dataclass(frozen=True)
+class PlotAnalyticsDTO:
+    plot_code: str
+    localidad: str | None
+    stall_risk: RiskDTO
+    mortality_risk: RiskDTO
+    n_trees: int | None
+
+
+@dataclass(frozen=True)
+class VarianceComponentDTO:
+    model: str
+    grouping: str
+    variance: float
+    sd: float
+    icc: float
+    n_levels: int | None
+    n_observations: int | None
+    n_events: int | None
+
+
+@dataclass(frozen=True)
+class ModelVarianceDTO:
+    """Descomposicion de UN modelo, con la lectura ya hecha.
+
+    `species_to_plot_ratio` es el numero que decide la estrategia: 2.7 en
+    estancamiento (elegir bien que plantar) frente a 1.1 en mortalidad
+    (mejorar las condiciones del sitio).
+    """
+
+    model: str
+    components: list[VarianceComponentDTO]
+    species_to_plot_ratio: float | None
+    interpretation: str

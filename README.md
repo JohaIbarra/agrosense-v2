@@ -17,12 +17,18 @@ desarrollo sigue el loop por slices verticales definido en `AGENTS.md`.
 |---|---|---|
 | 1 — Fundación de datos | ingesta ancho→long + invariantes de dominio | ✅ cerrado |
 | 2 — Persistencia + API | UC1 (crear proyecto), UC2 (cargar campaña), lecturas | ✅ verificado ([evidencia](docs/verificacion-slice2.md)) |
-| 3 — Riesgo de mortalidad | modelo + eval gate | ⬜ pendiente |
-| 4 — Estancados/anómalos | IsolationForest + regla de negocio | ⬜ pendiente |
-| 5 — Analítica por especie/sitio | dashboards | ⬜ pendiente |
+| 5 — Analítica por especie/sitio | efectos de los modelos mixtos: DB + API + dashboard | 🔄 verificado contra Supabase ([evidencia](docs/verificacion-slice5.md)); falta review |
+| 4 — Estancados/anómalos | logística + regla de negocio | ⬜ siguiente |
+| 3 — Riesgo de mortalidad | modelo + eval gate | ⬜ después del 4 |
 
-Frontend (React TS): aún no empezado. Deuda conocida en
-[`docs/deuda-tecnica.md`](docs/deuda-tecnica.md) — léelo antes de desplegar.
+> **El orden de los slices de modelo se invirtió el 2026-09-21**: estancados
+> (4) va antes que mortalidad (3). Estancamiento tiene 153 eventos positivos y
+> protocolo cerrado; mortalidad tiene 33–37 por ola (EPV 4–11). Además el
+> slice 4 **produce** `estancó_intervalo_previo`, el predictor más fuerte del
+> modelo de mortalidad (OR 2.92 / 1.70). El 4 alimenta al 3, no al revés.
+
+Deuda conocida en [`docs/deuda-tecnica.md`](docs/deuda-tecnica.md) — léelo
+antes de desplegar.
 
 ## Cómo correr
 
@@ -83,6 +89,39 @@ curl http://127.0.0.1:8000/projects/1/trees/1/observations
 > El upload del dataset de referencia tarda ~80s contra una DB remota. Es
 > deuda conocida (#G) y **bloquea el deploy**, no el desarrollo local.
 
+### Analítica de crecimiento (slice 5)
+
+Publica los efectos por especie y parcela de los modelos mixtos
+(`lme4::glmer`) ya ajustados. **No entrena nada**: los CSV de
+`backend/data/processed/` son la fuente de verdad.
+
+```bash
+cd backend
+alembic upgrade head
+python scripts/load_analytics.py --dry-run   # valida sin escribir
+python scripts/load_analytics.py             # carga idempotente
+
+curl http://127.0.0.1:8000/api/v1/analytics/variance-decomposition
+curl "http://127.0.0.1:8000/api/v1/analytics/species?sort=stall_risk"
+curl http://127.0.0.1:8000/api/v1/analytics/species/top-risk-stall
+```
+
+> **Escala.** Los efectos se estiman en log-odds y se publican en **odds
+> ratio**: `or = exp(efecto)`, `or_lo = exp(lo)`, `or_hi = exp(hi)`. El
+> contrato separa las dos escalas por nombre — `or_ci95` es lo que se muestra,
+> `ci95_log_odds` es solo trazabilidad y **nunca** se renderiza.
+
+### Dashboard (React + Recharts)
+
+```bash
+cd frontend
+npm install
+npm run dev      # http://localhost:5173, proxy /api → :8000
+```
+
+Necesita el backend corriendo y la analítica cargada; si la base está vacía, la
+pantalla dice qué script ejecutar.
+
 ### CLI del ingester (sin DB)
 
 ```bash
@@ -94,9 +133,13 @@ python -m agrosense.adapters.ingester.cli data/raw/anexo1.xlsx
 
 ```bash
 cd backend
-pytest                    # 134 tests locales, sin red (SQLite en memoria)
-pytest -m supabase        # 4 smoke contra la DB real, requiere DATABASE_URL
+pytest                    # 230 tests locales, sin red (SQLite en memoria)
+pytest -m supabase        # 25 smoke contra la DB real, requiere DATABASE_URL
 ruff check src tests
+
+cd ../frontend
+npm test                  # 28 tests (vitest + testing-library)
+npm run build             # tsc -b (strict) + vite build
 ```
 
 `pytest` a secas **nunca** toca la red: los repositorios se prueban contra
@@ -109,7 +152,15 @@ conexión real sin el marker `supabase`.
 backend/src/agrosense/
 ├── domain/        entidades, invariantes, errores. Cero imports de infra
 ├── application/   casos de uso, DTOs y puertos. Importa solo domain
-└── adapters/      api (FastAPI) · db (SQLAlchemy + Alembic) · ingester (pandas)
+└── adapters/      api (FastAPI) · db (SQLAlchemy + Alembic)
+                   ingester (pandas) · analytics (efectos de los modelos mixtos)
+
+backend/scripts/   cargas de datos puntuales (no son parte del paquete)
+
+frontend/src/
+├── api/           única capa que habla con el backend
+├── components/    presentación; no decide qué significa un OR
+└── pages/         composición de pantalla
 ```
 
 Una sola regla de dependencia, hacia adentro (ADR-003). No es una convención
@@ -124,3 +175,5 @@ de carpetas: `backend/tests/architecture/` la verifica en cada corrida.
 - `docs/adr/` — decisiones arquitectónicas
 - `docs/deuda-tecnica.md` — brechas conocidas, con dueño y gate
 - `docs/verificacion-slice2.md` — evidencia del gate del slice 2
+- `docs/verificacion-slice5.md` — evidencia del slice 5 y de las 3 correcciones
+- `docs/obsidian-agrosense/` — bóveda de conocimiento (Obsidian)

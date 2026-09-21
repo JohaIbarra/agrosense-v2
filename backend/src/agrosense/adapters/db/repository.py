@@ -11,8 +11,11 @@ from sqlalchemy.orm import Session
 from agrosense.adapters.db.models import (
     CampaignFile,
     ObservationRow,
+    PlotAnalytics,
     Project,
+    SpeciesAnalytics,
     TreeRow,
+    VarianceComponent,
 )
 from agrosense.application.dtos import CampaignData
 from agrosense.application.errors import AppError
@@ -313,3 +316,75 @@ class CampaignRepository:
         if a_actualizar:
             self._s.execute(update(ObservationRow), a_actualizar)
         self._s.flush()
+
+
+class AnalyticsRepository:
+    """Lectura y recarga de las tablas analiticas del slice 5.
+
+    Es de solo lectura para la API: las escrituras vienen de
+    `scripts/load_analytics.py`, no de un endpoint. Por eso `replace_all` no
+    esta expuesto en ninguna route — recargar la analitica es una operacion
+    de datos, no una accion de usuario.
+    """
+
+    def __init__(self, session: Session):
+        self._s = session
+
+    # ── Lectura ────────────────────────────────────────────────────────────
+
+    def list_species(self, gremio: str | None = None) -> list[SpeciesAnalytics]:
+        stmt = select(SpeciesAnalytics)
+        if gremio is not None:
+            stmt = stmt.where(SpeciesAnalytics.gremio == gremio)
+        return list(self._s.scalars(stmt.order_by(SpeciesAnalytics.species_name)).all())
+
+    def get_species(self, name: str) -> SpeciesAnalytics | None:
+        return self._s.get(SpeciesAnalytics, name)
+
+    def list_plots(self, localidad: str | None = None) -> list[PlotAnalytics]:
+        stmt = select(PlotAnalytics)
+        if localidad is not None:
+            stmt = stmt.where(PlotAnalytics.localidad == localidad)
+        return list(self._s.scalars(stmt.order_by(PlotAnalytics.plot_code)).all())
+
+    def list_variance(self) -> list[VarianceComponent]:
+        return list(
+            self._s.scalars(
+                select(VarianceComponent).order_by(
+                    VarianceComponent.model, VarianceComponent.grouping
+                )
+            ).all()
+        )
+
+    # ── Recarga (solo desde el script de carga) ────────────────────────────
+
+    def replace_all(
+        self,
+        species: list[SpeciesAnalytics],
+        plots: list[PlotAnalytics],
+        variance: list[VarianceComponent],
+    ) -> dict[str, int]:
+        """Reemplaza las tres tablas en UNA transaccion (ADR-004: todo o nada).
+
+        Es un borrado y recarga completos, no un upsert fila a fila: los
+        efectos provienen de un ajuste conjunto sobre todo el panel, asi que
+        mezclar filas de dos corridas distintas daria un ranking que no
+        corresponde a ningun modelo. Si la carga falla a medias, la tabla
+        anterior queda intacta.
+        """
+        try:
+            self._s.query(SpeciesAnalytics).delete()
+            self._s.query(PlotAnalytics).delete()
+            self._s.query(VarianceComponent).delete()
+            self._s.add_all(species)
+            self._s.add_all(plots)
+            self._s.add_all(variance)
+            self._s.commit()
+        except Exception:
+            self._s.rollback()
+            raise
+        return {
+            "species": len(species),
+            "plots": len(plots),
+            "variance": len(variance),
+        }

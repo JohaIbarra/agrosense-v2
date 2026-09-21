@@ -59,3 +59,76 @@ def test_engine_uses_psycopg3_dialect():
         # No conecta: solo resuelve el dialecto
     )
     assert engine.dialect.driver == "psycopg"
+
+
+class TestEngineIsReusedAcrossRequests:
+    """Regresion del hallazgo de la fase 6 del slice 5 (2026-09-21).
+
+    `api/deps.get_session` llama a `get_session_factory()` una vez por request
+    HTTP. Cuando `get_engine()` devolvia un engine nuevo en cada llamada, eso
+    significaba un pool nuevo por request: resolucion DNS, TCP y TLS contra el
+    session pooler de Supabase en cada peticion (~200 ms RTT), pools anteriores
+    sin cerrar, y `getaddrinfo` fallando de forma intermitente bajo rafagas.
+
+    Estos tests usan SQLite y no abren conexion a la DB real.
+    """
+
+    def test_engine_is_a_single_instance(self, monkeypatch):
+        from agrosense.adapters.db import session as mod
+
+        monkeypatch.setattr(mod, "DATABASE_URL", "sqlite:///:memory:")
+        mod.reset_engine_cache()
+        try:
+            primero = mod.get_engine()
+            assert all(mod.get_engine() is primero for _ in range(5))
+        finally:
+            mod.reset_engine_cache()
+
+    def test_session_factories_share_the_engine(self, monkeypatch):
+        """Diez 'requests' seguidos reutilizan el mismo pool."""
+        from agrosense.adapters.db import session as mod
+
+        monkeypatch.setattr(mod, "DATABASE_URL", "sqlite:///:memory:")
+        mod.reset_engine_cache()
+        try:
+            binds = {id(mod.get_session_factory().kw["bind"]) for _ in range(10)}
+            assert len(binds) == 1, "cada request esta creando su propio engine"
+        finally:
+            mod.reset_engine_cache()
+
+    def test_importing_the_module_does_not_connect(self):
+        """El engine sigue siendo PEREZOSO pese a la cache.
+
+        Si se construyera al importar, `pytest` offline intentaria hablar con
+        Supabase solo por importar el modulo.
+        """
+        from agrosense.adapters.db import session as mod
+
+        mod.reset_engine_cache()
+        assert mod.get_engine.cache_info().currsize == 0
+
+    def test_reset_releases_the_pool(self, monkeypatch):
+        from agrosense.adapters.db import session as mod
+
+        monkeypatch.setattr(mod, "DATABASE_URL", "sqlite:///:memory:")
+        mod.reset_engine_cache()
+        try:
+            antes = mod.get_engine()
+            mod.reset_engine_cache()
+            assert mod.get_engine() is not antes
+        finally:
+            mod.reset_engine_cache()
+
+    def test_missing_url_still_raises_actionable_error(self, monkeypatch):
+        """Cachear no puede tragarse el error de configuracion."""
+        import pytest as _pytest
+
+        from agrosense.adapters.db import session as mod
+
+        monkeypatch.setattr(mod, "DATABASE_URL", "")
+        mod.reset_engine_cache()
+        try:
+            with _pytest.raises(RuntimeError, match="DATABASE_URL no configurada"):
+                mod.get_engine()
+        finally:
+            mod.reset_engine_cache()

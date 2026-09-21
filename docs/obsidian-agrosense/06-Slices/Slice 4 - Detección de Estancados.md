@@ -10,6 +10,16 @@ protocolo: "[[Protocolo Estancamiento]]"
 > [!abstract] Regresión logística + regla de negocio (no IsolationForest)
 > **Estado**: ⬜ Pendiente | **Protocolo**: [[Protocolo Estancamiento]]
 > **Modelo**: Logística (PR-AUC 0.469, interpretable)
+> **Orden**: va ANTES de [[Slice 3 - Riesgo de Mortalidad]] (invertido el 2026-09-21)
+
+> [!important] Este es el primer slice de modelo — y alimenta al de mortalidad
+> 1. **Tiene evidencia suficiente**: 153 eventos positivos en el intervalo de
+>    prueba (310 en el panel completo, prevalencia 23%) y un protocolo cerrado
+>    con PR-AUC 0.469 bajo validación honesta. Mortalidad tiene 33–37 eventos
+>    por ola (EPV 4–11) — no alcanza.
+> 2. **Produce `estancó_intervalo_previo`**, el predictor más fuerte que
+>    tenemos: OR 2.92 dentro del propio modelo de estancamiento y OR 1.70
+>    (marginal, p=0.10) en el de mortalidad. El Slice 4 alimenta al 3.
 
 ---
 
@@ -35,6 +45,34 @@ Detectar árboles que no crecerán hasta el próximo monitoreo.
 | Recall@20% | 45% |
 | Precision@20% | 50% |
 | Prevalencia | 22% |
+| Eventos positivos (panel) | 310 de 1.335 obs árbol-intervalo |
+
+---
+
+## Por qué la especie manda aquí ([[Slice 5 - Analítica de Crecimiento]])
+
+El modelo mixto sobre `panel_estancamiento.csv` dice algo operativamente
+distinto a lo del modelo de mortalidad:
+
+| Hallazgo | Valor | Implicación |
+|---|---|---|
+| Varianza especie / parcela | 0.846 / 0.317 (**razón 2.7×**) | La especie pesa casi el triple que el sitio |
+| ICC especie / parcela | 0.190 / 0.071 | El efecto de especie no es ignorable |
+| Rango OR entre especies | 0.24 – 4.94 (**factor 20×**) | Elegir bien qué plantar cambia el resultado |
+| Especies significativas | 8 de 30 | Señal concreta, no difusa |
+| Parcelas significativas | 3 de 42 | El sitio casi no discrimina |
+| Efecto fijo más fuerte | Estancó intervalo previo, **OR 2.92** | Justifica que este slice vaya primero |
+| Fitosanidad deficiente | OR 2.30 | Segunda palanca |
+
+**Se estancan más**: *Lafoensia speciosa* (OR 4.94), *Delostoma integrifolium*
+(4.71), *Persea caerulea* (3.82), *Delostoma roseum* (2.98), *Cedrela montana*
+(2.29).
+**Se estancan menos**: *Verbesina arborea* (0.24), *Heliocarpus popayanensis*
+(0.35), *Senna viarum* (0.61).
+
+> [!tip] Lectura estratégica
+> Estancamiento es un problema **dominado por la especie**: se ataca eligiendo
+> qué plantar. La especie es, por tanto, una feature de primer orden del modelo.
 
 ---
 
@@ -120,6 +158,7 @@ Con presupuesto del 20% de árboles para revisión en campo:
 | Task 6 | ⬜ | Feature importance + calibration plot |
 | Task 7 | ⬜ | Test anti-leakage |
 | Task 8 | ⬜ | API + integración con [[Slice 2 - Persistencia y API]] |
+| Task 9 | ⬜ | Exponer `estancó_intervalo_previo` como feature persistida para [[Slice 3 - Riesgo de Mortalidad]] |
 
 ---
 
@@ -136,6 +175,7 @@ Con presupuesto del 20% de árboles para revisión en campo:
 ## Links
 
 - [[Protocolo Estancamiento]] — Diseño completo + código + resultados
-- [[Slice 3 - Riesgo de Mortalidad]] — Proceso complementario
-- [[Slice 5 - Analítica de Crecimiento]] — Siguiente
+- [[Slice 2 - Persistencia y API]] — Anterior (datos y API base)
+- [[Slice 3 - Riesgo de Mortalidad]] — **Siguiente**; consume `estancó_intervalo_previo`
+- [[Slice 5 - Analítica de Crecimiento]] — Efectos por especie/parcela del modelo mixto
 - [[Resumen ML]] — Visión general

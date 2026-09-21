@@ -47,17 +47,33 @@ class NonContiguousCensusError(DomainError):
         )
 
 
-class SuspiciousContractionWarning(Exception):
-    """No es error: contraccion >1 cm es error de medicion documentado (~13/652
-    casos en el dataset de referencia). La ingesta CONTINUA; se reporta."""
+class LargeContractionNoted(Exception):
+    """Nota descriptiva: la altura del arbol BAJO mas de MAX_CONTRACTION_M.
+
+    NO es un error y NO pide corregir el dato. Una contraccion de altura es
+    un hecho biologico posible: dano fisico, poda, ramoneo, quiebre del apice
+    o cambio del punto de referencia de la cinta entre cuadrillas. El dato
+    original se conserva tal cual se midio.
+
+    Por que importa el matiz (auditoria del 2026-09-21): el dataset de
+    referencia solo tiene contracciones en M1->M2 (13 casos, 1-20 cm) y
+    CERO en M2->M3 y M3->M4. Esa monotonia perfecta no es biologia, es
+    correccion en campo. Un aviso redactado como "sospechoso" empuja a la
+    cuadrilla a seguir monotonizando, y el modelo de estancamiento pierde
+    justo la senal que busca. De ahi el nombre neutro y el umbral de 5 cm:
+    se anota lo llamativo, no se acusa a la medicion.
+    """
 
     def __init__(self, tree_id: str, campaign: int, contraction_m: float):
         self.tree_id = tree_id
         self.campaign = campaign
         self.contraction_m = contraction_m
         super().__init__(
-            f"Arbol {tree_id} 'encoge' {contraction_m:.3f} m hasta campana {campaign} "
-            f"(error de medicion de campo documentado)"
+            f"Arbol {tree_id} decrece {contraction_m:.3f} m hasta campana {campaign}. "
+            f"Una contraccion de altura no es un error de medicion: puede reflejar "
+            f"dano fisico, poda, ramoneo o cambio del punto de referencia. "
+            f"NO corregir el dato original; verificar en campo si se quiere confirmar "
+            f"la causa."
         )
 
 

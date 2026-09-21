@@ -31,6 +31,15 @@ def create_app() -> FastAPI:
 
     app.include_router(router)
 
+    # Rutas del slice 5 (analitica de los modelos mixtos, solo lectura).
+    # Llevan prefijo /api/v1 mientras que las del slice 2 no: es deuda
+    # conocida del contrato, anotada en docs/deuda-tecnica.md. Versionar las
+    # existentes rompe al consumidor del slice 2, asi que se unifica cuando
+    # haya un cambio de contrato que lo justifique, no de paso.
+    from agrosense.adapters.api.routes.analytics import router as analytics_router
+
+    app.include_router(analytics_router)
+
     # Techo del cuerpo ANTES de que el parser de multipart toque disco.
     # Se anade el ultimo para que quede el mas externo de la pila.
     app.add_middleware(BodySizeLimitMiddleware, max_bytes=MAX_UPLOAD_BYTES)

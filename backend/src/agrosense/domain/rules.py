@@ -7,14 +7,27 @@ from agrosense.domain.entities import Observation, Tree
 from agrosense.domain.errors import (
     CensusGapWarning,
     DeathViolationError,
+    LargeContractionNoted,
     SpeciesMismatchError,
-    SuspiciousContractionWarning,
     SuspiciousRevivalWarning,
     TreeIdentityMismatchError,
 )
 
 STAGNATION_THRESHOLD_M = 0.05
-MAX_CONTRACTION_M = 0.01
+
+# Altura por debajo de la cual una bajada NO se anota siquiera (5 cm).
+#
+# Una contraccion de altura no es un error de medicion: puede reflejar dano
+# fisico, poda, ramoneo o error de referencia. NO corregir el dato original.
+#
+# El umbral subio de 1 cm a 5 cm el 2026-09-21. Con 1 cm, el unico intervalo
+# sin corregir del dataset de referencia (M1->M2) habria generado nota en 12
+# de sus 13 contracciones reales (1-20 cm), y ese volumen de avisos es
+# exactamente lo que empuja a la cuadrilla a "arreglar" la altura hasta
+# dejarla monotona — que es lo que ya paso en M2->M3 y M3->M4 (0 %
+# de contracciones, biologicamente inverosimil). 5 cm deja pasar el ruido
+# normal de cinta y solo anota la bajada que de verdad vale una visita.
+MAX_CONTRACTION_M = 0.05
 
 
 def growth_between(prev: Observation, curr: Observation) -> float:
@@ -26,12 +39,13 @@ def growth_between(prev: Observation, curr: Observation) -> float:
 
 def validate_tree_observations(
     tree: Tree, observations: list[Observation]
-) -> list[SuspiciousContractionWarning | SuspiciousRevivalWarning | CensusGapWarning]:
+) -> list[LargeContractionNoted | SuspiciousRevivalWarning | CensusGapWarning]:
     """Valida la serie temporal de un arbol.
 
     Lanza DomainError (aborta la ingesta) SOLO si viola invariante dura:
     un arbol muerto que CRECE tras morir.
-    Devuelve warnings (NO abortan): contraccion sospechosa, 'revives'
+    Devuelve avisos (NO abortan): contraccion grande ANOTADA (no es error:
+    ver LargeContractionNoted — el dato original no se corrige), 'revives'
     (probable replanteo), huecos de censo (logistica de campo).
     """
     if not observations:
@@ -41,7 +55,7 @@ def validate_tree_observations(
     campaigns = [o.campaign for o in obs_sorted]
 
     warnings: list[
-        SuspiciousContractionWarning | SuspiciousRevivalWarning | CensusGapWarning
+        LargeContractionNoted | SuspiciousRevivalWarning | CensusGapWarning
     ] = []
 
     if campaigns != list(range(campaigns[0], campaigns[-1] + 1)):
@@ -82,7 +96,7 @@ def validate_tree_observations(
                 contraction = prev.height_m - obs.height_m
                 if contraction > MAX_CONTRACTION_M + 1e-9:
                     warnings.append(
-                        SuspiciousContractionWarning(tree.tree_id, obs.campaign, contraction)
+                        LargeContractionNoted(tree.tree_id, obs.campaign, contraction)
                     )
             if obs.alive is False:
                 dead_seen = True

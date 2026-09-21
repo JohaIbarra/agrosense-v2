@@ -63,8 +63,13 @@ fuente de datos: todo se recalcula desde `Monitoreo_4`.
 - Training and inference must share preprocessing logic.
 - Never use information unavailable at prediction time.
 - Never allow target leakage.
-- Train/validation/test splits must respect temporal structure when applicable
-  (and group structure: the same tree must never appear in both train and test).
+- Train/validation/test splits must respect temporal structure when applicable.
+  For time-forward evaluation, the same tree may appear in training and test
+  at different monitoring times, provided that no information from the future
+  crosses the prediction boundary. The same observation (same tree + same
+  monitoring time) must never appear in both train and test. When group-level
+  independence is required, observations are grouped by the relevant unit
+  (e.g., sampling plot, not individual tree).
 - Every production model must have reproducible training and evaluation.
 - Model artifacts must be versioned.
 - Metrics must be documented.
@@ -195,9 +200,13 @@ feature. Fases 8-9 cierran el ciclo.
   frontend), demostrable por sí sola.
 - Ningún slice sale del loop sin pasar los TRES gates: verify (6), review (7)
   y, si tiene modelo, el ML eval gate (4).
-- ML eval gate (para slices con modelo): evaluación honesta (group split por
-  árbol + split temporal donde aplique, cero leakage), métricas documentadas,
-  artefacto versionado, y preprocessing compartido train/serve.
+- ML eval gate (para slices con modelo): evaluación honesta (split temporal
+  primario + group split por **parcela** — `Codigo de unidad muestreo`, NO por
+  árbol —, cero leakage), métricas documentadas, artefacto versionado, y
+  preprocessing compartido train/serve. Agrupar por árbol deja fuga espacial
+  (misma parcela ⇒ mismo suelo, pendiente y cuadrilla de medición) y, bajo
+  split temporal, no aporta independencia porque las olas ya separan las
+  observaciones del mismo individuo.
 - Un bug encontrado → regresión test → vuelve a entrar al loop en 5.
 - Si un slice revela un requisito de dominio o arquitectura no contemplado,
   el flujo es: justificar → ADR → actualizar documentación → revisar impacto
@@ -213,12 +222,17 @@ antes de comenzar su implementación, usando writing-plans.
 1. **Fundación de datos**: ingesta de `Monitoreo_4` → formato long limpio y
    reproducible (script versionado), validaciones de dominio (alturas no
    negativas, árboles muertos no reviven ni crecen).
-2. **Riesgo de mortalidad**: predicción de muerte por árbol (señal validada:
+2. **Detección de estancados/anómalos**: regresión logística + regla de
+   negocio (crecimiento de altura ≈ 0). Va ANTES que mortalidad (orden
+   invertido el 2026-09-21): tiene 153 eventos positivos y protocolo cerrado
+   (PR-AUC 0.469), y **produce `estancó_intervalo_previo`**, el predictor más
+   fuerte del modelo de mortalidad.
+3. **Riesgo de mortalidad**: predicción de muerte por árbol (señal validada:
    estancados ≤5cm tienen ~35x más riesgo; mortalidad 16% acumulada).
-3. **Detección de estancados/anómalos**: IsolationForest + regla de negocio
-   (crecimiento ≈ 0).
-4. **Analítica de crecimiento por especie/sitio**: dashboards (lo que ya
-   funciona de v1, portado).
+   Limitante: 33–37 eventos por ola ⇒ EPV 4–11. Consume la feature del
+   punto 2; descomponer en slices pequeños antes de empezar.
+4. **Analítica de crecimiento por especie/sitio**: efectos por especie y
+   parcela de los modelos mixtos ya ajustados (`data/processed/`) + dashboards.
 
 ## Skills to use per phase
 

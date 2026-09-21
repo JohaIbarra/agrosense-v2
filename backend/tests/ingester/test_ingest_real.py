@@ -1,3 +1,4 @@
+from collections import Counter
 from pathlib import Path
 
 import pandas as pd
@@ -24,7 +25,8 @@ def test_real_annex_ingests():
     Evidencia previa del spike (docs/01-discovery.md):
     - 856 filas, 683/652/755/718 alturas en M1-M4
     - 591 vivos los 4, 138 muertos en M4
-    - ~13 contracciones >1cm documentadas
+    - 13 contracciones documentadas en M1->M2 (1-20 cm); 7 superan los
+      5 cm de MAX_CONTRACTION_M y se anotan
     """
     df = read_reference_dataset()
     result = ingest_wide(df)
@@ -45,8 +47,16 @@ def test_real_annex_ingests():
     alive_m4 = sum(1 for o in result.observations if o.campaign == 4 and o.alive is True)
     assert alive_m4 == 718  # vivos M4 documentados
 
-    # contracciones: 13 casos >1cm documentados en M1-M2; revives: 6 casos
-    # de replanteo (ruling). Tolerancia amplia para periodos M3-M4.
+    # Desglose real con MAX_CONTRACTION_M = 0.05 (2026-09-21):
+    #   7 contracciones anotadas (0.07-0.20 m) + 6 revives + 1 hueco de censo.
+    # Las otras 6 contracciones del dataset (1-5 cm) quedan por debajo del
+    # umbral a proposito: anotarlas empujaba a la cuadrilla a monotonizar la
+    # altura (ver LargeContractionNoted). La cota superior queda holgada
+    # porque M5 traera casos nuevos.
+    counts = Counter(type(w).__name__ for w in result.warnings)
+    assert counts["LargeContractionNoted"] == 7
+    assert counts["SuspiciousRevivalWarning"] == 6
+    assert counts["CensusGapWarning"] == 1
     assert 0 < len(result.warnings) < 60
 
 

@@ -5,6 +5,7 @@ from agrosense.domain.errors import (
     DeathViolationError,
 )
 from agrosense.domain.rules import (
+    MAX_CONTRACTION_M,
     STAGNATION_THRESHOLD_M,
     growth_between,
     validate_tree_observations,
@@ -139,14 +140,49 @@ def test_contraction_large_warns_not_raises():
     obs = [make_obs(1, 0.30, True), make_obs(2, 0.20, True)]
     warnings = validate_tree_observations(tree, obs)
     assert len(warnings) == 1
-    assert "encoge" in str(warnings[0])
+    assert "decrece" in str(warnings[0])
 
 
 def test_contraction_at_tolerance_boundary_is_not_warning():
+    """Justo en el umbral (5 cm) NO se anota: el aviso es para lo que lo supera."""
     tree = make_tree()
-    obs = [make_obs(1, 0.30, True), make_obs(2, 0.29, True)]
+    obs = [make_obs(1, 0.30, True), make_obs(2, 0.25, True)]
     warnings = validate_tree_observations(tree, obs)
     assert len(warnings) == 0
+
+
+def test_contraction_threshold():
+    """Gate del ajuste del 2026-09-21: el umbral NO puede volver a 1 cm.
+
+    Con 1 cm, 12 de las 13 contracciones reales del unico intervalo sin
+    corregir del dataset (M1->M2, magnitudes 1-20 cm) generaban aviso. Ese
+    volumen de avisos es lo que institucionaliza la monotonizacion artificial
+    de la altura (0 % de contracciones en M2->M3 y M3->M4).
+    """
+    assert MAX_CONTRACTION_M >= 0.05
+
+
+def test_field_scale_contractions_are_not_flagged():
+    """Las contracciones tipicas de campo (1-4 cm) pasan sin anotarse."""
+    tree = make_tree()
+    for bajada in (0.01, 0.02, 0.03, 0.04):
+        obs = [make_obs(1, 1.00, True), make_obs(2, 1.00 - bajada, True)]
+        assert validate_tree_observations(tree, obs) == [], f"bajada de {bajada} m anotada"
+
+
+def test_contraction_note_does_not_ask_to_correct_the_datum():
+    """El texto del aviso no debe empujar a "corregir" la altura medida.
+
+    Es la mitad del arreglo: el umbral evita el ruido, la redaccion evita que
+    quien lo lee monotonice el dato. Si alguien vuelve a redactarlo como
+    "sospechoso" o "error de medicion", este test cae.
+    """
+    tree = make_tree()
+    obs = [make_obs(1, 1.20, True), make_obs(2, 1.00, True)]
+    mensaje = str(validate_tree_observations(tree, obs)[0]).lower()
+    assert "no corregir" in mensaje
+    assert "no es un error de medicion" in mensaje
+    assert "sospechos" not in mensaje
 
 
 def test_empty_series_passes():

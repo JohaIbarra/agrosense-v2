@@ -461,7 +461,7 @@ class TestCampaignSourcePort:
         from agrosense.application.use_cases.upload_campaign import upload_campaign
         from agrosense.domain.errors import (
             CensusGapWarning,
-            SuspiciousContractionWarning,
+            LargeContractionNoted,
             SuspiciousRevivalWarning,
         )
 
@@ -470,7 +470,7 @@ class TestCampaignSourcePort:
             trees=data.trees,
             observations=data.observations,
             warnings=[
-                SuspiciousContractionWarning("T1", 2, 0.04),
+                LargeContractionNoted("T1", 2, 0.04),
                 SuspiciousRevivalWarning("T2", 3),
                 CensusGapWarning("T1", [1, 4]),
             ],

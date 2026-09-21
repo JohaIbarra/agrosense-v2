@@ -108,14 +108,31 @@ classDiagram
 
 | Warning | `type` en el contrato | Significado |
 |---|---|---|
-| `SuspiciousContractionWarning` | `contraction` | Altura "encoge" >1 cm (error de medición) |
+| `LargeContractionNoted` | `contraction` | La altura baja más de **5 cm** — se anota, NO se corrige |
 | `SuspiciousRevivalWarning` | `revival` | Muerto→vivo: replanteo o ID reusado |
 | `CensusGapWarning` | `census_gap` | Censado, saltó campañas y reapareció |
 
 > [!warning] Corrección respecto a notas anteriores
 > `CensusGap` NO impide la ingesta: es un **warning** (1/856 casos en el
-> dataset real). Y la altura no "solo aumenta": se tolera una contracción de
-> hasta **1 cm** como error de medición documentado (~13/652 casos).
+> dataset real).
+
+> [!danger] Una contracción de altura NO es un error de medición (2026-09-21)
+> Antes esta regla se llamaba `SuspiciousContractionWarning` y saltaba con
+> cualquier bajada de más de **1 cm**. Las dos cosas estaban mal:
+>
+> - **El umbral.** El único intervalo sin corregir del dataset (M1→M2) tiene 13
+>   contracciones reales de 1 a 20 cm; con 1 cm se marcaban 12. Con los 5 cm
+>   actuales se anotan 7 (las de ≥7 cm) y el ruido normal de cinta pasa sin
+>   aviso.
+> - **El nombre y el texto.** Un aviso redactado como "sospechoso" empuja a la
+>   cuadrilla a "arreglar" la altura. Eso ya pasó: M2→M3 y M3→M4 tienen **0 %
+>   de contracciones**, lo cual es biológicamente inverosímil — es
+>   monotonización artificial, y se lleva por delante justo la señal que busca
+>   el modelo de estancamiento.
+>
+> Una altura que baja puede reflejar **daño físico, poda, ramoneo, quiebre del
+> ápice o cambio del punto de referencia**. El dato original **no se corrige**.
+> El `type` del contrato sigue siendo `contraction` (vocabulario estable).
 
 ---
 

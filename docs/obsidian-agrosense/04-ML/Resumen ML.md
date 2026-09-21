@@ -37,7 +37,7 @@ tags: [ml, machine-learning]
 | **Features** | DAP, altura, crecimiento acumulado, especie, sitio |
 | **Algoritmo** | XGBoost / Random Forest |
 | **Métrica** | AUC-ROC, Precision-Recall |
-| **Split** | Por árbol (group split) + temporal |
+| **Split** | Temporal (primario) + group split por parcela |
 
 ### 2. Detección de Estancados (Slice 4)
 
@@ -94,16 +94,33 @@ serve_time:  preprocessing.transform(X_new)  # mismos pasos
 
 ---
 
-## Split por Árbol
+## Split por Parcela
 
-> [!important] Group split
+> [!important] Group split — el grupo es la PARCELA, no el árbol
 > ```python
 > # MAL (v1):
 > train_test_split(X, y, test_size=0.2)  # árbol A en train Y test
-> 
+>
+> # MAL (v2, corregido el 2026-09-21):
+> GroupKFold(n_splits=5, groups=tree_id)  # deja fuga espacial
+>
 > # BIEN (v2):
-> GroupKFold(n_splits=5, groups=tree_id)  # árbol A solo en un fold
+> GroupKFold(n_splits=5, groups=unidad_muestreo)  # `Codigo de unidad muestreo`
 > ```
+
+> [!warning] Por qué la parcela y no el árbol
+> Los árboles de una misma parcela comparten suelo, pendiente, exposición y
+> **cuadrilla de medición**: agrupar por árbol deja que el modelo aprenda la
+> parcela en train y la explote en test — fuga espacial.
+>
+> Además, con validación primaria temporal (M2→M3 entrena, M3→M4 prueba) el
+> agrupamiento por árbol es casi irrelevante: las olas ya separan las
+> observaciones del mismo individuo. La agrupación que aporta independencia
+> real es la **espacial**.
+>
+> Esto es coherente con la descomposición de varianza: la parcela explica
+> ICC 0.07 del estancamiento y 0.09 de la mortalidad — no es ruido
+> ignorable. Ver [[Slice 5 - Analítica de Crecimiento]].
 
 ---
 

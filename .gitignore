@@ -28,6 +28,7 @@ ml_outputs/
 # Secrets / config local
 .env
 .env.*
+!.env.example
 *.local
 
 # IDE / OS
@@ -49,3 +50,8 @@ coverage/
 # Python build artifacts
 *.egg-info/
 backend/build/
+
+# Frontend
+frontend/dist/
+frontend/node_modules/.tmp/
+*.tsbuildinfo

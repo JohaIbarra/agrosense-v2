@@ -15,11 +15,11 @@ from agrosense.adapters.ingester.wide_to_long import wide_to_long
 from agrosense.application.dtos import CampaignData
 from agrosense.domain.errors import (
     CensusGapWarning,
-    SuspiciousContractionWarning,
+    LargeContractionNoted,
     SuspiciousRevivalWarning,
 )
 
-DomainWarning = SuspiciousContractionWarning | SuspiciousRevivalWarning | CensusGapWarning
+DomainWarning = LargeContractionNoted | SuspiciousRevivalWarning | CensusGapWarning
 
 
 def ingest_wide(df: pd.DataFrame) -> CampaignData:

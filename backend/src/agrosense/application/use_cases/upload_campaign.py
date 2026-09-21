@@ -20,13 +20,13 @@ from agrosense.application.errors import AppError
 from agrosense.application.ports import CampaignSource
 from agrosense.domain.errors import (
     CensusGapWarning,
-    SuspiciousContractionWarning,
+    LargeContractionNoted,
     SuspiciousRevivalWarning,
 )
 
 # Vocabulario estable del contrato (schemas.WarningItem.type)
 _WARNING_TYPES: tuple[tuple[type[Exception], str], ...] = (
-    (SuspiciousContractionWarning, "contraction"),
+    (LargeContractionNoted, "contraction"),
     (SuspiciousRevivalWarning, "revival"),
     (CensusGapWarning, "census_gap"),
 )

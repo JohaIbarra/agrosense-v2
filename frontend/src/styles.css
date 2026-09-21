@@ -1,0 +1,324 @@
+/* Estilos del dashboard. Sin framework CSS: son seis componentes y una
+   pantalla; una dependencia de UI aquí sería peso sin uso. */
+
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --border: #e5e7eb;
+  --text: #111827;
+  --muted: #6b7280;
+  --risk: #c2410c;
+  --protective: #0f766e;
+  --warn-bg: #fffbeb;
+  --warn-border: #fcd34d;
+  --radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+code {
+  background: #f1f5f9;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.page-head h1 {
+  margin: 0 0 6px;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+}
+
+.card-head {
+  margin-bottom: 12px;
+}
+
+.card h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+/* ── Forest plot ───────────────────────────────────────────────── */
+
+.plots {
+  display: grid;
+  gap: 24px;
+}
+
+@media (min-width: 1000px) {
+  .plots {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin: 8px 0 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 2px;
+}
+
+.tooltip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  max-width: 300px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 8%);
+  font-size: 13px;
+}
+
+.tooltip p {
+  margin: 6px 0 0;
+}
+
+.tooltip-or {
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Panel comparativo ─────────────────────────────────────────── */
+
+.comparison {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.comparison th,
+.comparison td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+}
+
+.comparison thead th,
+.comparison tbody th {
+  text-align: left;
+  font-weight: 500;
+}
+
+.comparison thead th {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.comparison thead th:not(:first-child) {
+  text-align: right;
+}
+
+.row-strong td,
+.row-strong th {
+  font-weight: 600;
+  background: #f9fafb;
+}
+
+.readings {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.reading {
+  margin: 0;
+  font-size: 14px;
+  border-left: 3px solid var(--border);
+  padding-left: 10px;
+}
+
+.footnote {
+  margin-top: 14px;
+}
+
+/* ── Filtro ────────────────────────────────────────────────────── */
+
+.filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-label {
+  font-size: 13px;
+  color: var(--muted);
+  margin-right: 2px;
+}
+
+.chip {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--muted);
+}
+
+.chip-on {
+  background: var(--text);
+  color: var(--surface);
+  border-color: var(--text);
+}
+
+/* ── Detalle ───────────────────────────────────────────────────── */
+
+.detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.species-name {
+  font-style: italic;
+}
+
+.close {
+  border: none;
+  background: none;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.risk-grid {
+  display: grid;
+  gap: 18px;
+}
+
+@media (min-width: 700px) {
+  .risk-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.risk-block h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.risk-block p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.risk-or {
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.badge-sig {
+  background: #ecfdf5;
+  color: var(--protective);
+}
+
+.badge-nosig {
+  background: #f3f4f6;
+  color: var(--muted);
+}
+
+.warn {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+/* ── Estados ───────────────────────────────────────────────────── */
+
+.state {
+  max-width: 640px;
+  margin: 80px auto;
+  padding: 0 20px;
+  text-align: center;
+}
+
+.state-error h2 {
+  color: var(--risk);
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.page-foot {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}

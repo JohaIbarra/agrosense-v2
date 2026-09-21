@@ -19,6 +19,29 @@ TESTS = Path(__file__).parents[1]
 # modulo no conecta (hay funciones puras ahi); LLAMARLAS si.
 REAL_DB_FACTORIES = {"get_engine", "get_session_factory"}
 
+# Excepcion acotada: un test PUEDE llamar a esas fabricas si antes redirige
+# `DATABASE_URL` a SQLite, porque entonces no hay conexion remota que abrir.
+# Es el caso de los tests del engine cacheado (fase 6 del slice 5): lo que
+# verifican es que el engine se reutilice entre requests, y para eso tienen
+# que construirlo.
+#
+# La excepcion exige las DOS marcas en el mismo archivo — parchear
+# `DATABASE_URL` y apuntar a sqlite —, no solo una. Un test que parchee la
+# variable hacia otra cosa sigue siendo una violacion.
+_REDIRECT_MARKS = ('"DATABASE_URL"', "'DATABASE_URL'")
+_SQLITE_MARK = "sqlite://"
+
+
+def _redirects_to_sqlite(source: str) -> bool:
+    """El archivo apunta DATABASE_URL a SQLite antes de usar las fabricas."""
+    parchea = any(
+        f"setattr(mod, {mark}" in source or f"setattr({mark}" in source
+        for mark in _REDIRECT_MARKS
+    ) or any(
+        f"monkeypatch.setenv({mark}" in source for mark in _REDIRECT_MARKS
+    )
+    return parchea and _SQLITE_MARK in source
+
 
 def _factories_called(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -41,12 +64,31 @@ def test_only_marked_tests_open_the_real_connection() -> None:
     offenders = []
     for py in sorted(TESTS.rglob("*.py")):
         source = py.read_text(encoding="utf-8")
-        if _factories_called(py) and not _has_supabase_marker(source):
-            offenders.append(str(py.relative_to(TESTS)))
+        if not _factories_called(py):
+            continue
+        if _has_supabase_marker(source) or _redirects_to_sqlite(source):
+            continue
+        offenders.append(str(py.relative_to(TESTS)))
     assert not offenders, (
         "Estos tests abren la conexion real sin marker 'supabase' "
         f"(se colgarian en una corrida normal): {offenders}"
     )
+
+
+def test_the_sqlite_exception_is_not_a_blank_cheque() -> None:
+    """La excepcion exige AMBAS marcas, no basta con nombrar DATABASE_URL.
+
+    Sin esto, la excepcion que se abrio para los tests del engine cacheado
+    dejaria pasar cualquier test que mencionara la variable — que es
+    exactamente como un gate deja de servir para algo.
+    """
+    solo_parche = 'monkeypatch.setattr(mod, "DATABASE_URL", "postgresql://real/db")'
+    solo_sqlite = 'engine = create_engine("sqlite://")'
+    ambas = solo_parche.replace("postgresql://real/db", "sqlite:///:memory:")
+
+    assert not _redirects_to_sqlite(solo_parche)
+    assert not _redirects_to_sqlite(solo_sqlite)
+    assert _redirects_to_sqlite(ambas)
 
 
 def test_supabase_marker_is_registered() -> None:

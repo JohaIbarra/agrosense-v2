@@ -67,7 +67,35 @@ Contract → Implement → Verify → Review → Siguiente Slice
 > eligiendo el status HTTP, un `async def` que congelaba el worker y un
 > `.xlsx` de 4.8 KB que costaba 370 MB. Todo corregido; ver la nota del slice.
 
-### Slice 3: Riesgo de Mortalidad ⬜
+> [!important] Orden invertido el 2026-09-21: Estancados va ANTES que Mortalidad
+> Los números conservan su nombre (Slice 3 = Mortalidad, Slice 4 = Estancados),
+> pero el **orden de ejecución** se invierte. Tres razones:
+>
+> 1. **Evidencia disponible.** Estancamiento tiene 153 eventos positivos y un
+>    protocolo cerrado con PR-AUC 0.47 bajo validación honesta. Mortalidad
+>    tiene 33–37 eventos por ola: con ~8 predictores eso es un EPV de 4–11,
+>    por debajo del mínimo habitual de 10–20. Un modelo de mortalidad hoy
+>    sería un modelo de ruido.
+> 2. **Dependencia de features.** `estancó_intervalo_previo` es el predictor
+>    individual más fuerte que tenemos (OR 2.92 en estancamiento, OR 1.70
+>    marginal en mortalidad) y lo **produce** el slice de estancados. El
+>    Slice 4 alimenta al 3, no al revés.
+> 3. **Riesgo de gate.** Construir mortalidad primero obliga a improvisar esa
+>    feature y a pasarle el ML eval gate dos veces.
+
+### Slice 4: Detección de Estancados ⬜ ← siguiente
+
+> [[Slice 4 - Detección de Estancados]]
+
+| Aspecto | Plan |
+|---|---|
+| Target | Altura no crece en el intervalo (t, t+1] |
+| Modelo | Regresión logística + regla de negocio |
+| Evidencia | 153 eventos positivos, PR-AUC 0.469 (IC 95% 0.36–0.58) |
+| Split | Temporal M2→M3 / M3→M4 + GroupKFold por **parcela** |
+| Produce | `estancó_intervalo_previo` — feature de entrada del Slice 3 |
+
+### Slice 3: Riesgo de Mortalidad ⬜ ← después de Estancados
 
 > [[Slice 3 - Riesgo de Mortalidad]]
 
@@ -76,27 +104,27 @@ Contract → Implement → Verify → Review → Siguiente Slice
 | Target | Muerte del árbol |
 | Modelo | XGBoost / Random Forest |
 | Señal | Estancados ≤5cm → 35x más riesgo |
-| Split | GroupKFold por árbol |
+| Limitante | 33–37 eventos por ola (EPV 4–11): descomponer y acotar el alcance |
+| Depende de | `estancó_intervalo_previo` ([[Slice 4 - Detección de Estancados]]) |
+| Split | Temporal M2→M3 / M3→M4 + GroupKFold por **parcela** |
 
-### Slice 4: Detección de Estancados ⬜
-
-> [[Slice 4 - Detección de Estancados]]
-
-| Aspecto | Plan |
-|---|---|
-| Target | Anomalía (estancamiento extremo) |
-| Modelo | IsolationForest + regla |
-| Regla | Crecimiento ≈ 0 en N campañas |
-
-### Slice 5: Analítica de Crecimiento ⬜
+### Slice 5: Analítica de Crecimiento 🔄
 
 > [[Slice 5 - Analítica de Crecimiento]]
 
-| Aspecto | Plan |
+| Aspecto | Estado |
 |---|---|
-| Target | Tasa crecimiento por especie/sitio |
-| Modelo | Regresión + clustering |
-| Dashboard | Portado de v1 |
+| Migración + 3 tablas analíticas | ✅ |
+| Loader idempotente (`scripts/load_analytics.py`) | ✅ |
+| 6 endpoints `/api/v1/analytics` | ✅ |
+| Dashboard React + Recharts | ✅ |
+| 52 tests nuevos backend (230 total) + 28 frontend | ✅ |
+| Fase 6 — Verify contra Supabase real | ✅ 25 smoke |
+| Fase 7 — Review | ⬜ |
+
+> [!note] No entrena nada
+> La estadística está cerrada: los CSV de `backend/data/processed/` son la
+> fuente de verdad y el slice los traduce a tablas, API y UI.
 
 ---
 
@@ -104,9 +132,11 @@ Contract → Implement → Verify → Review → Siguiente Slice
 
 ```
 Sep 2026:  Slice 1 ✅ + Slice 2 🔄 (cerrando fase 7)
-           Slice 3 (Mortalidad) — descomponer en slices pequeños primero
-Pendiente: Slice 4 (Estancados) + Slice 5 (Crecimiento)
-           Frontend React + Integración
+           Slice 5 (Analítica) — estadística ya resuelta, solo DB/API/UI
+Siguiente: Slice 4 (Estancados) — protocolo cerrado, produce
+             `estancó_intervalo_previo`
+Después:   Slice 3 (Mortalidad) — descomponer en slices pequeños primero;
+             consume la feature del Slice 4
            Deploy — BLOQUEADO por deuda #G (upload de 81s) y #R6
 ```
 
@@ -120,4 +150,7 @@ Pendiente: Slice 4 (Estancados) + Slice 5 (Crecimiento)
 
 - [[Slice 1 - Fundación de Datos]]
 - [[Slice 2 - Persistencia y API]]
+- [[Slice 5 - Analítica de Crecimiento]]
+- [[Slice 4 - Detección de Estancados]]
+- [[Slice 3 - Riesgo de Mortalidad]]
 - [[Resumen ML]] — Modelos

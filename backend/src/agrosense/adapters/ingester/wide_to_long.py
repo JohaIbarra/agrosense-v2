@@ -19,8 +19,8 @@ from agrosense.application.errors import AppError
 from agrosense.domain.entities import Observation, StatusSemantic, Tree
 from agrosense.domain.errors import (
     CensusGapWarning,
+    LargeContractionNoted,
     SpeciesMismatchError,
-    SuspiciousContractionWarning,
     SuspiciousRevivalWarning,
 )
 from agrosense.domain.rules import validate_tree_observations
@@ -39,7 +39,7 @@ def _to_str(v) -> str | None:
     return s or None
 
 
-DomainWarning = SuspiciousContractionWarning | SuspiciousRevivalWarning | CensusGapWarning
+DomainWarning = LargeContractionNoted | SuspiciousRevivalWarning | CensusGapWarning
 
 
 def wide_to_long(df: pd.DataFrame) -> tuple[list[Tree], list[Observation], list[DomainWarning]]:
@@ -58,7 +58,7 @@ def wide_to_long(df: pd.DataFrame) -> tuple[list[Tree], list[Observation], list[
     trees: list[Tree] = []
     observations: list[Observation] = []
     all_warnings: list[
-        SuspiciousContractionWarning | SuspiciousRevivalWarning | CensusGapWarning
+        LargeContractionNoted | SuspiciousRevivalWarning | CensusGapWarning
     ] = []
     species_by_tree: dict[str, str] = {}
 

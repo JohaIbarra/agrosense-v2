@@ -70,8 +70,9 @@ dron/satélite). Cubierto por diseño, sin cambios presentes:
   va a los datos, no al revés. Solo inferencia vive en el monolito (CPU,
   ms para dataset pequeño).
 - `ml/` es agnóstico al framework: sklearn hoy, PyTorch/ONNX mañana, la
-  misma interfaz de inferencia y el mismo ML eval gate (group split por
-  árbol, cero leakage, artefacto versionado, preprocessing compartido).
+  misma interfaz de inferencia y el mismo ML eval gate (split temporal +
+  group split por parcela, cero leakage, artefacto versionado,
+  preprocessing compartido).
 - Extracción de `ml/` como servicio independiente SOLO si la inferencia
   deja de ser acotada (lotes de imágenes): sería ADR-005, escrito cuando
   exista el requisito real, no antes.

@@ -50,8 +50,12 @@ carga los datos recolectados (CSV/XLSX) y la plataforma analiza:
 
 ## 6. Spike ML — evidencia de viabilidad (ya ejecutado)
 
-**Metodología:** evaluación honesta (GroupKFold por árbol, sin variables
-derivadas del target) sobre el dataset de referencia.
+**Metodología:** evaluación honesta (GroupKFold por **parcela** —
+`Codigo de unidad muestreo` —, sin variables derivadas del target) sobre el
+dataset de referencia. El grupo se corrigió de árbol a parcela el
+2026-09-21: agrupar por árbol deja fuga espacial (misma parcela ⇒ mismo
+suelo, pendiente y cuadrilla) y, bajo split temporal, no aporta nada
+porque las olas ya separan las observaciones del mismo individuo.
 
 | Resultado | Valor | Implicación |
 |---|---|---|

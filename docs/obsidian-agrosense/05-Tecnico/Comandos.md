@@ -182,6 +182,54 @@ pytest --version
 
 ---
 
+## Analítica (slice 5)
+
+```bash
+cd backend
+
+# 1. Esquema: crea species_analytics, plot_analytics, variance_components
+alembic upgrade head
+
+# 2. Validar los CSV sin escribir nada (imprime los conteos esperados:
+#    30 especies, 8 significativas en estancamiento, 1 en mortalidad)
+python scripts/load_analytics.py --dry-run
+
+# 3. Cargar: borra y recarga las 3 tablas en UNA transacción (idempotente)
+python scripts/load_analytics.py
+```
+
+Requiere `backend/data/processed/*.csv`. Esos archivos **no están en el repo**
+(`.gitignore` excluye `data/processed/` y `*.csv`): se copian a mano. Sin
+ellos, los tests de analítica hacen skip en vez de fallar.
+
+```bash
+# Verificar la API a mano
+uvicorn agrosense.adapters.api.app:create_app --factory --reload
+curl http://127.0.0.1:8000/api/v1/analytics/variance-decomposition
+curl "http://127.0.0.1:8000/api/v1/analytics/species?sort=stall_risk"
+curl "http://127.0.0.1:8000/api/v1/analytics/species/Lafoensia%20speciosa"
+```
+
+---
+
+## Frontend
+
+```bash
+cd frontend
+npm install
+
+npm run dev       # http://localhost:5173 (proxy /api → :8000)
+npm run build     # tsc -b + vite build
+npm test          # vitest
+npm run lint      # eslint
+```
+
+El dashboard vive en `/analytics`. Necesita el backend corriendo **y** la
+analítica cargada; si la base está vacía, la propia pantalla dice qué script
+ejecutar.
+
+---
+
 ## Atajos de PowerShell
 
 ```powershell
@@ -201,3 +249,4 @@ Select-String -Path "archivo.py" -Pattern "def "
 
 - [[Setup Técnico]] — Instalación
 - [[Sistema]] — Arquitectura
+- [[Slice 5 - Analítica de Crecimiento]] — Qué cargan esos comandos
