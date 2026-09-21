@@ -11,7 +11,7 @@ conoce el DTO, el DTO no conoce al adapter.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 
 from agrosense.domain.entities import Observation, Tree
 
@@ -70,7 +70,7 @@ class CampaignData:
 
 @dataclass(frozen=True)
 class ProjectSummary:
-    """UC1/UC3: proyecto con su conteo de campanas."""
+    """UC1/UC3: proyecto con su conteo de campanas (E1: con todos sus campos)."""
 
     id: int
     name: str
@@ -78,6 +78,37 @@ class ProjectSummary:
     description: str | None
     created_at: datetime
     campaigns_count: int
+    # E1 (decision D7). Con valores por defecto para no romper a quien ya
+    # construye el DTO con los campos del slice 2.
+    project_code: str | None = None
+    contract_code: str | None = None
+    objective: str | None = None
+    executing_org: str | None = None
+    contracting_entity: str | None = None
+    department: str | None = None
+    municipality: str | None = None
+    intervention_type: str | None = None
+    area_ha: float | None = None
+    planted_individuals: int | None = None
+    planting_density: float | None = None
+    establishment_date: date | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    legal_framework: str | None = None
+    environmental_authority: str | None = None
+    status: str = "activo"
+    coordinate_srid: int = 9377
+
+
+@dataclass(frozen=True)
+class EngineerDTO:
+    """Perfil del ingeniero autenticado (E1)."""
+
+    id: str
+    email: str | None
+    full_name: str | None
+    professional_license: str | None
+    organization: str | None
 
 
 @dataclass(frozen=True)

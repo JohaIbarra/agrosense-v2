@@ -60,17 +60,20 @@ def upload_campaign(
     project_repo,
     campaign_repo,
     source: CampaignSource,
+    owner_id: str,
 ) -> UploadResult:
     """Sube y valida una campana de monitoreo a un proyecto existente.
 
     Raises:
-        AppError("PROJECT_NOT_FOUND"): si el project_id no existe.
+        AppError("PROJECT_NOT_FOUND"): si el proyecto no existe o no es del ingeniero.
         AppError("INVALID_FILE"): si el source no puede leer el archivo.
         AppError("DUPLICATE_FILE"): si ese archivo ya fue ingresado.
         DomainError: si un invariante de dominio falla (el caller lo mapea).
     """
-    # 1. Proyecto primero: no se parsea un archivo que no tiene donde ir
-    if project_repo.get(project_id) is None:
+    # 1. Proyecto primero, y del ingeniero que llama (E1): no se parsea un
+    #    archivo que no tiene donde ir. Uno ajeno responde igual que uno
+    #    inexistente, para no revelar que existe.
+    if project_repo.get_owned(project_id, owner_id) is None:
         raise AppError("PROJECT_NOT_FOUND", f"El proyecto {project_id} no existe.")
 
     # 2. Hash del archivo CRUDO, antes de parsear

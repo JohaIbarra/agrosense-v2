@@ -16,6 +16,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from tests.auth.keys import bearer, fake_verifier
+
 PROCESSED = Path(__file__).parents[2] / "data" / "processed"
 SCRIPTS = Path(__file__).parents[2] / "scripts"
 
@@ -39,7 +41,7 @@ def analytics_client():
         pytest.skip("CSV de los modelos mixtos ausentes (data/processed/)")
 
     from agrosense.adapters.api.app import create_app
-    from agrosense.adapters.api.deps import get_session
+    from agrosense.adapters.api.deps import get_session, get_token_verifier
     from agrosense.adapters.db.models import Base
     from agrosense.adapters.db.repository import AnalyticsRepository
 
@@ -71,7 +73,8 @@ def analytics_client():
             s.close()
 
     app.dependency_overrides[get_session] = _override
-    with TestClient(app) as c:
+    app.dependency_overrides[get_token_verifier] = fake_verifier
+    with TestClient(app, headers=bearer()) as c:
         yield c
     engine.dispose()
 
@@ -85,7 +88,7 @@ def empty_analytics_client():
     interpretaria como "no hay riesgo".
     """
     from agrosense.adapters.api.app import create_app
-    from agrosense.adapters.api.deps import get_session
+    from agrosense.adapters.api.deps import get_session, get_token_verifier
     from agrosense.adapters.db.models import Base
 
     engine = create_engine(
@@ -105,6 +108,7 @@ def empty_analytics_client():
             s.close()
 
     app.dependency_overrides[get_session] = _override
-    with TestClient(app) as c:
+    app.dependency_overrides[get_token_verifier] = fake_verifier
+    with TestClient(app, headers=bearer()) as c:
         yield c
     engine.dispose()

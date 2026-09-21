@@ -43,17 +43,75 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+class Engineer(Base):
+    """Perfil del ingeniero (E1, ADR-006).
+
+    `id` es el `sub` del token de Supabase Auth: usuario y contrasena los
+    gestiona Supabase, AgroSense solo guarda el perfil. Se crea en la primera
+    peticion autenticada. No hay FK hacia `auth.users` a proposito: esa tabla
+    vive en otro esquema, no existe en los tests locales, y la identidad ya la
+    garantiza la firma del token.
+    """
+
+    __tablename__ = "engineers"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    email: Mapped[str | None] = mapped_column(String(320))
+    full_name: Mapped[str | None] = mapped_column(String(200))
+    professional_license: Mapped[str | None] = mapped_column(String(100))
+    organization: Mapped[str | None] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    projects: Mapped[list["Project"]] = relationship(back_populates="owner")
+
+
 class Project(Base):
+    """Proyecto de restauracion. Pertenece a UN ingeniero (E1).
+
+    `project_code` lo asigna AgroSense (`AGS-{año}-{id}`): identificador interno,
+    obligatorio y unico global. El nombre es unico por ingeniero, no global:
+    dos ingenieros pueden tener «Restauracion Guayabal».
+    """
+
     __tablename__ = "projects"
+    __table_args__ = (
+        UniqueConstraint("owner_id", "name", name="uq_project_owner_name"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
+    project_code: Mapped[str] = mapped_column(String(40), nullable=False, unique=True)
+    owner_id: Mapped[str] = mapped_column(
+        ForeignKey("engineers.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
     locality: Mapped[str | None] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
 
+    # E1 — campos del proyecto (decision D7)
+    contract_code: Mapped[str | None] = mapped_column(String(100))
+    objective: Mapped[str | None] = mapped_column(Text)
+    executing_org: Mapped[str | None] = mapped_column(String(200))
+    contracting_entity: Mapped[str | None] = mapped_column(String(200))
+    department: Mapped[str | None] = mapped_column(String(100))
+    municipality: Mapped[str | None] = mapped_column(String(100))
+    intervention_type: Mapped[str | None] = mapped_column(String(50))
+    area_ha: Mapped[float | None] = mapped_column(Float)
+    planted_individuals: Mapped[int | None] = mapped_column(Integer)
+    planting_density: Mapped[float | None] = mapped_column(Float)
+    establishment_date: Mapped[date | None] = mapped_column(Date)
+    start_date: Mapped[date | None] = mapped_column(Date)
+    end_date: Mapped[date | None] = mapped_column(Date)
+    legal_framework: Mapped[str | None] = mapped_column(String(50))
+    environmental_authority: Mapped[str | None] = mapped_column(String(200))
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="activo")
+    coordinate_srid: Mapped[int] = mapped_column(Integer, nullable=False, default=9377)
+
+    owner: Mapped["Engineer"] = relationship(back_populates="projects")
     campaigns: Mapped[list["CampaignFile"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )

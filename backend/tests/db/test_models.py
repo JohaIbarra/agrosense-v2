@@ -20,8 +20,25 @@ def unique_groups(table) -> list[tuple[str, ...]]:
 def test_project_table():
     t = models.Project.__table__
     cols = {c.name for c in t.columns}
-    assert cols == {"id", "name", "locality", "description", "created_at"}
-    assert ("name",) in unique_groups(t)
+    assert {"id", "name", "locality", "description", "created_at"} <= cols
+    # E1: propietario, codigo interno y los campos de D7
+    assert {
+        "owner_id", "project_code", "contract_code", "objective", "executing_org",
+        "contracting_entity", "department", "municipality", "intervention_type",
+        "area_ha", "planted_individuals", "planting_density", "establishment_date",
+        "start_date", "end_date", "legal_framework", "environmental_authority",
+        "status", "coordinate_srid",
+    } <= cols
+    # el nombre es unico POR INGENIERO, no global
+    assert ("name", "owner_id") in unique_groups(t)
+    assert ("name",) not in unique_groups(t)
+
+
+def test_engineer_table():
+    t = models.Engineer.__table__
+    assert {"id", "email", "full_name", "professional_license", "organization"} <= {
+        c.name for c in t.columns
+    }
 
 
 def test_campaign_file_table():

@@ -24,7 +24,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from agrosense.adapters.api.deps import get_session
+from agrosense.adapters.api.deps import get_current_engineer, get_session
 from agrosense.adapters.api.errors import raise_for_value_error
 from agrosense.adapters.api.schemas import (
     ModelVarianceResponse,
@@ -49,7 +49,13 @@ from agrosense.application.use_cases.read_analytics import (
     variance_decomposition,
 )
 
-router = APIRouter(prefix="/api/v1/analytics", tags=["analytics"])
+# E1: el referente tambien exige sesion (ADR-006). No hay dato sensible, pero
+# toda la API es para ingenieros autenticados y la regla es una sola.
+router = APIRouter(
+    prefix="/api/v1/analytics",
+    tags=["analytics"],
+    dependencies=[Depends(get_current_engineer)],
+)
 
 SessionDep = Annotated[Session, Depends(get_session)]
 

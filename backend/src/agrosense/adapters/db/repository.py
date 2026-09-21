@@ -4,12 +4,15 @@ Transaccionalidad de save_ingest: TODO o NADA (regla ADR-004 — sin
 persistencia parcial). El commit lo hace el propio repo en el borde de
 la operacion completa.
 """
+import uuid
+
 from sqlalchemy import func, insert, select, update
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 
 from agrosense.adapters.db.models import (
     CampaignFile,
+    Engineer,
     MonitoringRow,
     ObservationRow,
     PlotAnalytics,
@@ -51,28 +54,123 @@ _PLOT_ATTRS = (
 )
 
 
+class EngineerRepository:
+    """Perfiles de ingeniero (E1). La identidad la da el token, no esta tabla."""
+
+    def __init__(self, session: Session):
+        self._s = session
+
+    def get(self, engineer_id: str) -> Engineer | None:
+        return self._s.get(Engineer, engineer_id)
+
+    def ensure(self, engineer_id: str, email: str | None) -> Engineer:
+        """Devuelve el perfil, creandolo en la primera peticion autenticada.
+
+        El email se refresca desde el token: si el ingeniero lo cambia en
+        Supabase, AgroSense lo ve en su siguiente peticion.
+        """
+        eng = self._s.get(Engineer, engineer_id)
+        if eng is None:
+            eng = Engineer(id=engineer_id, email=email)
+            self._s.add(eng)
+            try:
+                self._s.commit()
+            except IntegrityError:
+                # Dos peticiones simultaneas del mismo ingeniero nuevo
+                self._s.rollback()
+                eng = self._s.get(Engineer, engineer_id)
+        elif email and eng.email != email:
+            eng.email = email
+            self._s.commit()
+        return eng
+
+    def update(self, engineer: Engineer, **fields) -> Engineer:
+        for key, value in fields.items():
+            setattr(engineer, key, value)
+        self._s.commit()
+        return engineer
+
+
 class ProjectRepository:
     def __init__(self, session: Session):
         self._s = session
 
-    def create(self, name: str, locality: str | None, description: str | None) -> Project:
-        exists = self._s.execute(select(Project).where(Project.name == name)).scalar()
-        if exists:
-            raise AppError("DUPLICATE_NAME", f"Ya existe un proyecto llamado '{name}'.")
-        proj = Project(name=name, locality=locality, description=description)
+    def create(
+        self,
+        name: str,
+        locality: str | None = None,
+        description: str | None = None,
+        *,
+        owner_id: str,
+        **fields,
+    ) -> Project:
+        """Crea un proyecto del ingeniero y le asigna su codigo interno.
+
+        El codigo `AGS-{año}-{id:04d}` sale del id, asi que no hay carrera
+        posible entre dos altas simultaneas: se inserta con un marcador unico,
+        se obtiene el id y se fija el codigo en la misma transaccion.
+        """
+        if self._name_taken(owner_id, name):
+            raise AppError("DUPLICATE_NAME", f"Ya tiene un proyecto llamado '{name}'.")
+        proj = Project(
+            name=name,
+            locality=locality,
+            description=description,
+            owner_id=owner_id,
+            project_code=f"TMP-{uuid.uuid4().hex}",
+            **fields,
+        )
         self._s.add(proj)
         try:
+            self._s.flush()
+            proj.project_code = f"AGS-{proj.created_at.year}-{proj.id:04d}"
             self._s.commit()
         except IntegrityError as exc:
             # Carrera entre el SELECT y el INSERT: la constraint es la verdad
             self._s.rollback()
             raise AppError(
-                "DUPLICATE_NAME", f"Ya existe un proyecto llamado '{name}'."
+                "DUPLICATE_NAME", f"Ya tiene un proyecto llamado '{name}'."
             ) from exc
         return proj
 
+    def _name_taken(self, owner_id: str, name: str, exclude_id: int | None = None) -> bool:
+        stmt = select(Project.id).where(Project.owner_id == owner_id, Project.name == name)
+        if exclude_id is not None:
+            stmt = stmt.where(Project.id != exclude_id)
+        return self._s.scalar(stmt) is not None
+
+    def update(self, project: Project, **fields) -> Project:
+        new_name = fields.get("name")
+        if new_name and self._name_taken(project.owner_id, new_name, exclude_id=project.id):
+            raise AppError("DUPLICATE_NAME", f"Ya tiene un proyecto llamado '{new_name}'.")
+        for key, value in fields.items():
+            setattr(project, key, value)
+        try:
+            self._s.commit()
+        except IntegrityError as exc:
+            self._s.rollback()
+            raise AppError("DUPLICATE_NAME", "Ya tiene un proyecto con ese nombre.") from exc
+        return project
+
     def get(self, project_id: int) -> Project | None:
+        """Lectura SIN autorizacion: solo para uso interno y tests.
+
+        Toda ruta que atiende a un ingeniero usa `get_owned`.
+        """
         return self._s.get(Project, project_id)
+
+    def get_owned(self, project_id: int, owner_id: str) -> Project | None:
+        """El proyecto, solo si pertenece al ingeniero. Si no, None (→ 404)."""
+        return self._s.scalar(
+            select(Project).where(Project.id == project_id, Project.owner_id == owner_id)
+        )
+
+    def list_for_owner(self, owner_id: str) -> list[Project]:
+        return list(
+            self._s.scalars(
+                select(Project).where(Project.owner_id == owner_id).order_by(Project.id)
+            ).all()
+        )
 
     def list_all(self) -> list[Project]:
         return list(self._s.scalars(select(Project).order_by(Project.id)).all())

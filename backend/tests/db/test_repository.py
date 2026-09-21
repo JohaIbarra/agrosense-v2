@@ -13,6 +13,7 @@ from agrosense.adapters.db.models import CampaignFile, ObservationRow, TreeRow
 from agrosense.adapters.db.repository import CampaignRepository, ProjectRepository
 from agrosense.application.dtos import CampaignData
 from agrosense.domain.entities import Observation, StatusSemantic, Tree
+from tests.auth.keys import ENGINEER_A as OWNER
 
 DATASET = Path(__file__).parents[2] / "data" / "raw" / "anexo1.xlsx"
 
@@ -47,7 +48,7 @@ def sample_campaign() -> CampaignData:
 class TestProjectRepository:
     def test_create_and_get(self, session):
         repo = ProjectRepository(session)
-        p = repo.create(name="repo-test-project", locality="Guayabal", description=None)
+        p = repo.create(owner_id=OWNER, name="repo-test-project", locality="Guayabal")
         assert p.id > 0
         assert p.name == "repo-test-project"
 
@@ -57,13 +58,13 @@ class TestProjectRepository:
 
     def test_duplicate_name_rejected(self, session):
         repo = ProjectRepository(session)
-        repo.create(name="repo-test-project", locality=None, description=None)
+        repo.create(owner_id=OWNER, name="repo-test-project")
         with pytest.raises(ValueError, match="DUPLICATE_NAME"):
-            repo.create(name="repo-test-project", locality=None, description=None)
+            repo.create(owner_id=OWNER, name="repo-test-project")
 
     def test_list_all_contains_created(self, session):
         repo = ProjectRepository(session)
-        repo.create(name="repo-test-project", locality=None, description=None)
+        repo.create(owner_id=OWNER, name="repo-test-project")
         names = [p.name for p in repo.list_all()]
         assert "repo-test-project" in names
 
@@ -73,7 +74,7 @@ class TestProjectRepository:
 
     def test_campaigns_count_starts_at_zero(self, session):
         repo = ProjectRepository(session)
-        p = repo.create(name="sin-campanas", locality=None, description=None)
+        p = repo.create(owner_id=OWNER, name="sin-campanas")
         assert repo.campaigns_count(p.id) == 0
 
 
@@ -83,7 +84,7 @@ class TestCampaignRepositoryReads:
     @pytest.fixture()
     def project_with_campaign(self, session):
         prepo = ProjectRepository(session)
-        proj = prepo.create(name="lecturas", locality=None, description=None)
+        proj = prepo.create(owner_id=OWNER, name="lecturas")
         CampaignRepository(session).save_ingest(
             project_id=proj.id,
             result=sample_campaign(),
@@ -119,7 +120,7 @@ class TestCampaignRepositoryReads:
         """Un arbol de otro proyecto no se puede leer por id (aislamiento)."""
         repo = ProjectRepository(session)
         tree = repo.get_trees(project_with_campaign.id)[0]
-        other = repo.create(name="otro", locality=None, description=None)
+        other = repo.create(owner_id=OWNER, name="otro")
         assert repo.get_tree_row(project_with_campaign.id, tree.id) is not None
         assert repo.get_tree_row(other.id, tree.id) is None
 
@@ -127,7 +128,7 @@ class TestCampaignRepositoryReads:
 class TestCampaignRepositoryWrites:
     def test_save_ingest_persists_trees_and_observations(self, session):
         prepo = ProjectRepository(session)
-        proj = prepo.create(name="escritura", locality=None, description=None)
+        proj = prepo.create(owner_id=OWNER, name="escritura")
 
         stats = CampaignRepository(session).save_ingest(
             project_id=proj.id,
@@ -151,7 +152,7 @@ class TestCampaignRepositoryWrites:
     def test_duplicate_sha_rejected(self, session):
         """Provenance: el mismo archivo no se ingesta dos veces al proyecto."""
         prepo = ProjectRepository(session)
-        proj = prepo.create(name="repo-test-dup", locality=None, description=None)
+        proj = prepo.create(owner_id=OWNER, name="repo-test-dup")
         crepo = CampaignRepository(session)
 
         crepo.save_ingest(proj.id, sample_campaign(), "f.xlsx", "b" * 64)
@@ -161,8 +162,8 @@ class TestCampaignRepositoryWrites:
     def test_same_sha_allowed_in_another_project(self, session):
         """El unique es (project_id, sha256): otro proyecto puede subir el mismo archivo."""
         prepo = ProjectRepository(session)
-        a = prepo.create(name="proy-a", locality=None, description=None)
-        b = prepo.create(name="proy-b", locality=None, description=None)
+        a = prepo.create(owner_id=OWNER, name="proy-a")
+        b = prepo.create(owner_id=OWNER, name="proy-b")
         crepo = CampaignRepository(session)
 
         crepo.save_ingest(a.id, sample_campaign(), "f.xlsx", "e" * 64)
@@ -172,7 +173,7 @@ class TestCampaignRepositoryWrites:
     def test_deleting_project_cascades(self, session):
         """Sin huerfanos: borrar el proyecto se lleva arboles y observaciones."""
         prepo = ProjectRepository(session)
-        proj = prepo.create(name="cascada", locality=None, description=None)
+        proj = prepo.create(owner_id=OWNER, name="cascada")
         CampaignRepository(session).save_ingest(
             proj.id, sample_campaign(), "f.xlsx", "f" * 64
         )
@@ -194,7 +195,7 @@ class TestCampaignRepositoryWrites:
         from agrosense.adapters.ingester.ingest import ingest_wide
 
         prepo = ProjectRepository(session)
-        proj = prepo.create(name="dataset-real", locality=None, description=None)
+        proj = prepo.create(owner_id=OWNER, name="dataset-real")
         result = ingest_wide(pd.read_excel(DATASET, sheet_name="Monitoreo_4"))
 
         stats = CampaignRepository(session).save_ingest(
@@ -218,7 +219,7 @@ class TestCampaignRepositoryWrites:
     def test_failed_ingest_leaves_nothing_behind(self, session):
         """ADR-004: sin persistencia parcial. Si la escritura falla, rollback total."""
         prepo = ProjectRepository(session)
-        proj = prepo.create(name="atomico", locality=None, description=None)
+        proj = prepo.create(owner_id=OWNER, name="atomico")
 
         data = sample_campaign()
         # Observacion que apunta a un arbol inexistente: revienta a mitad del guardado

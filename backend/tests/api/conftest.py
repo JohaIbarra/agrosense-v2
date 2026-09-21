@@ -16,10 +16,17 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 
-def _build_client(raise_server_exceptions: bool):
+def _build_client(raise_server_exceptions: bool, authenticated: bool = True):
+    """Cliente contra SQLite en memoria.
+
+    Desde E1 toda la API exige sesion: por defecto el cliente va autenticado
+    como ENGINEER_A, con tokens firmados por el "Auth" de prueba
+    (`tests/auth/keys.py`) y verificados de verdad, sin red.
+    """
     from agrosense.adapters.api.app import create_app
-    from agrosense.adapters.api.deps import get_session
+    from agrosense.adapters.api.deps import get_session, get_token_verifier
     from agrosense.adapters.db.models import Base
+    from tests.auth.keys import bearer, fake_verifier
 
     engine = create_engine(
         "sqlite:///:memory:",
@@ -39,7 +46,12 @@ def _build_client(raise_server_exceptions: bool):
             s.close()
 
     app.dependency_overrides[get_session] = _override
-    return TestClient(app, raise_server_exceptions=raise_server_exceptions)
+    app.dependency_overrides[get_token_verifier] = fake_verifier
+    return TestClient(
+        app,
+        raise_server_exceptions=raise_server_exceptions,
+        headers=bearer() if authenticated else None,
+    )
 
 
 @pytest.fixture()
@@ -54,4 +66,11 @@ def lenient_client():
     re-lanzar. Necesario para verificar que una excepcion no mapeada sale
     como {code, message} y no como stack trace."""
     with _build_client(raise_server_exceptions=False) as c:
+        yield c
+
+
+@pytest.fixture()
+def anon_client():
+    """Mismo backend, sin token: para verificar los 401."""
+    with _build_client(raise_server_exceptions=True, authenticated=False) as c:
         yield c

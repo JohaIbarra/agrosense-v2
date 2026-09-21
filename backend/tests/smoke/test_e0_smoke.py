@@ -26,6 +26,7 @@ from agrosense.adapters.db.models import (
 from agrosense.adapters.db.repository import CampaignRepository, ProjectRepository
 from agrosense.application.dtos import CampaignData, FileMetadata
 from agrosense.domain.entities import Observation, StatusSemantic, Tree
+from tests.auth.keys import ENGINEER_A as OWNER
 
 pytestmark = [
     pytest.mark.supabase,
@@ -56,7 +57,7 @@ def project(session):
             session.commit()
 
     _drop()
-    p = ProjectRepository(session).create(name=SMOKE_PROJECT, locality=None, description=None)
+    p = ProjectRepository(session).create(owner_id=OWNER, name=SMOKE_PROJECT)
     yield p
     session.rollback()
     _drop()

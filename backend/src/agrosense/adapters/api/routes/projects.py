@@ -1,11 +1,18 @@
-"""Endpoints del slice 2 (UC1/UC2 + reads).
+"""Endpoints de proyectos (slice 2 + E0 + E1).
 
 Regla ADR-003: las routes parsean → llaman application/ → mapean respuesta.
-Cero logica de negocio aqui.
+Cero logica de negocio aqui: la autorizacion (un ingeniero solo ve lo suyo)
+vive en los casos de uso.
+
+AUTH (E1, ADR-006): todas las rutas exigen un token de Supabase Auth
+(`Authorization: Bearer …`) → 401 si falta o no es valido. Un proyecto de
+otro ingeniero responde 404, igual que uno inexistente.
 
 Contratos:
-    POST   /projects                               → 201 ProjectResponse
+    GET    /projects                               → 200 list[ProjectResponse]  (E1)
+    POST   /projects                               → 201 ProjectResponse | 409/422
     GET    /projects/{project_id}                  → 200 ProjectResponse | 404
+    PATCH  /projects/{project_id}                  → 200 ProjectResponse | 404/409/422  (E1)
     POST   /projects/{project_id}/campaigns        → 201 UploadResultResponse | 400/404/409/422
     GET    /projects/{project_id}/campaigns        → 200 list[CampaignResponse] | 404
     GET    /projects/{project_id}/trees            → 200 list[TreeRowResponse] | 404
@@ -16,12 +23,13 @@ Contratos:
 from __future__ import annotations
 
 import os
+from dataclasses import asdict
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
-from agrosense.adapters.api.deps import get_session
+from agrosense.adapters.api.deps import CurrentEngineer, get_session
 from agrosense.adapters.api.errors import raise_for_value_error
 from agrosense.adapters.api.schemas import (
     CampaignResponse,
@@ -29,15 +37,22 @@ from agrosense.adapters.api.schemas import (
     ObservationResponse,
     ProjectCreate,
     ProjectResponse,
+    ProjectUpdate,
     TreeRowResponse,
     UploadResultResponse,
     WarningItem,
 )
 from agrosense.adapters.db.repository import CampaignRepository, ProjectRepository
 from agrosense.adapters.ingester.excel_source import ExcelCampaignSource
-from agrosense.application.dtos import ProjectSummary, UploadResult
+from agrosense.application.dtos import EngineerDTO, ProjectSummary, UploadResult
 from agrosense.application.errors import AppError
-from agrosense.application.use_cases.create_project import create_project
+from agrosense.application.use_cases.create_project import (
+    create_project,
+    get_owned_project,
+    get_project,
+    list_projects,
+    update_project,
+)
 from agrosense.application.use_cases.upload_campaign import upload_campaign
 
 router = APIRouter()
@@ -96,14 +111,7 @@ def _safe_filename(raw: str | None) -> str:
 # El use case no conoce estos schemas; traducir es trabajo del adapter.
 
 def _to_project_response(dto: ProjectSummary) -> ProjectResponse:
-    return ProjectResponse(
-        id=dto.id,
-        name=dto.name,
-        locality=dto.locality,
-        description=dto.description,
-        created_at=dto.created_at,
-        campaigns_count=dto.campaigns_count,
-    )
+    return ProjectResponse(**asdict(dto))
 
 
 def _to_upload_response(dto: UploadResult) -> UploadResultResponse:
@@ -122,42 +130,64 @@ def _to_upload_response(dto: UploadResult) -> UploadResultResponse:
     )
 
 
-# ── UC1: Crear proyecto ────────────────────────────────────────────────────
+def _owned(repo: ProjectRepository, engineer: EngineerDTO, project_id: int):
+    """El proyecto del ingeniero, o 404 con la forma del contrato."""
+    try:
+        return get_owned_project(repo, engineer.id, project_id)
+    except ValueError as exc:
+        raise_for_value_error(exc)
+
+
+# ── Proyectos del ingeniero (UC1 + E1) ─────────────────────────────────────
+
+@router.get("/projects", response_model=list[ProjectResponse])
+def list_projects_endpoint(
+    session: SessionDep, engineer: CurrentEngineer
+) -> list[ProjectResponse]:
+    """Los proyectos del ingeniero autenticado, y solo esos."""
+    return [_to_project_response(p) for p in list_projects(ProjectRepository(session), engineer.id)]
+
 
 @router.post("/projects", response_model=ProjectResponse, status_code=201)
-def create_project_endpoint(body: ProjectCreate, session: SessionDep) -> ProjectResponse:
-    repo = ProjectRepository(session)
+def create_project_endpoint(
+    body: ProjectCreate, session: SessionDep, engineer: CurrentEngineer
+) -> ProjectResponse:
     try:
         dto = create_project(
-            repo=repo,
-            name=body.name,
-            locality=body.locality,
-            description=body.description,
+            ProjectRepository(session), engineer.id, **body.model_dump(exclude_none=True)
         )
+    except ValueError as exc:
+        raise_for_value_error(exc)
+    # InvalidProjectError (DomainError) sube al handler global → 422
+    return _to_project_response(dto)
+
+
+@router.get("/projects/{project_id}", response_model=ProjectResponse)
+def get_project_endpoint(
+    project_id: int, session: SessionDep, engineer: CurrentEngineer
+) -> ProjectResponse:
+    try:
+        dto = get_project(ProjectRepository(session), engineer.id, project_id)
     except ValueError as exc:
         raise_for_value_error(exc)
     return _to_project_response(dto)
 
 
-# ── Leer proyecto ──────────────────────────────────────────────────────────
-
-@router.get("/projects/{project_id}", response_model=ProjectResponse)
-def get_project_endpoint(project_id: int, session: SessionDep) -> ProjectResponse:
-    repo = ProjectRepository(session)
-    proj = repo.get(project_id)
-    if proj is None:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "PROJECT_NOT_FOUND", "message": f"Proyecto {project_id} no existe"},
+@router.patch("/projects/{project_id}", response_model=ProjectResponse)
+def update_project_endpoint(
+    project_id: int, body: ProjectUpdate, session: SessionDep, engineer: CurrentEngineer
+) -> ProjectResponse:
+    """Edita solo los campos presentes en el cuerpo."""
+    try:
+        dto = update_project(
+            ProjectRepository(session),
+            engineer.id,
+            project_id,
+            **body.model_dump(exclude_unset=True),
         )
-    return ProjectResponse(
-        id=proj.id,
-        name=proj.name,
-        locality=proj.locality,
-        description=proj.description,
-        created_at=proj.created_at,
-        campaigns_count=repo.campaigns_count(proj.id),
-    )
+    except ValueError as exc:
+        raise_for_value_error(exc)
+    return _to_project_response(dto)
 
 
 # ── UC2: Cargar campaña ────────────────────────────────────────────────────
@@ -171,8 +201,9 @@ def upload_campaign_endpoint(
     project_id: int,
     file: UploadFile,
     session: SessionDep,
+    engineer: CurrentEngineer,
 ) -> UploadResultResponse:
-    """Sube una campaña de monitoreo.
+    """Sube una campaña de monitoreo a un proyecto del ingeniero.
 
     Es `def` y no `async def` a propósito (hallazgo R3): el parseo y las
     escrituras son bloqueantes y duran decenas de segundos. FastAPI solo
@@ -191,6 +222,7 @@ def upload_campaign_endpoint(
             project_repo=proj_repo,
             campaign_repo=camp_repo,
             source=ExcelCampaignSource(),
+            owner_id=engineer.id,
         )
     except ValueError as exc:
         raise_for_value_error(exc)
@@ -202,15 +234,10 @@ def upload_campaign_endpoint(
 
 @router.get("/projects/{project_id}/campaigns", response_model=list[CampaignResponse])
 def list_campaigns_endpoint(
-    project_id: int, session: SessionDep
+    project_id: int, session: SessionDep, engineer: CurrentEngineer
 ) -> list[CampaignResponse]:
     repo = ProjectRepository(session)
-    if repo.get(project_id) is None:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "PROJECT_NOT_FOUND", "message": f"Proyecto {project_id} no existe"},
-        )
-    campaigns = repo.get_campaigns(project_id)
+    _owned(repo, engineer, project_id)
     return [
         CampaignResponse(
             id=c.id,
@@ -222,7 +249,7 @@ def list_campaigns_endpoint(
             observations=c.observations,
             deaths=c.deaths,
         )
-        for c in campaigns
+        for c in repo.get_campaigns(project_id)
     ]
 
 
@@ -232,16 +259,12 @@ def list_campaigns_endpoint(
 def list_trees_endpoint(
     project_id: int,
     session: SessionDep,
+    engineer: CurrentEngineer,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[TreeRowResponse]:
     repo = ProjectRepository(session)
-    if repo.get(project_id) is None:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "PROJECT_NOT_FOUND", "message": f"Proyecto {project_id} no existe"},
-        )
-    trees = repo.get_trees(project_id, limit=limit, offset=offset)
+    _owned(repo, engineer, project_id)
     return [
         TreeRowResponse(
             id=t.id,
@@ -259,7 +282,7 @@ def list_trees_endpoint(
             associated_cover=t.associated_cover,
             establishment_cover=t.establishment_cover,
         )
-        for t in trees
+        for t in repo.get_trees(project_id, limit=limit, offset=offset)
     ]
 
 
@@ -273,10 +296,11 @@ def list_observations_endpoint(
     project_id: int,
     tree_row_id: int,
     session: SessionDep,
+    engineer: CurrentEngineer,
 ) -> list[ObservationResponse]:
     repo = ProjectRepository(session)
-    tree = repo.get_tree_row(project_id, tree_row_id)
-    if tree is None:
+    _owned(repo, engineer, project_id)
+    if repo.get_tree_row(project_id, tree_row_id) is None:
         raise HTTPException(
             status_code=404,
             detail={
@@ -284,7 +308,6 @@ def list_observations_endpoint(
                 "message": f"Árbol {tree_row_id} no encontrado en proyecto {project_id}",
             },
         )
-    obs_rows = repo.get_observations(tree_row_id)
     return [
         ObservationResponse(
             campaign=o.campaign,
@@ -296,20 +319,18 @@ def list_observations_endpoint(
             alive=o.alive,
             colonization=o.colonization,
         )
-        for o in obs_rows
+        for o in repo.get_observations(tree_row_id)
     ]
 
 
 # ── Monitoreos del proyecto (E0) ───────────────────────────────────────────
 
 @router.get("/projects/{project_id}/monitorings", response_model=list[MonitoringResponse])
-def list_monitorings_endpoint(project_id: int, session: SessionDep) -> list[MonitoringResponse]:
+def list_monitorings_endpoint(
+    project_id: int, session: SessionDep, engineer: CurrentEngineer
+) -> list[MonitoringResponse]:
     repo = ProjectRepository(session)
-    if repo.get(project_id) is None:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "PROJECT_NOT_FOUND", "message": f"Proyecto {project_id} no existe"},
-        )
+    _owned(repo, engineer, project_id)
     return [
         MonitoringResponse(
             number=m.number,

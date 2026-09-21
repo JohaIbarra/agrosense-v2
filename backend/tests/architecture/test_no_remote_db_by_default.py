@@ -32,6 +32,13 @@ _REDIRECT_MARKS = ('"DATABASE_URL"', "'DATABASE_URL'")
 _SQLITE_MARK = "sqlite://"
 
 
+# El conftest del smoke (E1) crea el ingeniero de prueba en Supabase. Un
+# conftest no puede llevar `pytestmark`, pero solo se ejecuta cuando corren
+# tests de su carpeta; la exencion es segura MIENTRAS todos ellos esten
+# marcados `supabase`, y eso lo exige test_every_smoke_module_is_marked_supabase.
+SMOKE_CONFTEST = "smoke/conftest.py"
+
+
 def _redirects_to_sqlite(source: str) -> bool:
     """El archivo apunta DATABASE_URL a SQLite antes de usar las fabricas."""
     parchea = any(
@@ -68,6 +75,8 @@ def test_only_marked_tests_open_the_real_connection() -> None:
             continue
         if _has_supabase_marker(source) or _redirects_to_sqlite(source):
             continue
+        if py.relative_to(TESTS).as_posix() == SMOKE_CONFTEST:
+            continue  # ver test_every_smoke_module_is_marked_supabase
         offenders.append(str(py.relative_to(TESTS)))
     assert not offenders, (
         "Estos tests abren la conexion real sin marker 'supabase' "
@@ -98,3 +107,17 @@ def test_supabase_marker_is_registered() -> None:
     assert 'not supabase' in pyproject, (
         "falta addopts con -m 'not supabase': la corrida por defecto tocaria la red"
     )
+
+
+def test_every_smoke_module_is_marked_supabase() -> None:
+    """Condicion de la exencion del conftest del smoke.
+
+    Si un test sin marcar entrara en `tests/smoke/`, correria en el `pytest`
+    por defecto y arrastraria el fixture que abre la conexion real.
+    """
+    sin_marca = [
+        py.name
+        for py in sorted((TESTS / "smoke").glob("test_*.py"))
+        if not _has_supabase_marker(py.read_text(encoding="utf-8"))
+    ]
+    assert not sin_marca, f"tests de smoke sin el marker supabase: {sin_marca}"

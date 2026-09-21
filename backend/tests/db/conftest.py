@@ -49,8 +49,18 @@ def engine():
 
 @pytest.fixture()
 def session(engine):
+    """Sesion con el ingeniero de prueba ya creado.
+
+    Desde E1 todo proyecto tiene propietario (FK a `engineers`), asi que el
+    ingeniero debe existir antes de crear ningun proyecto.
+    """
+    from agrosense.adapters.db.models import Engineer
+    from tests.auth.keys import ENGINEER_A
+
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     s = factory()
+    s.add(Engineer(id=ENGINEER_A, email="ingeniera@example.com"))
+    s.commit()
     yield s
     s.rollback()
     s.close()

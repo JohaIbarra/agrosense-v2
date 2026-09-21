@@ -27,6 +27,7 @@ from agrosense.adapters.db.models import Base, ObservationRow, Project, TreeRow
 from agrosense.adapters.db.repository import CampaignRepository, ProjectRepository
 from agrosense.application.dtos import CampaignData
 from agrosense.domain.entities import Observation, StatusSemantic, Tree
+from tests.auth.keys import ENGINEER_A as OWNER
 
 pytestmark = [
     pytest.mark.supabase,
@@ -118,7 +119,9 @@ def test_migration_schema_matches_models(session):
 def test_round_trip_write_read_delete(session, clean_smoke_project):
     """Ciclo completo en el dialecto real, con provenance y cascada."""
     prepo = ProjectRepository(session)
-    proj = prepo.create(name=clean_smoke_project, locality="Guayabal", description="smoke")
+    proj = prepo.create(
+        owner_id=OWNER, name=clean_smoke_project, locality="Guayabal", description="smoke"
+    )
 
     stats = CampaignRepository(session).save_ingest(
         project_id=proj.id,
@@ -150,7 +153,7 @@ def test_round_trip_write_read_delete(session, clean_smoke_project):
 def test_duplicate_file_rejected_by_real_constraint(session, clean_smoke_project):
     """El UNIQUE (project_id, sha256) existe en la DB, no solo en el model."""
     prepo = ProjectRepository(session)
-    proj = prepo.create(name=clean_smoke_project, locality=None, description=None)
+    proj = prepo.create(owner_id=OWNER, name=clean_smoke_project)
     crepo = CampaignRepository(session)
 
     crepo.save_ingest(proj.id, smoke_campaign(), "smoke.xlsx", "6" * 64)

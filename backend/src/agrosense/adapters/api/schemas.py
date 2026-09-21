@@ -18,10 +18,56 @@ _DEATHS_DESC = (
 # ── UC1: proyectos ─────────────────────────────────────────────
 
 
-class ProjectCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=200)
+class _ProjectFields(BaseModel):
+    """Campos del proyecto (E1, decision D7).
+
+    Aqui se valida forma y longitud; los vocabularios y la coherencia de
+    fechas y cantidades son reglas de negocio y las valida el dominio
+    (`domain/project.py`) — un valor fuera de vocabulario sale como 422
+    INVALID_PROJECT con el mensaje del dominio.
+    """
+
     locality: str | None = Field(default=None, max_length=200)
     description: str | None = Field(default=None, max_length=2000)
+    contract_code: str | None = Field(default=None, max_length=100)
+    objective: str | None = Field(default=None, max_length=4000)
+    executing_org: str | None = Field(default=None, max_length=200)
+    contracting_entity: str | None = Field(default=None, max_length=200)
+    department: str | None = Field(default=None, max_length=100)
+    municipality: str | None = Field(default=None, max_length=100)
+    intervention_type: str | None = Field(
+        default=None, max_length=50,
+        description="rehabilitacion | restauracion_activa | restauracion_pasiva | "
+        "enriquecimiento | reforestacion | agroforestal | otro",
+    )
+    area_ha: float | None = Field(default=None, description="Area intervenida, en hectareas.")
+    planted_individuals: int | None = None
+    planting_density: float | None = Field(default=None, description="Individuos por hectarea.")
+    establishment_date: date | None = Field(default=None, description="Fecha de siembra.")
+    start_date: date | None = None
+    end_date: date | None = None
+    legal_framework: str | None = Field(
+        default=None, max_length=50,
+        description="compensacion_ambiental | inversion_1_por_ciento | plan_de_manejo | "
+        "voluntario | otro",
+    )
+    environmental_authority: str | None = Field(default=None, max_length=200)
+    coordinate_srid: int | None = Field(
+        default=None,
+        description="Sistema de coordenadas de los archivos del proyecto. Por defecto 9377 "
+        "(MAGNA-SIRGAS / Origen Nacional).",
+    )
+
+
+class ProjectCreate(_ProjectFields):
+    name: str = Field(min_length=1, max_length=200)
+
+
+class ProjectUpdate(_ProjectFields):
+    """PATCH: solo se modifican los campos presentes en el cuerpo."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    status: str | None = Field(default=None, max_length=20, description="activo | cerrado")
 
 
 class ProjectResponse(BaseModel):
@@ -31,6 +77,55 @@ class ProjectResponse(BaseModel):
     description: str | None
     created_at: datetime
     campaigns_count: int
+    # E1
+    project_code: str | None = Field(
+        default=None, description="Identificador interno asignado por AgroSense (AGS-año-n)."
+    )
+    contract_code: str | None = None
+    objective: str | None = None
+    executing_org: str | None = None
+    contracting_entity: str | None = None
+    department: str | None = None
+    municipality: str | None = None
+    intervention_type: str | None = None
+    area_ha: float | None = None
+    planted_individuals: int | None = None
+    planting_density: float | None = None
+    establishment_date: date | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    legal_framework: str | None = None
+    environmental_authority: str | None = None
+    status: str = "activo"
+    coordinate_srid: int = 9377
+
+
+# ── E1: perfil del ingeniero ───────────────────────────────────
+
+
+class EngineerResponse(BaseModel):
+    id: str
+    email: str | None
+    full_name: str | None
+    professional_license: str | None = Field(
+        description="Matricula profesional: firma los informes tecnicos."
+    )
+    organization: str | None
+
+
+class CatalogsResponse(BaseModel):
+    """Vocabularios del dominio que el frontend ofrece en sus formularios."""
+
+    intervention_types: list[str]
+    legal_frameworks: list[str]
+    project_statuses: list[str]
+    default_srid: int
+
+
+class EngineerUpdate(BaseModel):
+    full_name: str | None = Field(default=None, max_length=200)
+    professional_license: str | None = Field(default=None, max_length=100)
+    organization: str | None = Field(default=None, max_length=200)
 
 
 # ── UC2: upload de campaña ─────────────────────────────────────

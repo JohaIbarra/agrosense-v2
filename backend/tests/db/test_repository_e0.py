@@ -19,6 +19,7 @@ from agrosense.adapters.db.repository import CampaignRepository, ProjectReposito
 from agrosense.application.dtos import CampaignData, FileMetadata
 from agrosense.domain.entities import Observation, StatusSemantic, Tree
 from agrosense.domain.errors import ProjectLabelMismatchWarning
+from tests.auth.keys import ENGINEER_A as OWNER
 
 
 def _tree(tree_id: str, unit: str, plot: str, predio: str, **extra) -> Tree:
@@ -74,7 +75,7 @@ def _campaign(
 
 @pytest.fixture()
 def project(session):
-    return ProjectRepository(session).create(name="E0", locality=None, description=None)
+    return ProjectRepository(session).create(owner_id=OWNER, name="E0")
 
 
 def _count(session, model) -> int:
@@ -190,8 +191,8 @@ def test_file_without_project_label_does_not_warn(session, project):
 def test_same_plot_code_in_two_projects_are_different_plots(session):
     """La unicidad de la parcela es por proyecto."""
     prepo = ProjectRepository(session)
-    p1 = prepo.create(name="P1", locality=None, description=None)
-    p2 = prepo.create(name="P2", locality=None, description=None)
+    p1 = prepo.create(owner_id=OWNER, name="P1")
+    p2 = prepo.create(owner_id=OWNER, name="P2")
     repo = CampaignRepository(session)
     repo.save_ingest(p1.id, _campaign(), "a.xlsx", "a" * 64)
     repo.save_ingest(p2.id, _campaign(), "a.xlsx", "a" * 64)

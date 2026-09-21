@@ -289,8 +289,9 @@ def api_client(loaded):
     from fastapi.testclient import TestClient
 
     from agrosense.adapters.api.app import create_app
-    from agrosense.adapters.api.deps import get_session
+    from agrosense.adapters.api.deps import get_session, get_token_verifier
     from agrosense.adapters.db.session import get_session_factory
+    from tests.auth.keys import bearer, fake_verifier
 
     factory = get_session_factory()
     app = create_app()
@@ -303,7 +304,8 @@ def api_client(loaded):
             s.close()
 
     app.dependency_overrides[get_session] = _override
-    with TestClient(app) as c:
+    app.dependency_overrides[get_token_verifier] = fake_verifier
+    with TestClient(app, headers=bearer()) as c:
         yield c
 
 

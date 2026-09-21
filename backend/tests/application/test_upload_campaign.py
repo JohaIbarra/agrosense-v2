@@ -27,6 +27,7 @@ class FakeProject:
     description: str | None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     campaigns: list = field(default_factory=list)
+    owner_id: str = "ing-1"
 
 
 class FakeProjectRepository:
@@ -36,17 +37,35 @@ class FakeProjectRepository:
         self._projects: dict[int, FakeProject] = {}
         self._next_id = 1
 
-    def create(self, name: str, locality: str | None, description: str | None) -> FakeProject:
+    def create(
+        self,
+        name: str,
+        locality: str | None = None,
+        description: str | None = None,
+        *,
+        owner_id: str = "ing-1",
+        **_fields,
+    ) -> FakeProject:
         for p in self._projects.values():
-            if p.name == name:
+            if p.name == name and p.owner_id == owner_id:
                 raise ValueError("DUPLICATE_NAME")
-        p = FakeProject(id=self._next_id, name=name, locality=locality, description=description)
+        p = FakeProject(
+            id=self._next_id, name=name, locality=locality, description=description,
+            owner_id=owner_id,
+        )
         self._projects[self._next_id] = p
         self._next_id += 1
         return p
 
     def get(self, project_id: int) -> FakeProject | None:
         return self._projects.get(project_id)
+
+    def get_owned(self, project_id: int, owner_id: str) -> FakeProject | None:
+        p = self._projects.get(project_id)
+        return p if p is not None and p.owner_id == owner_id else None
+
+    def list_for_owner(self, owner_id: str) -> list[FakeProject]:
+        return [p for p in self._projects.values() if p.owner_id == owner_id]
 
     def campaigns_count(self, project_id: int) -> int:
         p = self._projects.get(project_id)
@@ -181,6 +200,7 @@ class TestCreateProject:
         proj_repo, _ = make_repos()
         result = create_project(
             repo=proj_repo,
+            owner_id="ing-1",
             name="Restauración Guayabal",
             locality="Guayabal",
             description="Piloto",
@@ -195,7 +215,7 @@ class TestCreateProject:
 
         proj_repo, _ = make_repos()
         result = create_project(
-            repo=proj_repo, name="Sin localidad", locality=None, description=None
+            repo=proj_repo, owner_id="ing-1", name="Sin localidad", locality=None, description=None
         )
         assert result.locality is None
 
@@ -203,9 +223,9 @@ class TestCreateProject:
         from agrosense.application.use_cases.create_project import create_project
 
         proj_repo, _ = make_repos()
-        create_project(repo=proj_repo, name="Duplicado", locality=None, description=None)
+        create_project(repo=proj_repo, owner_id="ing-1", name="Duplicado")
         with pytest.raises(ValueError, match="DUPLICATE_NAME"):
-            create_project(repo=proj_repo, name="Duplicado", locality=None, description=None)
+            create_project(repo=proj_repo, owner_id="ing-1", name="Duplicado")
 
     def test_result_is_application_dto_not_api_schema(self):
         """ADR-003: el use case devuelve un DTO de application/, no un schema de la API.
@@ -217,7 +237,7 @@ class TestCreateProject:
         from agrosense.application.use_cases.create_project import create_project
 
         proj_repo, _ = make_repos()
-        result = create_project(repo=proj_repo, name="Schema test", locality=None, description=None)
+        result = create_project(repo=proj_repo, owner_id="ing-1", name="Schema test")
         assert isinstance(result, ProjectSummary)
 
 
@@ -235,6 +255,7 @@ class TestUploadCampaign:
         proj = proj_repo.create("Test Upload", None, None)
 
         result = upload_campaign(
+            owner_id="ing-1",
             project_id=proj.id,
             filename="anexo1.xlsx",
             content=DATASET.read_bytes(),
@@ -259,6 +280,7 @@ class TestUploadCampaign:
         proj = proj_repo.create("Test Warnings", None, None)
 
         result = upload_campaign(
+            owner_id="ing-1",
             project_id=proj.id,
             filename="anexo1.xlsx",
             content=DATASET.read_bytes(),
@@ -280,6 +302,7 @@ class TestUploadCampaign:
         proj = proj_repo.create("Test Warning Types", None, None)
 
         result = upload_campaign(
+            owner_id="ing-1",
             project_id=proj.id,
             filename="anexo1.xlsx",
             content=DATASET.read_bytes(),
@@ -298,6 +321,7 @@ class TestUploadCampaign:
         proj_repo, camp_repo = make_repos()
         with pytest.raises(ValueError, match="PROJECT_NOT_FOUND"):
             upload_campaign(
+            owner_id="ing-1",
                 project_id=999,
                 filename="dummy.xlsx",
                 content=b"",
@@ -314,6 +338,7 @@ class TestUploadCampaign:
         proj = proj_repo.create("Test Invalid", None, None)
         with pytest.raises(ValueError, match="INVALID_FILE"):
             upload_campaign(
+            owner_id="ing-1",
                 project_id=proj.id,
                 filename="notexcel.txt",
                 content=b"esto no es un xlsx",
@@ -334,6 +359,7 @@ class TestUploadCampaign:
         content = DATASET.read_bytes()
 
         upload_campaign(
+            owner_id="ing-1",
             project_id=proj.id,
             filename="anexo1.xlsx",
             content=content,
@@ -343,6 +369,7 @@ class TestUploadCampaign:
         )
         with pytest.raises(ValueError, match="DUPLICATE_FILE"):
             upload_campaign(
+            owner_id="ing-1",
                 project_id=proj.id,
                 filename="anexo1.xlsx",
                 content=content,
@@ -363,6 +390,7 @@ class TestUploadCampaign:
         proj = proj_repo.create("Schema Result Test", None, None)
 
         result = upload_campaign(
+            owner_id="ing-1",
             project_id=proj.id,
             filename="anexo1.xlsx",
             content=DATASET.read_bytes(),
@@ -389,6 +417,7 @@ class TestCampaignSourcePort:
         proj = proj_repo.create("Fuente no-Excel", None, None)
 
         result = upload_campaign(
+            owner_id="ing-1",
             project_id=proj.id,
             filename="campaña.csv",
             content=b"cualquier cosa; el puerto decide como leerla",
@@ -411,6 +440,7 @@ class TestCampaignSourcePort:
         content = b"bytes crudos"
 
         upload_campaign(
+            owner_id="ing-1",
             project_id=proj.id,
             filename="m5.csv",
             content=content,
@@ -429,6 +459,7 @@ class TestCampaignSourcePort:
 
         with pytest.raises(ValueError, match="INVALID_FILE"):
             upload_campaign(
+            owner_id="ing-1",
                 project_id=proj.id,
                 filename="roto.xlsx",
                 content=b"no es un xlsx",
@@ -446,6 +477,7 @@ class TestCampaignSourcePort:
 
         with pytest.raises(ValueError, match="PROJECT_NOT_FOUND"):
             upload_campaign(
+            owner_id="ing-1",
                 project_id=404,
                 filename="x.xlsx",
                 content=b"x",
@@ -480,6 +512,7 @@ class TestCampaignSourcePort:
         proj_repo, camp_repo = make_repos()
         proj = proj_repo.create("Warnings DTO", None, None)
         result = upload_campaign(
+            owner_id="ing-1",
             project_id=proj.id,
             filename="x.xlsx",
             content=b"x",
