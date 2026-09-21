@@ -9,7 +9,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SpeciesAnalytics } from "../api/types";
-import { toPoint } from "./ForestPlot";
+import { toPoint, toPoints } from "./ForestPlot";
 
 /** Lafoensia speciosa, el caso real del informe. */
 const LAFOENSIA: SpeciesAnalytics = {
@@ -82,5 +82,44 @@ describe("toPoint", () => {
   it("transporta la interpretación del backend sin reescribirla", () => {
     const p = toPoint(LAFOENSIA, "stall_risk")!;
     expect(p.interpretation).toBe(LAFOENSIA.stall_risk.interpretation);
+  });
+});
+
+describe("toPoints — orden visual", () => {
+  const protectora: SpeciesAnalytics = {
+    ...LAFOENSIA,
+    species: "Verbesina arborea",
+    stall_risk: {
+      odds_ratio: 0.2435,
+      or_ci95: [0.115, 0.5154],
+      ci95_log_odds: [-2.1624, -0.6631],
+      significant: true,
+      interpretation: "protectora",
+    },
+  };
+  const media: SpeciesAnalytics = {
+    ...LAFOENSIA,
+    species: "Erythrina edulis",
+    stall_risk: {
+      odds_ratio: 1.9051,
+      or_ci95: [0.8169, 4.4432],
+      ci95_log_odds: [-0.2023, 1.4914],
+      significant: false,
+      interpretation: "no concluyente",
+    },
+  };
+
+  it("ordena ascendente para que Recharts lo pinte de mayor a menor", () => {
+    // Regresion del bug visual del 2026-09-21: con orden descendente, el
+    // eje de categorias de Recharts (que dibuja de abajo hacia arriba)
+    // mostraba la especie MAS protectora encabezando el ranking de riesgo.
+    const ors = toPoints([media, protectora, LAFOENSIA], "stall_risk").map((p) => p.or);
+    expect(ors).toEqual([...ors].sort((a, b) => a - b));
+    expect(ors[ors.length - 1]).toBeCloseTo(4.9427, 3);
+    expect(ors[0]).toBeCloseTo(0.2435, 3);
+  });
+
+  it("omite las especies sin estimacion en vez de ponerlas en el origen", () => {
+    expect(toPoints([LAFOENSIA, media], "mortality_risk")).toHaveLength(0);
   });
 });

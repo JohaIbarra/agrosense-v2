@@ -54,6 +54,18 @@ export function AnalyticsPage() {
 
   const handleSelect = useCallback((name: string) => setSelected(name), []);
 
+  // Cada modelo corre sobre su propio panel: 1.335 observaciones el de
+  // estancamiento y 1.405 el de mortalidad. Mostrar uno solo como si fuera
+  // «el total» era lo que hacia antes esta cabecera, y hacia parecer que
+  // ambos rankings salen del mismo conjunto de datos.
+  const obsPorModelo = useCallback(
+    (model: string) =>
+      variance.data
+        ?.find((m) => m.model === model)
+        ?.components[0]?.n_observations?.toLocaleString("es") ?? "—",
+    [variance.data],
+  );
+
   if (all.loading && speciesAll.length === 0) {
     return <p className="state">Cargando analítica…</p>;
   }
@@ -88,11 +100,10 @@ export function AnalyticsPage() {
       <header className="page-head">
         <h1>Analítica de crecimiento</h1>
         <p className="subtitle">
-          Efectos por especie y parcela de los modelos mixtos sobre{" "}
-          {variance.data?.[0]?.components[0]?.n_observations?.toLocaleString("es") ??
-            "—"}{" "}
-          observaciones árbol-intervalo. Todas las cifras son{" "}
-          <strong>odds ratio</strong>: 1.0 es «como el promedio».
+          Efectos por especie y parcela de dos modelos mixtos sobre paneles
+          distintos: {obsPorModelo("stall")} observaciones árbol-intervalo para
+          estancamiento y {obsPorModelo("mortality")} para mortalidad. Todas las
+          cifras son <strong>odds ratio</strong>: 1.0 es «como el promedio».
         </p>
       </header>
 

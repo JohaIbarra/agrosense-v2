@@ -512,6 +512,49 @@ npm run lint
 
 ---
 
+## Revisión visual en navegador (2026-09-21)
+
+Los tests no podían cubrir esto: en jsdom el SVG se renderiza con tamaño 0 y
+no emite texto. Se abrió el dashboard en Chrome con backend y datos reales.
+
+**Bug encontrado y corregido: el ranking salía invertido.** `YAxis
+type="category"` de Recharts pinta el array de abajo hacia arriba, así que un
+`sort` descendente —lo "natural"— ponía *Verbesina arborea* (OR 0.24, la más
+protectora) encabezando un panel titulado «Estancamiento por especie», y
+*Lafoensia speciosa* (OR 4.94) al fondo. Corregido invirtiendo el orden, con
+`toPoints()` extraída y probada (`ForestPlot.test.tsx`).
+
+**Cabecera engañosa, corregida.** Decía «sobre 1405 observaciones» tomando el
+`n` del primer modelo de la lista (mortalidad, por orden alfabético) como si
+fuera el total. Ahora nombra los dos paneles por separado: 1.335 para
+estancamiento, 1.405 para mortalidad.
+
+Verificado correcto: escala logarítmica con ticks `0.1 · 0.5 · 1x · 2x · 4x ·
+16x`, línea de referencia en 1.0, color solo en lo concluyente (rojo riesgo /
+verde protector / gris IC que cruza 1), filtro por gremio y panel comparativo.
+
+---
+
+## Discrepancia en los CSV de origen (no es del código)
+
+`comparacion_estancamiento_mortalidad.csv` dice, para mortalidad:
+
+| | Informe | Datos reales (`efectos_aleatorios_mortalidad.csv`) |
+|---|---|---|
+| Parcelas con IC significativo | `0 (de 42)` | **1 de 45** |
+
+La parcela es `GEB/MED-LV/NV/FR/53`: OR 3.01, IC en log-odds [0.388, 1.814],
+que **no cruza 0**, con n = 67. Y el panel de mortalidad tiene **45**
+parcelas, no 42 — el «de 42» parece copiado de la fila de estancamiento.
+
+El dashboard muestra `1 (de 45)` porque **deriva la tabla de la API**, no del
+CSV de resumen. Es justamente la razón por la que se decidió derivarla.
+
+**No se ha tocado nada**: la discrepancia es entre dos archivos del informe y
+la resuelve quien lo produjo, no este slice.
+
+---
+
 ## Cierre de la fase 6
 
 La fase 6 queda **cerrada**. Lo verificado está arriba; lo que queda abierto

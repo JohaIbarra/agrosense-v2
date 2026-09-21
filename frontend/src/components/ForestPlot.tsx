@@ -75,6 +75,28 @@ export function toPoint(s: SpeciesAnalytics, riskKey: RiskKey): Point | null {
   };
 }
 
+/**
+ * Serie lista para el grafico, ordenada de MAYOR a MENOR riesgo de arriba
+ * hacia abajo.
+ *
+ * El `sort` es ASCENDENTE aunque la lectura sea descendente, y no es un
+ * error: `YAxis type="category"` de Recharts pinta el array de abajo hacia
+ * arriba, asi que el orden visual es el inverso del orden del array. Con un
+ * sort descendente (lo "natural") el dashboard mostraba *Verbesina arborea*
+ * — la especie MAS protectora, OR 0.24 — encabezando un panel titulado
+ * "Estancamiento por especie", y *Lafoensia speciosa* (OR 4.94) al fondo.
+ *
+ * Lo encontro una revision visual en navegador, no los tests: en jsdom el
+ * SVG se renderiza con tamano 0 y no emite texto, asi que ninguna asercion
+ * sobre el DOM podia verlo. De ahi que el orden se pruebe AQUI.
+ */
+export function toPoints(species: SpeciesAnalytics[], riskKey: RiskKey): Point[] {
+  return species
+    .map((s) => toPoint(s, riskKey))
+    .filter((p): p is Point => p !== null)
+    .sort((a, b) => a.or - b.or);
+}
+
 /** Ticks fijos en escala log: se leen como "2x mas", "2x menos". */
 const LOG_TICKS = [0.1, 0.25, 0.5, 1, 2, 4, 8, 16];
 
@@ -104,10 +126,7 @@ export function ForestPlot({
   onSelect,
   selected,
 }: Props) {
-  const points = species
-    .map((s) => toPoint(s, riskKey))
-    .filter((p): p is Point => p !== null)
-    .sort((a, b) => b.or - a.or);
+  const points = toPoints(species, riskKey);
 
   if (points.length === 0) {
     return (
