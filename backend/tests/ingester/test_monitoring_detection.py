@@ -124,3 +124,38 @@ def test_event_that_contradicts_the_data_warns_but_ingests():
 def test_unreadable_event_is_ignored():
     data = ingest_wide(df_of({"Altura total (m)_M2": 0.3, "Evento": "Línea base"}))
     assert not [w for w in data.warnings if isinstance(w, EventMismatchWarning)]
+
+
+# ── Fase 7 de E0 ────────────────────────────────────────────────────────────
+
+def test_unknown_columns_are_reported_not_dropped_silently():
+    """Si otro proyecto renombra una columna, el ingeniero se entera."""
+    from agrosense.domain.errors import UnrecognizedColumnsWarning
+
+    data = ingest_wide(df_of({"Altura total (m)_M1": 0.2, "Altura del arbol M2": 0.3}))
+    avisos = [w for w in data.warnings if isinstance(w, UnrecognizedColumnsWarning)]
+    assert len(avisos) == 1
+    assert avisos[0].columns == ["Altura del arbol M2"]
+    assert data.observations, "el aviso no bloquea la carga"
+
+
+def test_known_columns_do_not_trigger_the_unknown_warning():
+    from agrosense.domain.errors import UnrecognizedColumnsWarning
+
+    data = ingest_wide(df_of({"Altura total (m)_M1": 0.2, "ID Ind.": 3}))
+    assert not [w for w in data.warnings if isinstance(w, UnrecognizedColumnsWarning)]
+
+
+def test_integer_ids_read_as_floats_keep_their_integer_form():
+    """Con un blanco en la columna, pandas vuelve float los enteros: 11 -> 11.0.
+
+    Sin normalizar, `ID Parcela` seria "11.0" en esta carga y "11" en otra, y
+    la identidad del arbol se romperia entre campanas.
+    """
+    df = df_of(
+        {"ID_MUEST": "T1", "ID Parcela": 11.0, "Altura total (m)_M1": 0.2},
+        {"ID_MUEST": "T2", "ID Parcela": float("nan"), "Altura total (m)_M1": 0.3},
+    )
+    trees = {t.tree_id: t for t in ingest_wide(df).trees}
+    assert trees["T1"].plot_id == "11"
+    assert trees["T2"].plot_id is None

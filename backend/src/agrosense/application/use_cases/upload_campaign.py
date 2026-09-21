@@ -24,6 +24,7 @@ from agrosense.domain.errors import (
     LargeContractionNoted,
     ProjectLabelMismatchWarning,
     SuspiciousRevivalWarning,
+    UnrecognizedColumnsWarning,
 )
 
 # Vocabulario estable del contrato (schemas.WarningItem.type)
@@ -34,6 +35,7 @@ _WARNING_TYPES: tuple[tuple[type[Exception], str], ...] = (
     # E0 — avisos de archivo (tree_id = "")
     (EventMismatchWarning, "event_mismatch"),
     (ProjectLabelMismatchWarning, "project_mismatch"),
+    (UnrecognizedColumnsWarning, "unknown_columns"),
 )
 
 

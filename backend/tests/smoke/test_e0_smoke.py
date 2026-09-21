@@ -159,3 +159,33 @@ def test_cascade_from_project_reaches_the_new_tables(session, project):
         ).scalar()
         assert n == 0, tabla
     assert session.scalar(select(PropertyRow).where(PropertyRow.project_id == pid)) is None
+
+
+def test_too_long_value_is_an_invalid_file_not_a_500(session, project):
+    """Postgres rechaza un valor mas largo que su columna; SQLite no.
+
+    Antes salia como "error interno". Ahora es INVALID_FILE con un mensaje
+    accionable, y la transaccion no deja nada a medias.
+    """
+    from agrosense.application.errors import AppError
+
+    data = _campaign()
+    data.trees[0] = data.trees[0].model_copy(update={"floristic_design": "x" * 400})
+    with pytest.raises(AppError) as exc:
+        CampaignRepository(session).save_ingest(project.id, data, "s.xlsx", "f" * 64)
+    assert exc.value.code == "INVALID_FILE"
+    n = session.execute(
+        text("SELECT COUNT(*) FROM plots WHERE project_id = :p"), {"p": project.id}
+    ).scalar()
+    assert n == 0, "la carga fallida no debe dejar parcelas a medias"
+
+
+def test_long_joined_metadata_is_trimmed_to_fit(session, project):
+    """Varias cuadrillas unidas por AgroSense se recortan: es un dato derivado."""
+    data = _campaign()
+    data.file_metadata = FileMetadata(field_crew="; ".join(f"Cuadrilla {i}" for i in range(80)))
+    CampaignRepository(session).save_ingest(project.id, data, "s.xlsx", "g" * 64)
+    m = session.scalar(select(MonitoringRow).where(
+        MonitoringRow.project_id == project.id, MonitoringRow.number == 2
+    ))
+    assert len(m.field_crew) <= 500 and m.field_crew.endswith("…")

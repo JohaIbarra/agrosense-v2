@@ -36,8 +36,17 @@ def _to_float(v) -> float | None:
 
 
 def _to_str(v) -> str | None:
+    """Texto de campo, o None si esta en blanco.
+
+    Un entero que llega como float (11.0) se escribe "11". Pasa cuando una
+    columna numerica trae algun blanco: pandas la convierte entera a float, y
+    sin esto `ID Parcela` 11 pasaria a ser "11.0" en una carga y "11" en otra,
+    rompiendo la identidad del arbol entre campanas.
+    """
     if is_blank(v):
         return None
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
     s = str(v).strip()
     return s or None
 

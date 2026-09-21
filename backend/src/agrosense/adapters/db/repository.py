@@ -5,7 +5,7 @@ persistencia parcial). El commit lo hace el propio repo en el borde de
 la operacion completa.
 """
 from sqlalchemy import func, insert, select, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 
 from agrosense.adapters.db.models import (
@@ -24,6 +24,21 @@ from agrosense.application.dtos import CampaignData
 from agrosense.application.errors import AppError
 from agrosense.domain.errors import ProjectLabelMismatchWarning
 from agrosense.domain.rules import plot_key, validate_tree_identity
+
+
+def _fit(value: str | None, width: int) -> str | None:
+    """Recorta a `width` un metadato que construye AgroSense.
+
+    Solo para valores DERIVADOS (p. ej. varias cuadrillas unidas con "; "):
+    si no caben, es responsabilidad nuestra que quepan. Los datos del arbol y
+    de la parcela NO se recortan: un valor demasiado largo ahi se rechaza con
+    INVALID_FILE (ver save_ingest), porque recortar un identificador podria
+    fusionar dos parcelas distintas.
+    """
+    if value is None or len(value) <= width:
+        return value
+    return value[: width - 1] + "…"
+
 
 # Atributos descriptivos de la parcela que se actualizan con el archivo mas
 # reciente (como los del arbol: manda el ultimo archivo, docs/02-domain.md §2.4)
@@ -185,10 +200,10 @@ class CampaignRepository:
                 trees=len(result.trees),
                 observations=len(result.observations),
                 deaths=deaths,
-                source_project_label=meta.project_label,
-                source_event=meta.event,
-                source_field_crew=meta.field_crew,
-                source_recorder=meta.recorder,
+                source_project_label=_fit(meta.project_label, 500),
+                source_event=_fit(meta.event, 200),
+                source_field_crew=_fit(meta.field_crew, 500),
+                source_recorder=_fit(meta.recorder, 300),
             )
             campaign.monitorings = [
                 self._s.get(MonitoringRow, monitoring_ids[n]) for n in result.monitorings
@@ -209,6 +224,17 @@ class CampaignRepository:
         except IntegrityError as exc:
             self._s.rollback()
             raise self._integrity_error(exc) from exc
+        except DataError as exc:
+            # Postgres rechaza un valor que no cabe en su columna. SQLite no
+            # aplica longitudes, asi que solo se ve contra la base real; antes
+            # salia como un 500 "error interno".
+            self._s.rollback()
+            raise AppError(
+                "INVALID_FILE",
+                "Un valor del archivo es demasiado largo para su campo (por ejemplo, "
+                "un nombre de especie, parcela o diseno florístico). Revise que las "
+                "celdas contengan solo el dato y no texto pegado por error.",
+            ) from exc
         except Exception:
             self._s.rollback()
             raise
@@ -338,9 +364,9 @@ class CampaignRepository:
             ultimo = existing[result.monitorings[-1]]
             meta = result.file_metadata
             if meta.field_crew:
-                ultimo.field_crew = meta.field_crew
+                ultimo.field_crew = _fit(meta.field_crew, 500)
             if meta.recorder:
-                ultimo.recorder = meta.recorder
+                ultimo.recorder = _fit(meta.recorder, 300)
         self._s.flush()
         return {number: fila.id for number, fila in existing.items()}
 

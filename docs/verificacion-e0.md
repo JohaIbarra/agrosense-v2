@@ -19,7 +19,7 @@ ninguna dimensión de las 7 hojas del Excel, y nada de lo construido se rompe.
 | 4 | Migración aplicada en Supabase | ✅ `c2d8e41f6a07 (head)` |
 | 5 | Advisors de seguridad | ✅ sin regresión (las 4 tablas nuevas con RLS, como las demás) |
 | 6 | Contratos del Slice 2 | ✅ ningún test de API ni de repositorio existente modificado |
-| 7 | Review (fase 7) | ⬜ pendiente |
+| 7 | Review (fase 7) | ✅ 3 hallazgos corregidos (ver abajo) |
 
 ---
 
@@ -106,6 +106,16 @@ Virginia. Queda ~30 km al este de la recta entre ambas, lo cual es posible en
 una compensación ambiental pero no se puede verificar desde los datos.
 
 ---
+
+## Fase 7 — revisión
+
+| Hallazgo | Impacto | Corrección |
+|---|---|---|
+| Las columnas desconocidas se descartaban en silencio (`unclassified_columns` solo se usaba en tests) | Un Excel con una columna renombrada perdía el dato sin avisar: el mismo fallo que E0 venía a cerrar | Aviso `unknown_columns` en la respuesta del upload |
+| Un texto más largo que su columna daba un 500 en Postgres | «Error interno» ante un dato del usuario; SQLite no lo detecta | `DataError` → `INVALID_FILE` con mensaje accionable; los metadatos que une AgroSense se recortan (`_fit`) |
+| Enteros leídos como float (`11` → `"11.0"`) si la columna trae un blanco | Identidad del árbol inestable entre cargas | `_to_str` escribe los enteros sin decimal |
+
+Gates tras la revisión: 294 tests locales, 33 smoke contra Supabase.
 
 ## Desviaciones respecto al plan
 

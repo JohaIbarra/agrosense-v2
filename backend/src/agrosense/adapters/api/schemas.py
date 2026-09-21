@@ -38,10 +38,13 @@ class ProjectResponse(BaseModel):
 
 class WarningItem(BaseModel):
     type: str = Field(
-        pattern="^(contraction|revival|census_gap|event_mismatch|project_mismatch)$",
+        pattern=(
+            "^(contraction|revival|census_gap|event_mismatch|project_mismatch|unknown_columns)$"
+        ),
         description=(
             "contraction | revival | census_gap: avisos de un arbol. "
-            "event_mismatch | project_mismatch: avisos del ARCHIVO (E0), con "
+            "event_mismatch | project_mismatch | unknown_columns: avisos del ARCHIVO "
+            "(E0), con "
             "tree_id vacio."
         ),
     )

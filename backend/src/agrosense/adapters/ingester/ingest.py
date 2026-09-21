@@ -10,7 +10,11 @@ no al reves.
 """
 import pandas as pd
 
-from agrosense.adapters.ingester.column_mapping import MAPPING_VERSION, parse_event_number
+from agrosense.adapters.ingester.column_mapping import (
+    MAPPING_VERSION,
+    parse_event_number,
+    unclassified_columns,
+)
 from agrosense.adapters.ingester.wide_to_long import read_file_metadata, wide_to_long
 from agrosense.application.dtos import CampaignData
 from agrosense.domain.errors import (
@@ -18,6 +22,7 @@ from agrosense.domain.errors import (
     EventMismatchWarning,
     LargeContractionNoted,
     SuspiciousRevivalWarning,
+    UnrecognizedColumnsWarning,
 )
 
 DomainWarning = LargeContractionNoted | SuspiciousRevivalWarning | CensusGapWarning
@@ -40,4 +45,9 @@ def ingest_wide(df: pd.DataFrame) -> CampaignData:
     declared = parse_event_number(metadata.event)
     if declared is not None and data.monitorings and declared != data.monitorings[-1]:
         data.warnings.append(EventMismatchWarning(declared, data.monitorings[-1]))
+
+    # Una columna que no se sabe interpretar se reporta; no se pierde en silencio
+    desconocidas = [str(c) for c in unclassified_columns(list(df.columns))]
+    if desconocidas:
+        data.warnings.append(UnrecognizedColumnsWarning(desconocidas))
     return data

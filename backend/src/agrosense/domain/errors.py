@@ -173,3 +173,24 @@ class ProjectLabelMismatchWarning(Exception):
             f"de este proyecto eran de «{previous}». Verifique que lo subio al "
             f"proyecto correcto."
         )
+
+
+class UnrecognizedColumnsWarning(Exception):
+    """El archivo trae columnas que AgroSense no sabe interpretar.
+
+    No es error: la carga sigue con las columnas conocidas. Pero es el caso
+    que E0 existe para cerrar: hasta entonces nueve columnas se descartaban
+    sin avisar. Si otro proyecto renombra una columna, el ingeniero tiene que
+    enterarse en la respuesta, no descubrirlo cuando falte el dato.
+    """
+
+    tree_id = ""
+
+    def __init__(self, columns: list[str]):
+        self.columns = columns
+        muestra = ", ".join(f"«{c}»" for c in columns[:10])
+        resto = f" y {len(columns) - 10} mas" if len(columns) > 10 else ""
+        super().__init__(
+            f"Columnas no reconocidas, se ignoraron: {muestra}{resto}. Si contienen "
+            f"datos del monitoreo, revise el nombre de la columna."
+        )
