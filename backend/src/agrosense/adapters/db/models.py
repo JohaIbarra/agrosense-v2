@@ -3,6 +3,11 @@
 Derivados del dominio (docs/02-domain.md): Project 1-N CampaignFile,
 Project 1-N TreeRow, TreeRow 1-N ObservationRow.
 
+E0 (docs/04-vision-producto.md) anade el territorio y el monitoreo como
+entidades: Project 1-N PropertyRow (predio) 1-N PlotRow (unidad de muestreo)
+1-N TreeRow, y Project 1-N MonitoringRow 1-N ObservationRow. Un archivo subido
+(CampaignFile) puede traer varios monitoreos: relacion N:N.
+
 Slice 5 anade dos tablas ANALITICAS (SpeciesAnalytics, PlotAnalytics) que no
 son parte de ese grafo: no cuelgan de Project ni tienen FKs hacia el. Son el
 resultado ya ajustado de los modelos mixtos sobre el dataset de referencia
@@ -10,16 +15,20 @@ resultado ya ajustado de los modelos mixtos sobre el dataset de referencia
 `scripts/load_analytics.py`. Se modelan aparte a proposito — ver el docstring
 de SpeciesAnalytics.
 """
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
+    Column,
+    Date,
     DateTime,
     Float,
     ForeignKey,
     Integer,
     String,
+    Table,
     Text,
     UniqueConstraint,
 )
@@ -51,6 +60,120 @@ class Project(Base):
     trees: Mapped[list["TreeRow"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
+    properties: Mapped[list["PropertyRow"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+    plots: Mapped[list["PlotRow"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+    monitorings: Mapped[list["MonitoringRow"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+
+
+# Puente N:N: un archivo acumulado trae varios monitoreos, y un monitoreo puede
+# llegar en varios archivos (el original y sus correcciones).
+campaign_file_monitorings = Table(
+    "campaign_file_monitorings",
+    Base.metadata,
+    Column(
+        "campaign_file_id",
+        ForeignKey("campaign_files.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "monitoring_id",
+        ForeignKey("monitorings.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
+
+
+class PropertyRow(Base):
+    """Predio: `LOCALIDAD` en el formato de campo (Tres Jotas, Guayabal…)."""
+
+    __tablename__ = "properties"
+    __table_args__ = (
+        UniqueConstraint("project_id", "name", name="uq_property_project_name"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    vereda: Mapped[str | None] = mapped_column(String(200))
+
+    project: Mapped["Project"] = relationship(back_populates="properties")
+    plots: Mapped[list["PlotRow"]] = relationship(back_populates="property")
+
+
+class PlotRow(Base):
+    """Unidad de muestreo. El diseno y las coberturas son SUYOS, no del arbol.
+
+    En el dataset de referencia son constantes dentro de cada unidad
+    (verificado en E0), asi que viven aqui y no se repiten en 856 arboles.
+
+    `code` es la identidad dentro del proyecto (`domain.rules.plot_key`). La
+    parcela lleva `project_id` propio aunque el predio ya lo implica: el predio
+    es opcional, y la unicidad de la parcela tiene que ser por PROYECTO.
+    """
+
+    __tablename__ = "plots"
+    __table_args__ = (UniqueConstraint("project_id", "code", name="uq_plot_project_code"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    property_id: Mapped[int | None] = mapped_column(
+        ForeignKey("properties.id", ondelete="SET NULL"), index=True
+    )
+    code: Mapped[str] = mapped_column(String(300), nullable=False)
+    sampling_unit_code: Mapped[str | None] = mapped_column(String(200))
+    plot_label: Mapped[str | None] = mapped_column(String(100))
+    monitoring_unit: Mapped[str | None] = mapped_column(String(200))
+    floristic_design: Mapped[str | None] = mapped_column(String(300))
+    associated_cover: Mapped[str | None] = mapped_column(String(300))
+    establishment_cover: Mapped[str | None] = mapped_column(String(300))
+
+    project: Mapped["Project"] = relationship(back_populates="plots")
+    property: Mapped["PropertyRow | None"] = relationship(
+        back_populates="plots", lazy="joined"
+    )
+    trees: Mapped[list["TreeRow"]] = relationship(back_populates="plot")
+
+
+class MonitoringRow(Base):
+    """Un monitoreo del proyecto (M1, M2…): la entidad que faltaba (hallazgo H3).
+
+    Sin ella no habia donde guardar la FECHA, que el protocolo de estancamiento
+    declara como su limitacion nº 1: sin fechas no se puede anualizar el
+    crecimiento. `monitoring_date` es nullable porque el Excel no la trae: la
+    registra el ingeniero (E2).
+    """
+
+    __tablename__ = "monitorings"
+    __table_args__ = (
+        UniqueConstraint("project_id", "number", name="uq_monitoring_project_number"),
+        CheckConstraint("number >= 1", name="ck_monitoring_number_positive"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    number: Mapped[int] = mapped_column(Integer, nullable=False)
+    monitoring_date: Mapped[date | None] = mapped_column(Date)
+    field_crew: Mapped[str | None] = mapped_column(String(500))
+    recorder: Mapped[str | None] = mapped_column(String(300))
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    project: Mapped["Project"] = relationship(back_populates="monitorings")
+    observations: Mapped[list["ObservationRow"]] = relationship(back_populates="monitoring")
+    campaign_files: Mapped[list["CampaignFile"]] = relationship(
+        secondary=campaign_file_monitorings, back_populates="monitorings"
+    )
 
 
 class CampaignFile(Base):
@@ -75,7 +198,16 @@ class CampaignFile(Base):
     observations: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     deaths: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
+    # E0 — lo que el archivo dice de si mismo (columnas de archivo)
+    source_project_label: Mapped[str | None] = mapped_column(String(500))
+    source_event: Mapped[str | None] = mapped_column(String(200))
+    source_field_crew: Mapped[str | None] = mapped_column(String(500))
+    source_recorder: Mapped[str | None] = mapped_column(String(300))
+
     project: Mapped["Project"] = relationship(back_populates="campaigns")
+    monitorings: Mapped[list["MonitoringRow"]] = relationship(
+        secondary=campaign_file_monitorings, back_populates="campaign_files"
+    )
 
 
 class TreeRow(Base):
@@ -93,29 +225,71 @@ class TreeRow(Base):
     family: Mapped[str | None] = mapped_column(String(200))
     common_name: Mapped[str | None] = mapped_column(String(300))
     guild: Mapped[str | None] = mapped_column(String(100))
-    plot_id: Mapped[str | None] = mapped_column(String(100))
-    locality: Mapped[str | None] = mapped_column(String(200))
+    plot_row_id: Mapped[int | None] = mapped_column(
+        ForeignKey("plots.id", ondelete="SET NULL"), index=True
+    )
     coord_x: Mapped[float | None] = mapped_column(Float)
     coord_y: Mapped[float | None] = mapped_column(Float)
     elevation_m: Mapped[float | None] = mapped_column(Float)
 
     project: Mapped["Project"] = relationship(back_populates="trees")
+    plot: Mapped["PlotRow | None"] = relationship(back_populates="trees", lazy="joined")
     observations: Mapped[list["ObservationRow"]] = relationship(
         back_populates="tree", cascade="all, delete-orphan"
     )
+
+    # ── Vistas de solo lectura sobre la parcela (E0) ───────────────────────
+    # Hasta E0 `plot_id` y `locality` eran columnas de `trees`. Pasaron a
+    # `plots` / `properties`, pero se siguen exponiendo con el mismo nombre:
+    # `domain.rules.validate_tree_identity` y el contrato de la API los leen
+    # por atributo y no deben enterarse de la normalizacion.
+
+    @property
+    def plot_id(self) -> str | None:
+        return self.plot.plot_label if self.plot else None
+
+    @property
+    def locality(self) -> str | None:
+        if self.plot is None or self.plot.property is None:
+            return None
+        return self.plot.property.name
+
+    @property
+    def sampling_unit_code(self) -> str | None:
+        return self.plot.sampling_unit_code if self.plot else None
+
+    @property
+    def monitoring_unit(self) -> str | None:
+        return self.plot.monitoring_unit if self.plot else None
+
+    @property
+    def floristic_design(self) -> str | None:
+        return self.plot.floristic_design if self.plot else None
+
+    @property
+    def associated_cover(self) -> str | None:
+        return self.plot.associated_cover if self.plot else None
+
+    @property
+    def establishment_cover(self) -> str | None:
+        return self.plot.establishment_cover if self.plot else None
 
 
 class ObservationRow(Base):
     __tablename__ = "observations"
     __table_args__ = (
-        UniqueConstraint("tree_row_id", "campaign", name="uq_observation_tree_campaign"),
+        UniqueConstraint(
+            "tree_row_id", "monitoring_id", name="uq_observation_tree_monitoring"
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     tree_row_id: Mapped[int] = mapped_column(
         ForeignKey("trees.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    campaign: Mapped[int] = mapped_column(Integer, nullable=False)
+    monitoring_id: Mapped[int] = mapped_column(
+        ForeignKey("monitorings.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     height_m: Mapped[float | None] = mapped_column(Float)
     crown_diameter_m: Mapped[float | None] = mapped_column(Float)
     dap_cm: Mapped[float | None] = mapped_column(Float)
@@ -123,8 +297,20 @@ class ObservationRow(Base):
     phytosanitary: Mapped[str | None] = mapped_column(String(50))
     alive: Mapped[bool | None] = mapped_column(Boolean)
     colonization: Mapped[str | None] = mapped_column(JSON)
+    field_notes: Mapped[str | None] = mapped_column(Text)
 
     tree: Mapped["TreeRow"] = relationship(back_populates="observations")
+    monitoring: Mapped["MonitoringRow"] = relationship(
+        back_populates="observations", lazy="joined"
+    )
+
+    @property
+    def campaign(self) -> int:
+        """Numero de monitoreo, como lo siguen viendo el dominio y la API.
+
+        Hasta E0 era una columna; ahora sale del monitoreo al que pertenece.
+        """
+        return self.monitoring.number
 
 
 # ── Slice 5: analitica (efectos de los modelos mixtos) ─────────────────────

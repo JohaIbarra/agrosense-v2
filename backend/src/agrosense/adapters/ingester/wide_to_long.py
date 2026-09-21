@@ -1,7 +1,10 @@
 """Transformacion ancho -> list[Tree] + list[Observation] (ADR-004).
 
-Una fila del ancho = un arbol con hasta 4 observaciones (una por campana
-con columnas M{k}). Solo TRADUCE semantica de campo a entidades de dominio:
+Una fila del ancho = un arbol con una observacion por cada monitoreo cuyas
+columnas M{k} traen datos. Los monitoreos se DETECTAN en las columnas del
+archivo, sin techo: un Excel de un solo monitoreo o uno acumulado (M1-M4, o
+mas) se leen igual (decision D1 de E0). Solo TRADUCE semantica de campo a
+entidades de dominio:
 - campana totalmente en blanco -> sin Observation (sin_censo)
 - DAP>0 -> MEDIDO; DAP 0/blanco con arbol censado -> BAJO_UMBRAL_DAP
 - ' '/'NaN'/NaN -> None (blanco de campo)
@@ -11,10 +14,12 @@ import pandas as pd
 
 from agrosense.adapters.ingester.column_mapping import (
     campaign_columns,
+    file_columns,
     fixed_columns,
     is_blank,
     parse_alive,
 )
+from agrosense.application.dtos import FileMetadata
 from agrosense.application.errors import AppError
 from agrosense.domain.entities import Observation, StatusSemantic, Tree
 from agrosense.domain.errors import (
@@ -24,8 +29,6 @@ from agrosense.domain.errors import (
     SuspiciousRevivalWarning,
 )
 from agrosense.domain.rules import validate_tree_observations
-
-CAMPAIGNS = (1, 2, 3, 4)
 
 
 def _to_float(v) -> float | None:
@@ -41,6 +44,34 @@ def _to_str(v) -> str | None:
 
 DomainWarning = LargeContractionNoted | SuspiciousRevivalWarning | CensusGapWarning
 
+# Atributos de parcela que el arbol transporta desde el archivo (E0)
+_PLOT_FIELDS = (
+    "sampling_unit_code",
+    "monitoring_unit",
+    "floristic_design",
+    "associated_cover",
+    "establishment_cover",
+)
+
+
+def read_file_metadata(df: pd.DataFrame) -> FileMetadata:
+    """Lee las columnas que describen el archivo completo.
+
+    En el formato de campo vienen repetidas en cada fila. Si aparecen valores
+    distintos se conservan todos, unidos, en lugar de quedarse con uno al azar:
+    es un archivo raro y el ingeniero debe poder verlo.
+    """
+    cols = file_columns(list(df.columns))
+    values: dict[str, str | None] = {}
+    for canonical, real in cols.items():
+        distintos = []
+        for v in df[real]:
+            texto = _to_str(v)
+            if texto is not None and texto not in distintos:
+                distintos.append(texto)
+        values[canonical] = "; ".join(distintos) if distintos else None
+    return FileMetadata(**values)
+
 
 def wide_to_long(df: pd.DataFrame) -> tuple[list[Tree], list[Observation], list[DomainWarning]]:
     columns = list(df.columns)
@@ -54,6 +85,8 @@ def wide_to_long(df: pd.DataFrame) -> tuple[list[Tree], list[Observation], list[
         )
 
     per_campaign = campaign_columns(columns)
+    # Monitoreos presentes en las COLUMNAS; que traigan datos se decide fila a fila
+    campaigns = sorted({k for by_campaign in per_campaign.values() for k in by_campaign})
 
     trees: list[Tree] = []
     observations: list[Observation] = []
@@ -110,11 +143,15 @@ def wide_to_long(df: pd.DataFrame) -> tuple[list[Tree], list[Observation], list[
                 if "elevation_m" in fixed_map
                 else None
             ),
+            **{
+                f: (_to_str(row[fixed_map[f]]) if f in fixed_map else None)
+                for f in _PLOT_FIELDS
+            },
         )
         trees.append(tree)
 
         tree_obs: list[Observation] = []
-        for campaign in CAMPAIGNS:
+        for campaign in campaigns:
             raw = {
                 canonical: (
                     row[cols[campaign]]
@@ -144,6 +181,12 @@ def wide_to_long(df: pd.DataFrame) -> tuple[list[Tree], list[Observation], list[
                     colonization=None,
                 )
             )
+
+        # `Observa` no tiene sufijo de monitoreo: es la nota de la visita mas
+        # reciente del archivo, asi que va a la ultima observacion del arbol.
+        notes = _to_str(row[fixed_map["field_notes"]]) if "field_notes" in fixed_map else None
+        if notes and tree_obs:
+            tree_obs[-1] = tree_obs[-1].model_copy(update={"field_notes": notes})
 
         all_warnings.extend(validate_tree_observations(tree, tree_obs))
         observations.extend(tree_obs)

@@ -127,3 +127,49 @@ class TreeIdentityMismatchError(DomainError):
             f"respecto a lo ya cargado. La identidad del arbol no cambia entre "
             f"campanas; revise el archivo o el identificador.",
         )
+
+
+# ── Avisos a nivel de ARCHIVO (E0) ─────────────────────────────────────────
+# No son de un arbol: describen el archivo completo. Llevan `tree_id = ""`
+# porque el contrato de WarningItem exige ese campo y no se quiso romperlo.
+
+
+class EventMismatchWarning(Exception):
+    """El archivo declara un monitoreo (`Evento`) distinto del que trae.
+
+    No es error: `Evento` es texto libre de campo («Cuarto monitoreo») y la
+    fuente de verdad son las columnas `_M{k}` con datos. Pero si no cuadran,
+    el ingeniero puede haber subido el archivo equivocado, y merece saberlo.
+    """
+
+    tree_id = ""
+
+    def __init__(self, declared: int, detected_latest: int):
+        self.declared = declared
+        self.detected_latest = detected_latest
+        super().__init__(
+            f"El archivo dice ser el monitoreo {declared} (columna Evento), pero "
+            f"el monitoreo mas reciente con datos es el {detected_latest}. "
+            f"Verifique que sea el archivo correcto."
+        )
+
+
+class ProjectLabelMismatchWarning(Exception):
+    """El archivo nombra un proyecto distinto del de cargas anteriores.
+
+    Se compara contra lo que dijeron los ARCHIVOS previos del mismo proyecto,
+    no contra el nombre del proyecto en AgroSense: ese lo elige el ingeniero
+    («Restauracion Guayabal») y casi nunca coincide con la etiqueta larga del
+    contrato que trae el Excel. Compararlos daria un aviso en cada carga.
+    """
+
+    tree_id = ""
+
+    def __init__(self, incoming: str, previous: str):
+        self.incoming = incoming
+        self.previous = previous
+        super().__init__(
+            f"Este archivo pertenece a «{incoming}», pero las cargas anteriores "
+            f"de este proyecto eran de «{previous}». Verifique que lo subio al "
+            f"proyecto correcto."
+        )

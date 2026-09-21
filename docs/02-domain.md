@@ -28,6 +28,19 @@ El estado de un árbol en un monitoreo determinado.
 - Atributos: altura total, diámetro de copa, DAP, estado fitosanitario,
   vivo/muerto, colonización de epífitas.
 
+### Territorio y monitoreo (E0 — ADR-005)
+
+- **Predio** (`LOCALIDAD`): Tres Jotas, Guayabal, San Antonio.
+- **Parcela** (unidad de muestreo): identidad = `Codigo de unidad muestreo`,
+  o `predio/ID Parcela` si el archivo no lo trae (`domain.rules.plot_key`).
+  Suyos, no del árbol: diseño florístico, cobertura vegetal asociada,
+  cobertura de establecimiento, unidad de monitoreo — constantes dentro de
+  cada unidad en el dataset de referencia.
+- **Monitoreo** (M1, M2…): número ≥ 1 **sin techo**, fecha (la registra el
+  ingeniero), cuadrilla y anotador. Una observación pertenece a un monitoreo.
+- **Archivo**: un Excel puede traer uno o varios monitoreos (acumulado).
+  `Proyecto` y `Evento` describen el archivo y solo sirven de verificación.
+
 ### StatusSemantic (value object clave)
 Distingue TRES estados de un dato, descubiertos en el dataset real:
 

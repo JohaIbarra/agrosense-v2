@@ -10,16 +10,30 @@ from sqlalchemy.orm import Session
 
 from agrosense.adapters.db.models import (
     CampaignFile,
+    MonitoringRow,
     ObservationRow,
     PlotAnalytics,
+    PlotRow,
     Project,
+    PropertyRow,
     SpeciesAnalytics,
     TreeRow,
     VarianceComponent,
 )
 from agrosense.application.dtos import CampaignData
 from agrosense.application.errors import AppError
-from agrosense.domain.rules import validate_tree_identity
+from agrosense.domain.errors import ProjectLabelMismatchWarning
+from agrosense.domain.rules import plot_key, validate_tree_identity
+
+# Atributos descriptivos de la parcela que se actualizan con el archivo mas
+# reciente (como los del arbol: manda el ultimo archivo, docs/02-domain.md §2.4)
+_PLOT_ATTRS = (
+    "sampling_unit_code",
+    "monitoring_unit",
+    "floristic_design",
+    "associated_cover",
+    "establishment_cover",
+)
 
 
 class ProjectRepository:
@@ -79,10 +93,22 @@ class ProjectRepository:
         return list(
             self._s.scalars(
                 select(ObservationRow)
+                .join(MonitoringRow, MonitoringRow.id == ObservationRow.monitoring_id)
                 .where(ObservationRow.tree_row_id == tree_row_id)
-                .order_by(ObservationRow.campaign)
+                .order_by(MonitoringRow.number)
             ).all()
         )
+
+    def get_monitorings(self, project_id: int) -> list[tuple[MonitoringRow, int]]:
+        """Monitoreos del proyecto, en orden, con cuantas observaciones tiene cada uno."""
+        rows = self._s.execute(
+            select(MonitoringRow, func.count(ObservationRow.id))
+            .outerjoin(ObservationRow, ObservationRow.monitoring_id == MonitoringRow.id)
+            .where(MonitoringRow.project_id == project_id)
+            .group_by(MonitoringRow.id)
+            .order_by(MonitoringRow.number)
+        ).all()
+        return [(m, n) for m, n in rows]
 
     def get_tree_row(
         self, project_id: int, tree_row_id: int
@@ -138,9 +164,17 @@ class CampaignRepository:
                 "vuelva a exportarlo: el contenido debe cambiar.",
             )
 
+        extra_warnings = self._project_label_warnings(project_id, result)
+        meta = result.file_metadata
+
         try:
-            tree_db_id = self._upsert_trees(project_id, result)
-            self._upsert_observations(project_id, result, tree_db_id)
+            # Orden de las dependencias: predio -> parcela -> arbol, y
+            # monitoreo -> observacion. Todo dentro de la misma transaccion.
+            property_ids = self._upsert_properties(project_id, result)
+            plot_ids = self._upsert_plots(project_id, result, property_ids)
+            tree_db_id = self._upsert_trees(project_id, result, plot_ids)
+            monitoring_ids = self._upsert_monitorings(project_id, result)
+            self._upsert_observations(result, tree_db_id, monitoring_ids)
 
             deaths = sum(1 for o in result.observations if o.alive is False)
             campaign = CampaignFile(
@@ -151,7 +185,14 @@ class CampaignRepository:
                 trees=len(result.trees),
                 observations=len(result.observations),
                 deaths=deaths,
+                source_project_label=meta.project_label,
+                source_event=meta.event,
+                source_field_crew=meta.field_crew,
+                source_recorder=meta.recorder,
             )
+            campaign.monitorings = [
+                self._s.get(MonitoringRow, monitoring_ids[n]) for n in result.monitorings
+            ]
             self._s.add(campaign)
             self._s.commit()
 
@@ -161,6 +202,8 @@ class CampaignRepository:
                 "observations": len(result.observations),
                 "deaths": deaths,
                 "warnings": result.warnings,
+                "extra_warnings": extra_warnings,
+                "monitorings": result.monitorings,
                 "mapping_version": result.mapping_version,
             }
         except IntegrityError as exc:
@@ -191,14 +234,115 @@ class CampaignRepository:
                 "El archivo repite identificadores de arbol dentro del proyecto. "
                 "Revise que cada ID_MUEST aparezca una sola vez.",
             )
-        if "uq_observation_tree_campaign" in detalle:
+        if "uq_observation_tree_monitoring" in detalle:
             return AppError(
                 "DUPLICATE_TREE",
-                "El archivo trae dos mediciones del mismo arbol en la misma "
-                "campana. Revise las filas duplicadas.",
+                "El archivo trae dos mediciones del mismo arbol en el mismo "
+                "monitoreo. Revise las filas duplicadas.",
             )
         # Constraint no prevista: es un fallo nuestro, no del archivo
         raise exc
+
+    def _project_label_warnings(self, project_id: int, result: CampaignData) -> list:
+        """Aviso si el archivo nombra otro proyecto que las cargas anteriores.
+
+        Se compara con la columna `Proyecto` de los ARCHIVOS previos, no con el
+        nombre del proyecto en AgroSense (ver ProjectLabelMismatchWarning).
+        """
+        incoming = result.file_metadata.project_label
+        if not incoming:
+            return []
+        previous = self._s.scalar(
+            select(CampaignFile.source_project_label)
+            .where(
+                CampaignFile.project_id == project_id,
+                CampaignFile.source_project_label.is_not(None),
+            )
+            .order_by(CampaignFile.ingested_at, CampaignFile.id)
+            .limit(1)
+        )
+        if previous and previous != incoming:
+            return [ProjectLabelMismatchWarning(incoming, previous)]
+        return []
+
+    def _upsert_properties(self, project_id: int, result: CampaignData) -> dict[str, int]:
+        """Predios del archivo (`LOCALIDAD`): crea los nuevos, reutiliza los viejos."""
+        existing = {
+            p.name: p.id
+            for p in self._s.scalars(
+                select(PropertyRow).where(PropertyRow.project_id == project_id)
+            ).all()
+        }
+        nombres = {t.locality for t in result.trees if t.locality} - existing.keys()
+        for name in sorted(nombres):
+            fila = PropertyRow(project_id=project_id, name=name)
+            self._s.add(fila)
+            self._s.flush()
+            existing[name] = fila.id
+        return existing
+
+    def _upsert_plots(
+        self, project_id: int, result: CampaignData, property_ids: dict[str, int]
+    ) -> dict[str, int]:
+        """Parcelas del archivo, por su clave (`domain.rules.plot_key`).
+
+        Los atributos descriptivos (diseno, coberturas…) se toman del archivo
+        mas reciente, igual que los del arbol.
+        """
+        existing = {
+            p.code: p
+            for p in self._s.scalars(
+                select(PlotRow).where(PlotRow.project_id == project_id)
+            ).all()
+        }
+
+        primer_arbol: dict[str, object] = {}
+        for tree in result.trees:
+            key = plot_key(tree)
+            if key is not None and key not in primer_arbol:
+                primer_arbol[key] = tree
+
+        for key, tree in primer_arbol.items():
+            fila = existing.get(key)
+            if fila is None:
+                fila = PlotRow(project_id=project_id, code=key)
+                self._s.add(fila)
+                existing[key] = fila
+            fila.plot_label = tree.plot_id
+            fila.property_id = property_ids.get(tree.locality) if tree.locality else None
+            for attr in _PLOT_ATTRS:
+                setattr(fila, attr, getattr(tree, attr))
+        self._s.flush()
+        return {code: fila.id for code, fila in existing.items()}
+
+    def _upsert_monitorings(self, project_id: int, result: CampaignData) -> dict[int, int]:
+        """Monitoreos que trae el archivo (decision D1: uno o varios).
+
+        `Responsables` y `Anotador` son de TODO el archivo y el archivo declara
+        su monitoreo en `Evento`, asi que se atribuyen al mas reciente que
+        trae — no a M1-M3, que los midio otra cuadrilla en otra fecha.
+        """
+        existing = {
+            m.number: m
+            for m in self._s.scalars(
+                select(MonitoringRow).where(MonitoringRow.project_id == project_id)
+            ).all()
+        }
+        for number in result.monitorings:
+            if number not in existing:
+                fila = MonitoringRow(project_id=project_id, number=number)
+                self._s.add(fila)
+                existing[number] = fila
+
+        if result.monitorings:
+            ultimo = existing[result.monitorings[-1]]
+            meta = result.file_metadata
+            if meta.field_crew:
+                ultimo.field_crew = meta.field_crew
+            if meta.recorder:
+                ultimo.recorder = meta.recorder
+        self._s.flush()
+        return {number: fila.id for number, fila in existing.items()}
 
     def _tree_ids(self, project_id: int) -> dict[str, int]:
         """tree_id de campo -> id de fila, para los arboles ya persistidos."""
@@ -207,14 +351,17 @@ class CampaignRepository:
         ).all()
         return {tree_id: row_id for tree_id, row_id in rows}
 
-    def _upsert_trees(self, project_id: int, result: CampaignData) -> dict[str, int]:
+    def _upsert_trees(
+        self, project_id: int, result: CampaignData, plot_ids: dict[str, int]
+    ) -> dict[str, int]:
         """Inserta los arboles nuevos y corrige los descriptivos de los viejos.
 
         Tres casos por arbol:
           - no existe            -> INSERT;
           - existe y su IDENTIDAD coincide -> se actualizan los atributos
-            descriptivos (familia, nombre comun, gremio, localidad, elevacion)
-            con el archivo mas reciente;
+            descriptivos (familia, nombre comun, gremio, elevacion) con el
+            archivo mas reciente. El predio y los datos de parcela viven en
+            `plots` desde E0;
           - existe y su identidad DIVERGE -> DomainError, la campana se
             rechaza entera. Antes esto se descartaba en silencio y la API
             respondia 201 sin haber corregido nada.
@@ -243,8 +390,10 @@ class CampaignRepository:
             fila.family = tree.family
             fila.common_name = tree.common_name
             fila.guild = tree.guild
-            fila.locality = tree.locality
             fila.elevation_m = tree.elevation_m
+            key = plot_key(tree)
+            if key is not None:
+                fila.plot_row_id = plot_ids[key]
 
         if nuevos:
             self._s.execute(
@@ -257,8 +406,9 @@ class CampaignRepository:
                         "family": t.family,
                         "common_name": t.common_name,
                         "guild": t.guild,
-                        "plot_id": t.plot_id,
-                        "locality": t.locality,
+                        "plot_row_id": (
+                            plot_ids[plot_key(t)] if plot_key(t) is not None else None
+                        ),
                         "coord_x": t.coord_x,
                         "coord_y": t.coord_y,
                         "elevation_m": t.elevation_m,
@@ -270,24 +420,27 @@ class CampaignRepository:
         return self._tree_ids(project_id)
 
     def _upsert_observations(
-        self, project_id: int, result: CampaignData, tree_db_id: dict[str, int]
+        self,
+        result: CampaignData,
+        tree_db_id: dict[str, int],
+        monitoring_ids: dict[int, int],
     ) -> None:
         """Inserta las observaciones nuevas y actualiza las que ya existian.
 
-        `UNIQUE(tree_row_id, campaign)` admite una fila por arbol y monitoreo,
-        asi que un archivo corregido pisa el valor anterior: manda el mas
-        reciente. Que archivos entraron y cuando queda en `campaign_files`.
+        `UNIQUE(tree_row_id, monitoring_id)` admite una fila por arbol y
+        monitoreo, asi que un archivo corregido pisa el valor anterior: manda
+        el mas reciente. Que archivos entraron y cuando queda en
+        `campaign_files`.
         """
+        monitoreos = set(monitoring_ids.values())
         previas = {
-            (tree_row_id, campana): obs_id
-            for obs_id, tree_row_id, campana in self._s.execute(
+            (tree_row_id, monitoring_id): obs_id
+            for obs_id, tree_row_id, monitoring_id in self._s.execute(
                 select(
                     ObservationRow.id,
                     ObservationRow.tree_row_id,
-                    ObservationRow.campaign,
-                )
-                .join(TreeRow, TreeRow.id == ObservationRow.tree_row_id)
-                .where(TreeRow.project_id == project_id)
+                    ObservationRow.monitoring_id,
+                ).where(ObservationRow.monitoring_id.in_(monitoreos))
             ).all()
         }
 
@@ -296,7 +449,7 @@ class CampaignRepository:
         for obs in result.observations:
             fila = {
                 "tree_row_id": tree_db_id[obs.tree_id],
-                "campaign": obs.campaign,
+                "monitoring_id": monitoring_ids[obs.campaign],
                 "height_m": obs.height_m,
                 "crown_diameter_m": obs.crown_diameter_m,
                 "dap_cm": obs.dap_cm,
@@ -304,8 +457,9 @@ class CampaignRepository:
                 "phytosanitary": obs.phytosanitary,
                 "alive": obs.alive,
                 "colonization": obs.colonization,
+                "field_notes": obs.field_notes,
             }
-            obs_id = previas.get((fila["tree_row_id"], obs.campaign))
+            obs_id = previas.get((fila["tree_row_id"], fila["monitoring_id"]))
             if obs_id is None:
                 a_insertar.append(fila)
             else:

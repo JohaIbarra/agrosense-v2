@@ -10,11 +10,12 @@ no al reves.
 """
 import pandas as pd
 
-from agrosense.adapters.ingester.column_mapping import MAPPING_VERSION
-from agrosense.adapters.ingester.wide_to_long import wide_to_long
+from agrosense.adapters.ingester.column_mapping import MAPPING_VERSION, parse_event_number
+from agrosense.adapters.ingester.wide_to_long import read_file_metadata, wide_to_long
 from agrosense.application.dtos import CampaignData
 from agrosense.domain.errors import (
     CensusGapWarning,
+    EventMismatchWarning,
     LargeContractionNoted,
     SuspiciousRevivalWarning,
 )
@@ -26,9 +27,17 @@ def ingest_wide(df: pd.DataFrame) -> CampaignData:
     """Ingiere formato ancho de campo. Lanza DomainError ante invariante
     dura (la campana se rechaza completa, sin persistencia parcial)."""
     trees, observations, warnings = wide_to_long(df)
-    return CampaignData(
+    metadata = read_file_metadata(df)
+    data = CampaignData(
         trees=trees,
         observations=observations,
-        warnings=warnings,
+        warnings=list(warnings),
         mapping_version=MAPPING_VERSION,
+        file_metadata=metadata,
     )
+
+    # `Evento` solo verifica: la fuente de verdad son las columnas con datos
+    declared = parse_event_number(metadata.event)
+    if declared is not None and data.monitorings and declared != data.monitorings[-1]:
+        data.warnings.append(EventMismatchWarning(declared, data.monitorings[-1]))
+    return data

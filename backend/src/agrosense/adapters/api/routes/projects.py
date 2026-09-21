@@ -11,6 +11,7 @@ Contratos:
     GET    /projects/{project_id}/trees            → 200 list[TreeRowResponse] | 404
     GET    /projects/{project_id}/trees/{tree_row_id}/observations
                                                    → 200 list[ObservationResponse] | 404
+    GET    /projects/{project_id}/monitorings      → 200 list[MonitoringResponse] | 404  (E0)
 """
 from __future__ import annotations
 
@@ -24,6 +25,7 @@ from agrosense.adapters.api.deps import get_session
 from agrosense.adapters.api.errors import raise_for_value_error
 from agrosense.adapters.api.schemas import (
     CampaignResponse,
+    MonitoringResponse,
     ObservationResponse,
     ProjectCreate,
     ProjectResponse,
@@ -116,6 +118,7 @@ def _to_upload_response(dto: UploadResult) -> UploadResultResponse:
             for w in dto.warnings
         ],
         errors=[],
+        monitorings=dto.monitorings,
     )
 
 
@@ -249,6 +252,12 @@ def list_trees_endpoint(
             guild=t.guild,
             locality=t.locality,
             elevation_m=t.elevation_m,
+            plot_id=t.plot_id,
+            sampling_unit_code=t.sampling_unit_code,
+            monitoring_unit=t.monitoring_unit,
+            floristic_design=t.floristic_design,
+            associated_cover=t.associated_cover,
+            establishment_cover=t.establishment_cover,
         )
         for t in trees
     ]
@@ -288,4 +297,26 @@ def list_observations_endpoint(
             colonization=o.colonization,
         )
         for o in obs_rows
+    ]
+
+
+# ── Monitoreos del proyecto (E0) ───────────────────────────────────────────
+
+@router.get("/projects/{project_id}/monitorings", response_model=list[MonitoringResponse])
+def list_monitorings_endpoint(project_id: int, session: SessionDep) -> list[MonitoringResponse]:
+    repo = ProjectRepository(session)
+    if repo.get(project_id) is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "PROJECT_NOT_FOUND", "message": f"Proyecto {project_id} no existe"},
+        )
+    return [
+        MonitoringResponse(
+            number=m.number,
+            monitoring_date=m.monitoring_date,
+            field_crew=m.field_crew,
+            recorder=m.recorder,
+            observations=n,
+        )
+        for m, n in repo.get_monitorings(project_id)
     ]

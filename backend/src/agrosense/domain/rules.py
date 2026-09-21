@@ -142,3 +142,24 @@ def validate_tree_identity(stored, incoming: Tree) -> None:
         ahora = getattr(incoming, field)
         if antes != ahora:
             raise TreeIdentityMismatchError(incoming.tree_id, field, antes, ahora)
+
+
+def plot_key(tree) -> str | None:
+    """Identidad de la parcela de un arbol dentro de su proyecto (E0).
+
+    1. `Codigo de unidad muestreo` cuando el archivo lo trae: es el
+       identificador de campo de la unidad, y la unidad por la que se agrupa
+       la validacion cruzada.
+    2. Si no, `predio/ID Parcela`: el numero de parcela solo es unico dentro
+       de su predio, asi que el predio forma parte de la clave.
+    3. Sin ninguno de los dos, el arbol no tiene parcela conocida.
+
+    Limitacion declarada: si un proyecto mezcla archivos con y sin codigo de
+    unidad, la misma parcela fisica recibe dos claves distintas. El formato de
+    campo real siempre trae el codigo.
+    """
+    if tree.sampling_unit_code:
+        return tree.sampling_unit_code
+    if tree.plot_id:
+        return f"{tree.locality}/{tree.plot_id}" if tree.locality else tree.plot_id
+    return None

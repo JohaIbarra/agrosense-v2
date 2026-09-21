@@ -195,3 +195,35 @@ def test_growth_between():
     b = make_obs(2, 0.32, True)
     assert growth_between(a, b) == pytest.approx(0.12)
     assert STAGNATION_THRESHOLD_M == 0.05
+
+
+# ── E0: identidad de la parcela ─────────────────────────────────────────────
+
+def test_plot_key_prefers_the_sampling_unit_code():
+    from agrosense.domain.rules import plot_key
+
+    t = Tree(tree_id="T1", species="S", sampling_unit_code="GEB/FR/11",
+             plot_id="11", locality="Guayabal")
+    assert plot_key(t) == "GEB/FR/11"
+
+
+def test_plot_key_falls_back_to_property_and_plot_label():
+    """El numero de parcela solo es unico dentro del predio."""
+    from agrosense.domain.rules import plot_key
+
+    a = Tree(tree_id="T1", species="S", plot_id="1", locality="Guayabal")
+    b = Tree(tree_id="T2", species="S", plot_id="1", locality="Tres Jotas")
+    assert plot_key(a) == "Guayabal/1"
+    assert plot_key(a) != plot_key(b)
+
+
+def test_plot_key_without_property_uses_the_label():
+    from agrosense.domain.rules import plot_key
+
+    assert plot_key(Tree(tree_id="T1", species="S", plot_id="7")) == "7"
+
+
+def test_tree_without_plot_information_has_no_plot():
+    from agrosense.domain.rules import plot_key
+
+    assert plot_key(Tree(tree_id="T1", species="S", locality="Guayabal")) is None

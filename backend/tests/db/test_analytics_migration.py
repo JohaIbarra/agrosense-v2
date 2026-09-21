@@ -114,7 +114,8 @@ def test_downgrade_removes_only_the_analytics_tables(migrated_engine):
     cfg.set_main_option("sqlalchemy.url", "sqlite://")
     with migrated_engine.connect() as conn:
         cfg.attributes["connection"] = conn
-        command.downgrade(cfg, "-1")
+        # Revision explicita, no "-1": desde E0 hay migraciones por encima
+        command.downgrade(cfg, "a8888efd3ae8")
         conn.commit()
         tablas = set(inspect(conn).get_table_names())
 

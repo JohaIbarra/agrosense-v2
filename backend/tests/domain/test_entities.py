@@ -42,14 +42,29 @@ def test_negative_dap_rejected():
         make_obs(dap_cm=-1.5, dap_status=StatusSemantic.MEDIDO)
 
 
-def test_campaign_out_of_range_rejected():
+def test_campaign_below_one_rejected():
+    """El numero de monitoreo empieza en 1 (M1)."""
     with pytest.raises(ValueError):
-        make_obs(campaign=5)
+        make_obs(campaign=0)
+    with pytest.raises(ValueError):
+        make_obs(campaign=-1)
 
 
-def test_campaign_bounds_inclusive():
+def test_campaign_has_no_upper_bound():
+    """E0: un proyecto puede tener M5, M6... (docs/04-vision-producto.md).
+
+    Antes el validador cortaba en 4 porque el dataset de referencia tiene
+    cuatro monitoreos: el quinto de cualquier proyecto habria sido rechazado.
+    """
     assert make_obs(campaign=1).campaign == 1
     assert make_obs(campaign=4).campaign == 4
+    assert make_obs(campaign=5).campaign == 5
+    assert make_obs(campaign=12).campaign == 12
+
+
+def test_observation_field_notes_optional():
+    assert make_obs().field_notes is None
+    assert make_obs(field_notes="Defoliacion parcial").field_notes == "Defoliacion parcial"
 
 
 def test_null_measurements_allowed():
@@ -66,6 +81,30 @@ def test_tree_valid():
     )
     assert tree.species == "Quercus humboldtii"
     assert tree.elevation_m == 2729
+
+
+def test_tree_carries_plot_attributes_for_ingestion():
+    """El arbol transporta los atributos de su parcela desde la ingesta.
+
+    La normalizacion a `plots` es del repositorio; el dominio solo exige
+    que el dato no se pierda en el camino (hallazgo H2 de E0).
+    """
+    tree = Tree(
+        tree_id="T1", species="Senna viarum",
+        sampling_unit_code="GEB/MED-LV/NV/FR/11", plot_id="11",
+        monitoring_unit="Parcela", floristic_design="Rehabilitacion vegetal",
+        associated_cover="Bosque de galeria",
+        establishment_cover="Mosaico de pastos con espacios naturales",
+    )
+    assert tree.sampling_unit_code == "GEB/MED-LV/NV/FR/11"
+    assert tree.floristic_design == "Rehabilitacion vegetal"
+
+
+def test_tree_plot_attributes_default_to_none():
+    """Los archivos sin esas columnas siguen siendo validos."""
+    tree = Tree(tree_id="T1", species="Senna viarum")
+    assert tree.sampling_unit_code is None
+    assert tree.associated_cover is None
 
 
 def test_tree_requires_species():

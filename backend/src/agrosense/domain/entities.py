@@ -25,7 +25,12 @@ class StatusSemantic(str, Enum):
 
 
 class Observation(BaseModel):
-    """Estado de un arbol en una campana de monitoreo (nucleo del dominio)."""
+    """Estado de un arbol en un monitoreo (nucleo del dominio).
+
+    `campaign` es el NUMERO de monitoreo dentro del proyecto (M1 = 1, M2 = 2…).
+    La base de datos lo traduce a una fila de `monitorings`; el dominio no
+    necesita saberlo.
+    """
 
     tree_id: str
     campaign: int
@@ -36,6 +41,8 @@ class Observation(BaseModel):
     phytosanitary: str | None
     alive: bool | None
     colonization: str | None
+    # Nota de campo de la visita (columna `Observa`)
+    field_notes: str | None = None
 
     @field_validator("tree_id")
     @classmethod
@@ -46,9 +53,15 @@ class Observation(BaseModel):
 
     @field_validator("campaign")
     @classmethod
-    def campaign_in_range(cls, v: int) -> int:
-        if not 1 <= v <= 4:
-            raise ValueError(f"campaign debe ser 1-4, recibido {v}")
+    def campaign_is_positive(cls, v: int) -> int:
+        """Los monitoreos se numeran desde 1 y SIN techo.
+
+        Hasta E0 el validador cortaba en 4 porque el dataset de referencia
+        tiene cuatro monitoreos; el quinto de cualquier proyecto habria sido
+        rechazado como dato invalido.
+        """
+        if v < 1:
+            raise ValueError(f"el numero de monitoreo empieza en 1, recibido {v}")
         return v
 
     @field_validator("height_m", "crown_diameter_m", "dap_cm")
@@ -62,18 +75,32 @@ class Observation(BaseModel):
 
 
 class Tree(BaseModel):
-    """Un individuo plantado en un proyecto; identidad persistente."""
+    """Un individuo plantado en un proyecto; identidad persistente.
+
+    Ademas de sus datos propios, transporta los atributos de su PARCELA tal
+    como llegan del archivo de campo. En el dataset de referencia todos ellos
+    son constantes dentro de cada unidad de muestreo (verificado en E0), asi
+    que la base de datos los normaliza en `plots`; aqui solo viajan para que
+    no se pierdan entre la lectura y la persistencia.
+    """
 
     tree_id: str
     species: str
     family: str | None = None
     common_name: str | None = None
     guild: str | None = None
-    plot_id: str | None = None
-    locality: str | None = None
+    plot_id: str | None = None  # `ID Parcela`
+    locality: str | None = None  # `LOCALIDAD` = predio
     coord_x: float | None = None
     coord_y: float | None = None
     elevation_m: float | None = None
+
+    # Atributos de la parcela (E0)
+    sampling_unit_code: str | None = None  # `Codigo de unidad muestreo`
+    monitoring_unit: str | None = None  # `Unidad de monitoreo`
+    floristic_design: str | None = None  # `Diseño florístico`
+    associated_cover: str | None = None  # `Cobertura vegetal asociada`
+    establishment_cover: str | None = None  # `Cobertura donde se establecio…`
 
     @field_validator("tree_id", "species")
     @classmethod

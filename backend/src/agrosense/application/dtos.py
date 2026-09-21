@@ -18,6 +18,21 @@ from agrosense.domain.entities import Observation, Tree
 # ── Datos de una campana ingerida ──────────────────────────────────────────
 
 
+@dataclass(frozen=True)
+class FileMetadata:
+    """Datos que describen el ARCHIVO, no a un arbol (E0).
+
+    En el formato de campo vienen repetidos en cada fila, pero son constantes:
+    `Proyecto`, `Evento`, `Responsables` y `Anotador` tienen un unico valor en
+    las 856 filas del dataset de referencia (verificado en E0, tarea T1).
+    """
+
+    project_label: str | None = None
+    event: str | None = None
+    field_crew: str | None = None
+    recorder: str | None = None
+
+
 @dataclass
 class CampaignData:
     """Campana de monitoreo ya traducida a entidades de dominio validadas.
@@ -36,6 +51,18 @@ class CampaignData:
     observations: list[Observation]
     warnings: list[Exception] = field(default_factory=list)
     mapping_version: str = "unknown"
+    file_metadata: FileMetadata = field(default_factory=FileMetadata)
+
+    @property
+    def monitorings(self) -> list[int]:
+        """Numeros de monitoreo que el archivo trae CON datos, ordenados.
+
+        Un archivo acumulado trae varios (M1-M4); uno de un solo monitoreo
+        trae uno (decision D1). Se deriva de las observaciones y no de las
+        columnas: un monitoreo cuyas columnas existen pero estan todas en
+        blanco no cuenta como traido.
+        """
+        return sorted({o.campaign for o in self.observations})
 
 
 # ── Resultados de los casos de uso ─────────────────────────────────────────
@@ -81,6 +108,8 @@ class UploadResult:
     observations: int
     deaths: int
     warnings: list[WarningDTO] = field(default_factory=list)
+    # Monitoreos que traia el archivo (E0, decision D1)
+    monitorings: list[int] = field(default_factory=list)
 
 
 # ── Slice 5: analitica de los modelos mixtos ───────────────────────────────

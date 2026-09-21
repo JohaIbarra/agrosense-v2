@@ -3,7 +3,7 @@
 FastAPI expone esto como OpenAPI; el frontend genera sus tipos de aqui.
 Los tipos de error/warning documentan los rulings del dominio (slice 1).
 """
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -37,7 +37,14 @@ class ProjectResponse(BaseModel):
 
 
 class WarningItem(BaseModel):
-    type: str = Field(pattern="^(contraction|revival|census_gap)$")
+    type: str = Field(
+        pattern="^(contraction|revival|census_gap|event_mismatch|project_mismatch)$",
+        description=(
+            "contraction | revival | census_gap: avisos de un arbol. "
+            "event_mismatch | project_mismatch: avisos del ARCHIVO (E0), con "
+            "tree_id vacio."
+        ),
+    )
     tree_id: str
     message: str
 
@@ -57,6 +64,10 @@ class UploadResultResponse(BaseModel):
     deaths: int = Field(description=_DEATHS_DESC)
     warnings: list[WarningItem]
     errors: list[ErrorItem]
+    monitorings: list[int] = Field(
+        default_factory=list,
+        description="Numeros de monitoreo que traia el archivo (uno o varios, E0).",
+    )
 
 
 class CampaignResponse(BaseModel):
@@ -79,6 +90,29 @@ class TreeRowResponse(BaseModel):
     guild: str | None
     locality: str | None
     elevation_m: float | None
+    # E0 — atributos de la parcela del arbol (campos nuevos, aditivos)
+    plot_id: str | None = None
+    sampling_unit_code: str | None = Field(
+        default=None, description="`Codigo de unidad muestreo` de la parcela."
+    )
+    monitoring_unit: str | None = None
+    floristic_design: str | None = None
+    associated_cover: str | None = None
+    establishment_cover: str | None = None
+
+
+class MonitoringResponse(BaseModel):
+    """Un monitoreo del proyecto (E0)."""
+
+    number: int = Field(description="Numero de monitoreo: 1 = M1, 2 = M2…")
+    monitoring_date: date | None = Field(
+        default=None,
+        description="Fecha del monitoreo. Null hasta que el ingeniero la registre: "
+        "el formato de campo no la trae.",
+    )
+    field_crew: str | None = None
+    recorder: str | None = None
+    observations: int = Field(description="Observaciones registradas en este monitoreo.")
 
 
 class ObservationResponse(BaseModel):

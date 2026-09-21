@@ -73,6 +73,12 @@ classDiagram
 
 ---
 
+> [!important] E0 — territorio y monitoreo como entidades (2026-09-21)
+> Predio → Parcela (unidad de muestreo) → Árbol, y Monitoreo → Observación.
+> El diseño florístico y las coberturas son de la **parcela**; el monitoreo
+> tiene **fecha** y no tiene techo (M5, M6…). Detalle en `docs/adr/005` y
+> `docs/verificacion-e0.md`.
+
 ## StatusSemantic
 
 > [!important] Valor object
