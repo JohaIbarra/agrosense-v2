@@ -17,6 +17,9 @@ from agrosense.domain.project import ProjectSpec
 # propietario y la fecha de creacion NO se editan.
 EDITABLE_FIELDS = tuple(ProjectSpec.model_fields)
 
+# Campos que el proyecto siempre tiene: no se pueden borrar con null.
+REQUIRED_FIELDS = ("name", "status", "coordinate_srid")
+
 
 def to_summary(proj, campaigns_count: int) -> ProjectSummary:
     """Proyecto persistido -> DTO. Lee atributos por nombre (ORM o doble)."""
@@ -76,6 +79,15 @@ def update_project(repo, owner_id: str, project_id: int, **changes) -> ProjectSu
     if desconocidos:
         raise AppError(
             "BAD_REQUEST", f"Campos no editables: {', '.join(sorted(desconocidos))}."
+        )
+    # Vaciar un campo opcional es valido (null lo borra); vaciar uno obligatorio
+    # no. Sin esta comprobacion el error salia como un 400 generico que no
+    # decia que campo era.
+    vaciados = sorted(f for f in REQUIRED_FIELDS if f in changes and changes[f] is None)
+    if vaciados:
+        raise AppError(
+            "BAD_REQUEST",
+            f"Estos campos no pueden quedar vacios: {', '.join(vaciados)}.",
         )
     spec = ProjectSpec(**{**actual, **changes})
     nuevos = {k: v for k, v in spec.model_dump().items() if k in changes}

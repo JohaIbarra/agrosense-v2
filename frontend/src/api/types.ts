@@ -72,3 +72,65 @@ export type SpeciesSort =
 export interface ApiErrorBody {
   detail?: { code?: string; message?: string };
 }
+
+// ── E1: proyectos, perfil y catálogos ─────────────────────────────────────
+// Espejo de los schemas de `backend/src/agrosense/adapters/api/schemas.py`.
+
+export interface Project {
+  id: number;
+  project_code: string | null;
+  name: string;
+  locality: string | null;
+  description: string | null;
+  created_at: string;
+  campaigns_count: number;
+  contract_code: string | null;
+  objective: string | null;
+  executing_org: string | null;
+  contracting_entity: string | null;
+  department: string | null;
+  municipality: string | null;
+  intervention_type: string | null;
+  area_ha: number | null;
+  planted_individuals: number | null;
+  planting_density: number | null;
+  establishment_date: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  legal_framework: string | null;
+  environmental_authority: string | null;
+  status: string;
+  coordinate_srid: number;
+}
+
+/** Cuerpo de POST /projects y PATCH /projects/{id}. */
+export type ProjectInput = Partial<
+  Omit<Project, "id" | "project_code" | "created_at" | "campaigns_count">
+> & { name?: string };
+
+export interface Engineer {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  professional_license: string | null;
+  organization: string | null;
+}
+
+export type EngineerInput = Partial<
+  Pick<Engineer, "full_name" | "professional_license" | "organization">
+>;
+
+export interface Catalogs {
+  intervention_types: string[];
+  legal_frameworks: string[];
+  project_statuses: string[];
+  default_srid: number;
+}
+
+export interface Monitoring {
+  number: number;
+  monitoring_date: string | null;
+  field_crew: string | null;
+  recorder: string | null;
+  observations: number;
+}

@@ -238,3 +238,18 @@ def test_catalogs_expose_the_domain_vocabularies(client):
 
 def test_catalogs_require_a_session(anon_client):
     assert anon_client.get("/api/v1/catalogs").status_code == 401
+
+
+@pytest.mark.parametrize("campo", ["name", "status", "coordinate_srid"])
+def test_patch_cannot_empty_a_required_field(client, campo):
+    """Vaciar un campo obligatorio da un mensaje que nombra el campo."""
+    pid = _create(client, f"Obligatorio {campo}").json()["id"]
+    r = client.patch(f"/projects/{pid}", json={campo: None})
+    assert r.status_code == 400
+    assert campo in r.json()["detail"]["message"]
+
+
+def test_patch_can_clear_an_optional_field(client):
+    pid = _create(client, "Opcional", contract_code="X-1").json()["id"]
+    r = client.patch(f"/projects/{pid}", json={"contract_code": None})
+    assert r.status_code == 200 and r.json()["contract_code"] is None

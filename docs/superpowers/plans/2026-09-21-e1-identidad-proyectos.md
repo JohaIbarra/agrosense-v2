@@ -1,6 +1,6 @@
 # Plan E1 — Identidad y proyectos
 
-Fecha: 2026-09-21. Origen: `docs/04-vision-producto.md` §9 (E1), decisiones
+Fecha: 2026-09-21. Estado: **implementado y verificado** (`docs/verificacion-e1.md`). Origen: `docs/04-vision-producto.md` §9 (E1), decisiones
 D3 (Supabase Auth) y D7 (campos del proyecto).
 
 **Objetivo**: un ingeniero inicia sesión, ve **solo sus** proyectos, crea

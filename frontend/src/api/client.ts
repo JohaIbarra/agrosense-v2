@@ -1,9 +1,7 @@
 /**
- * Capa de acceso a datos. Ningun componente hace `fetch` (AGENTS.md).
+ * Acceso a datos del Referente cientifico (`/api/v1/analytics`).
  *
- * Todo pasa por `request`, que centraliza dos cosas que si se duplican acaban
- * divergiendo: como se construye la URL y como se traduce un error del backend
- * a algo que la UI puede mostrar.
+ * El transporte (URL, token de sesion, errores) vive en `http.ts`.
  */
 import type {
   ModelKey,
@@ -13,61 +11,14 @@ import type {
   SpeciesSort,
 } from "./types";
 
+import { ApiError, request as http, type Query } from "./http";
+
+export { ApiError };
+
 const BASE = "/api/v1/analytics";
 
-/** Error con el `code` del contrato, para que la UI distinga los casos. */
-export class ApiError extends Error {
-  readonly code: string;
-  readonly status: number;
-
-  constructor(status: number, code: string, message: string) {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-    this.code = code;
-  }
-}
-
-type Query = Record<string, string | number | undefined | null>;
-
-function buildUrl(path: string, query?: Query): string {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query ?? {})) {
-    if (value !== undefined && value !== null && value !== "") {
-      params.set(key, String(value));
-    }
-  }
-  const qs = params.toString();
-  return qs ? `${BASE}${path}?${qs}` : `${BASE}${path}`;
-}
-
-async function request<T>(
-  path: string,
-  query?: Query,
-  signal?: AbortSignal,
-): Promise<T> {
-  const response = await fetch(buildUrl(path, query), {
-    signal,
-    headers: { Accept: "application/json" },
-  });
-
-  if (!response.ok) {
-    // El backend siempre responde {detail: {code, message}}; si algo se cuela
-    // sin esa forma (un 502 del proxy, por ejemplo), no se muestra el cuerpo
-    // crudo al usuario.
-    let code = "UNKNOWN";
-    let message = `La petición falló (HTTP ${response.status}).`;
-    try {
-      const body = await response.json();
-      if (body?.detail?.code) code = body.detail.code;
-      if (body?.detail?.message) message = body.detail.message;
-    } catch {
-      /* respuesta sin JSON: se conserva el mensaje genérico */
-    }
-    throw new ApiError(response.status, code, message);
-  }
-
-  return (await response.json()) as T;
+function request<T>(path: string, query?: Query, signal?: AbortSignal): Promise<T> {
+  return http<T>(`${BASE}${path}`, { query, signal });
 }
 
 export function fetchSpecies(

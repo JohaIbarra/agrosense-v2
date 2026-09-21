@@ -1,6 +1,6 @@
 # 04 — Visión de producto: arquitectura y roadmap
 
-Fecha: 2026-09-21. Estado: **aprobado (decisiones en §12) — no implementado.**
+Fecha: 2026-09-21. Estado: **aprobado (decisiones en §12)**. Avance: **E0 ✅** (`docs/verificacion-e0.md`) · **E1 ✅** (`docs/verificacion-e1.md`; falta el login con una cuenta real) · siguiente: **E2**.
 
 Reabre dominio y arquitectura (AGENTS.md: «un slice puede reabrir dominio o
 arquitectura cuando revela un requisito no contemplado, con justificación, ADR
