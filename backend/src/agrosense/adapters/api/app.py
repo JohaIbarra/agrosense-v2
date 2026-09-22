@@ -60,6 +60,11 @@ def create_app() -> FastAPI:
 
     app.include_router(imagery_router)
 
+    # E10a: indices espectrales (NDVI) por predio
+    from agrosense.adapters.api.routes.indices import router as indices_router
+
+    app.include_router(indices_router)
+
     # Techo del cuerpo ANTES de que el parser de multipart toque disco.
     # Se anade el ultimo para que quede el mas externo de la pila.
     app.add_middleware(BodySizeLimitMiddleware, max_bytes=MAX_UPLOAD_BYTES)

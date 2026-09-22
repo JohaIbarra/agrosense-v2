@@ -9,6 +9,7 @@
  *   /proyectos/:id/editar   editar proyecto
  *   /proyectos/:id/monitoreos/:numero   análisis del monitoreo (E3)
  *   /proyectos/:id/mapa     mapa del predio (E6, carga diferida)
+ *   /proyectos/:id/ndvi     verdor del predio (E10a)
  *   /referente              referente científico (antes /analytics)
  *   /perfil                 perfil del ingeniero
  *
@@ -23,6 +24,7 @@ import { AppLayout } from "./components/AppLayout";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { LandingPage } from "./pages/LandingPage";
 import { LoginPage } from "./pages/LoginPage";
+import { IndexPage } from "./pages/IndexPage";
 import { MonitoringAnalysisPage } from "./pages/MonitoringAnalysisPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
@@ -66,6 +68,7 @@ export function App() {
           </Privada>
         }
       />
+      <Route path="/proyectos/:id/ndvi" element={<Privada><IndexPage /></Privada>} />
       <Route path="/referente" element={<Privada><AnalyticsPage /></Privada>} />
       <Route path="/perfil" element={<Privada><ProfilePage /></Privada>} />
       <Route path="/analytics" element={<Navigate to="/referente" replace />} />

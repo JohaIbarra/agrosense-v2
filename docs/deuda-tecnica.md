@@ -314,3 +314,18 @@ una respuesta: ~330 bytes por árbol (279 KB para los 856 del Anexo). A 10 000
 árboles serían ~3 MB, y ahí toca paginar por predio o servir teselas
 vectoriales. Está escrito en ADR-009 para que no se descubra en producción.
 
+### S — Una consulta de NDVI larga puede pasar del minuto
+
+**Estado:** límite conocido con tope puesto. **Dueño:** el día que haga falta
+barrer años de histórico.
+
+Medido: ~0,8–1,6 s por (escena, predio). Con el tope por defecto (6 escenas ×
+3 predios) son ~18 s; con el máximo admitido (24 escenas) pasaría del minuto y
+chocaría con el timeout de proxy de un free tier. Por eso `max_scenes` es
+explícito, la operación es **idempotente** (lo ya medido no se vuelve a pedir)
+y una caída a mitad guarda lo conseguido.
+
+**Arreglo cuando toque:** es el caso de uso que sí justificaría la cola
+(ADR-010), junto con la ingesta. Hoy no se paga esa infraestructura por una
+consulta que el ingeniero hace de vez en cuando.
+

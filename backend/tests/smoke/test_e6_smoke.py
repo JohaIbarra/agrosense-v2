@@ -181,3 +181,43 @@ def test_la_capa_de_imagen_vive_y_muere_con_su_proyecto(session, project):
         text("SELECT COUNT(*) FROM imagery_layers WHERE project_id = :p"), {"p": pid}
     ).scalar()
     assert n == 0
+
+
+def test_las_lecturas_de_ndvi_viven_y_mueren_con_su_proyecto(session, project):
+    """E10a: UNIQUE(proyecto, predio, índice, escena) y cascada en Postgres."""
+    from datetime import date as _date
+
+    from sqlalchemy.exc import IntegrityError
+
+    from agrosense.adapters.db.repository import SatelliteIndexRepository
+
+    repo = SatelliteIndexRepository(session)
+    lectura = {
+        "property_name": "Guayabal", "index_name": "NDVI",
+        "scene_id": "S2B_MSIL2A_20241218T152659", "acquired_at": _date(2024, 12, 18),
+        "cloud_cover": 36.7, "mean_value": 0.4949, "median_value": 0.5,
+        "min_value": 0.27, "max_value": 0.62, "std_value": 0.053,
+        "valid_pixels": 1308, "source": "planetary-computer/sentinel-2-l2a",
+        "polygon_hash": "a" * 64,
+    }
+    assert repo.save_readings(project.id, [lectura]) == 1
+    # la misma escena no se duplica: el repositorio la filtra…
+    assert repo.save_readings(project.id, [lectura]) == 0
+    # …y si se fuerza, Postgres la rechaza
+    from agrosense.adapters.db.models import SatelliteIndexValueRow
+
+    session.add(SatelliteIndexValueRow(project_id=project.id, **lectura))
+    with pytest.raises(IntegrityError):
+        session.commit()
+    session.rollback()
+
+    guardadas = repo.list_for_project(project.id, "NDVI")
+    assert len(guardadas) == 1 and guardadas[0].mean_value == pytest.approx(0.4949)
+
+    pid = project.id
+    session.execute(text("DELETE FROM projects WHERE id = :i"), {"i": pid})
+    session.commit()
+    n = session.execute(
+        text("SELECT COUNT(*) FROM satellite_index_values WHERE project_id = :p"), {"p": pid}
+    ).scalar()
+    assert n == 0

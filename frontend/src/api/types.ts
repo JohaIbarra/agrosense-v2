@@ -310,3 +310,42 @@ export interface ImageryLayerCreate {
   max_zoom?: number | null;
   opacity?: number | null;
 }
+
+// ── E10a: índices espectrales por predio ──────────────────────────────────
+
+export interface IndexReading {
+  property_name: string;
+  index: string;
+  scene_id: string;
+  acquired_at: string;
+  cloud_cover: number | null;
+  mean: number;
+  median: number | null;
+  minimum: number | null;
+  maximum: number | null;
+  std: number | null;
+  valid_pixels: number;
+  reliable: boolean;
+  reading: string | null;
+  source: string;
+}
+
+export interface ProjectIndex {
+  project_id: number;
+  index: string;
+  properties: string[];
+  last_refreshed_at: string | null;
+  readings: IndexReading[];
+}
+
+export interface IndexRefreshSummary {
+  scenes_found: number;
+  readings_added: number;
+  without_data: number;
+  interrupted: boolean;
+  properties: string[];
+}
+
+export interface IndexRefresh extends ProjectIndex {
+  summary: IndexRefreshSummary;
+}

@@ -31,6 +31,11 @@ _CODE_HTTP: dict[str, int] = {
     "IMAGERY_LAYER_NOT_FOUND": 404,
     "DUPLICATE_IMAGERY_LAYER": 409,
     "INVALID_IMAGERY_LAYER": 422,
+    "INVALID_INDEX_REQUEST": 422,
+    "NO_COORDINATES": 422,
+    # El proveedor de imagenes es un tercero: su caida no es un fallo
+    # nuestro, y 503 le dice al cliente que reintentar tiene sentido.
+    "SATELLITE_UNAVAILABLE": 503,
     "SPECIES_NOT_FOUND": 404,
     "ANALYTICS_NOT_LOADED": 404,
     "INVALID_SORT": 400,

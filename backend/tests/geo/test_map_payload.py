@@ -178,3 +178,24 @@ def test_un_proyecto_sin_datos_devuelve_un_mapa_vacio_valido():
     assert mapa["trees"] == [] and mapa["plots"] == [] and mapa["monitorings"] == []
     assert mapa["bounds"] is None
     assert mapa["without_coordinates"] == 0
+
+
+def test_el_contorno_por_predio_sirve_para_pedir_el_indice():
+    """E10a: el NDVI se mide sobre el polígono de lo plantado, no sobre una
+    finca dibujada a mano."""
+    from agrosense.adapters.geo.map_payload import property_outlines
+
+    contornos = property_outlines(TREES, 9377)
+    assert sorted(contornos) == ["Guayabal", "Tres Jotas"]
+    guayabal = contornos["Guayabal"]
+    assert guayabal["trees"] == 7  # 5 de la parcela 11 + 2 de la 12
+    w, s, e, n = guayabal["bbox"]
+    assert w < e and s < n
+    assert len(guayabal["hull"]) >= 3
+    assert all(len(p) == 2 for p in guayabal["hull"])
+
+
+def test_sin_coordenadas_no_hay_contornos():
+    from agrosense.adapters.geo.map_payload import property_outlines
+
+    assert property_outlines([tree("X", coords=False)], 9377) == {}

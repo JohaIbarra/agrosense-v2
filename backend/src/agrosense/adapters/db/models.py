@@ -390,6 +390,51 @@ class ObservationRow(Base):
 # Cuando exista multi-proyecto de verdad, esto pide un ADR, no una columna.
 
 
+class SatelliteIndexValueRow(Base):
+    """Un indice espectral (NDVI) de un predio en una escena (E10a, ADR-011).
+
+    Por que esto SI se guarda y el mapa no: la cifra viene de un tercero,
+    cuesta una peticion de red por (escena, predio) y no se puede reproducir
+    si el proveedor deja de servir la escena. Guardarla con su procedencia
+    —que escena, que proveedor, sobre que poligono— es lo que permite que un
+    informe la cite dentro de un ano.
+
+    `polygon_hash` es la huella del contorno del predio: si se cargan arboles
+    nuevos y el poligono cambia, la lectura vieja sigue siendo cierta para el
+    poligono que la produjo, y se ve que ya no corresponde al actual.
+    """
+
+    __tablename__ = "satellite_index_values"
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id", "property_name", "index_name", "scene_id",
+            name="uq_index_value_scene",
+        ),
+        CheckConstraint("valid_pixels >= 0", name="ck_index_value_pixels"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    property_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    index_name: Mapped[str] = mapped_column(String(20), nullable=False)
+    scene_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    acquired_at: Mapped[date] = mapped_column(Date, nullable=False)
+    cloud_cover: Mapped[float | None] = mapped_column(Float)
+    mean_value: Mapped[float] = mapped_column(Float, nullable=False)
+    median_value: Mapped[float | None] = mapped_column(Float)
+    min_value: Mapped[float | None] = mapped_column(Float)
+    max_value: Mapped[float | None] = mapped_column(Float)
+    std_value: Mapped[float | None] = mapped_column(Float)
+    valid_pixels: Mapped[int] = mapped_column(Integer, nullable=False)
+    source: Mapped[str] = mapped_column(String(120), nullable=False)
+    polygon_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
+
+
 class ImageryLayerRow(Base):
     """Capa de imagen de un proyecto: su ortofoto (E6b, ADR-009).
 

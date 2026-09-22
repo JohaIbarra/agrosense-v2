@@ -118,9 +118,14 @@ export function ProjectDetailPage() {
         </div>
         <div className="head-actions head-actions-row">
           {(monitorings.data?.length ?? 0) > 0 && (
-            <Link to={`/proyectos/${p.id}/mapa`} className="btn btn-ghost">
-              Ver mapa
-            </Link>
+            <>
+              <Link to={`/proyectos/${p.id}/mapa`} className="btn btn-ghost">
+                Ver mapa
+              </Link>
+              <Link to={`/proyectos/${p.id}/ndvi`} className="btn btn-ghost">
+                Ver NDVI
+              </Link>
+            </>
           )}
           <Link to={`/proyectos/${p.id}/editar`} className="btn btn-ghost">
             Editar

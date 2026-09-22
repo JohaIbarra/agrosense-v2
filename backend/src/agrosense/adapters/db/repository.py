@@ -22,6 +22,7 @@ from agrosense.adapters.db.models import (
     PlotRow,
     Project,
     PropertyRow,
+    SatelliteIndexValueRow,
     SpeciesAnalytics,
     TreeRow,
     VarianceComponent,
@@ -760,6 +761,56 @@ class ImageryRepository:
     def delete(self, layer: ImageryLayerRow) -> None:
         self._s.delete(layer)
         self._s.commit()
+
+
+class SatelliteIndexRepository:
+    """Lecturas de indices espectrales de un proyecto (E10a)."""
+
+    def __init__(self, session: Session):
+        self._s = session
+
+    def list_for_project(self, project_id: int, index_name: str) -> list[SatelliteIndexValueRow]:
+        return list(
+            self._s.scalars(
+                select(SatelliteIndexValueRow)
+                .where(
+                    SatelliteIndexValueRow.project_id == project_id,
+                    SatelliteIndexValueRow.index_name == index_name,
+                )
+                .order_by(
+                    SatelliteIndexValueRow.acquired_at,
+                    SatelliteIndexValueRow.property_name,
+                )
+            ).all()
+        )
+
+    def known_scenes(self, project_id: int, index_name: str) -> set[tuple[str, str]]:
+        """(predio, escena) ya medidos: no se vuelve a pedir lo que ya esta."""
+        filas = self._s.execute(
+            select(SatelliteIndexValueRow.property_name, SatelliteIndexValueRow.scene_id).where(
+                SatelliteIndexValueRow.project_id == project_id,
+                SatelliteIndexValueRow.index_name == index_name,
+            )
+        ).all()
+        return {(p, s) for p, s in filas}
+
+    def save_readings(self, project_id: int, readings: list[dict]) -> int:
+        """Guarda lecturas nuevas; las repetidas se ignoran (idempotente)."""
+        if not readings:
+            return 0
+        conocidas = self.known_scenes(project_id, readings[0]["index_name"])
+        nuevas = [
+            r for r in readings if (r["property_name"], r["scene_id"]) not in conocidas
+        ]
+        if not nuevas:
+            return 0
+        _bulk_insert(
+            self._s,
+            SatelliteIndexValueRow,
+            [{"project_id": project_id, **r} for r in nuevas],
+        )
+        self._s.commit()
+        return len(nuevas)
 
 
 class ProjectAnalysisRepository:

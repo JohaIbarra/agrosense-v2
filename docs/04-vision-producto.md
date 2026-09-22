@@ -5,7 +5,8 @@ Avance: **E0 ✅** (`docs/verificacion-e0.md`) · **E1 ✅** (`docs/verificacion
 falta el login con una cuenta real) · **E2+E3 ✅** (`docs/verificacion-e2e3.md`;
 falta el recorrido en navegador) · **E6 + E6b ✅**
 (`docs/verificacion-e6.md`) · **E4 ✅** (`docs/verificacion-e4.md`) ·
-siguiente: **E10a · NDVI Sentinel-2 por predio**.
+**E10a ✅** (`docs/verificacion-e10a.md`). **Las cinco épicas del orden
+aprobado están terminadas.**
 
 Reabre dominio y arquitectura (AGENTS.md: «un slice puede reabrir dominio o
 arquitectura cuando revela un requisito no contemplado, con justificación, ADR
@@ -501,6 +502,18 @@ Aquí está el alcance, no la descomposición.
 - Entrada: snapshots de E3/E4. **Nunca** calcula una métrica.
 - Exportación del informe.
 
+### E10a · NDVI Sentinel-2 por predio — ✅ hecho (2026-09-22)
+- Serie temporal del NDVI de cada predio, medida sobre el contorno de lo
+  plantado (el mismo que dibuja el mapa), con su lectura en palabras y la
+  procedencia de cada cifra.
+- **Sin cuenta, sin clave y sin GDAL**: Planetary Computer calcula el
+  estadístico por polígono (ADR-011). Puerto `SatelliteIndexSource` porque
+  hay variación real de proveedor y es la única dependencia de red.
+- Leer la serie no consulta al proveedor; buscar imágenes es una acción
+  explícita. Si el proveedor se cae a mitad, se guarda lo conseguido.
+- Por predio y no por parcela: un píxel mide 10 × 10 m. Umbral de fiabilidad
+  fijado con el dato real (San Antonio da 10 píxeles; Guayabal, 1 308).
+
 ### E10 · Imágenes satelitales e índices
 - Sentinel-2: NDVI, EVI, NDMI **a escala de predio** (y de parcela solo si su
   tamaño lo permite — ver D6).
@@ -555,7 +568,7 @@ Tres dependencias que no son obvias:
 | 5 | **E6 · Mapa del predio** ✅ | *Adelantado el 2026-09-22 por decisión del ingeniero*: árboles sobre satélite, coloreados por estado, línea de tiempo M1→Mn, histórico al hacer clic y mapa de calor por parcela |
 | 6 | **E6b · Ortofoto por proyecto** ✅ *(por dirección; el archivo propio, pendiente de decisión)* | Probada con una imagen libre de OpenAerialMap |
 | 7 | **E4 · Comparación temporal** ✅ | 🎯 **Cumple la visión central**; entra también en el reporte descargable |
-| 8 | **E10a · NDVI Sentinel-2 por predio** | Cierra el orden aprobado por el ingeniero |
+| 8 | **E10a · NDVI Sentinel-2 por predio** ✅ | Cierra el orden aprobado por el ingeniero |
 | — | **E5 · Referente + contraste** | Barato: el referente ya existe, falta conectarlo |
 | 9 | **E9 · IA** | Solo necesita E3 y E4; se puede adelantar en paralelo con E6 |
 | 10 | **E7 · Estancados** | Primer modelo de ML |

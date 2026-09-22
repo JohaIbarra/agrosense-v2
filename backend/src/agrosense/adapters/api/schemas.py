@@ -417,6 +417,53 @@ class ProjectMapResponse(BaseModel):
     )
 
 
+class IndexReadingResponse(BaseModel):
+    """Una lectura de indice espectral de un predio en una fecha (E10a)."""
+
+    property_name: str
+    index: str
+    scene_id: str
+    acquired_at: date
+    cloud_cover: float | None
+    mean: float
+    median: float | None
+    minimum: float | None
+    maximum: float | None
+    std: float | None
+    valid_pixels: int
+    reliable: bool = Field(
+        description="False si el poligono cubre muy pocos pixeles para promediar."
+    )
+    reading: str | None = Field(description="Que dice el valor, en palabras.")
+    source: str = Field(description="Proveedor y coleccion de la imagen (provenance).")
+
+
+class ProjectIndexResponse(BaseModel):
+    """Serie guardada de un indice espectral. Leerla no consulta al proveedor."""
+
+    project_id: int
+    index: str
+    properties: list[str]
+    last_refreshed_at: datetime | None
+    readings: list[IndexReadingResponse]
+
+
+class IndexRefreshSummary(BaseModel):
+    scenes_found: int
+    readings_added: int
+    without_data: int = Field(
+        description="Mediciones sin pixeles validos: nubes o escena que no cubre el predio."
+    )
+    interrupted: bool = Field(
+        description="El proveedor dejo de responder; lo conseguido se guardo igual."
+    )
+    properties: list[str]
+
+
+class IndexRefreshResponse(ProjectIndexResponse):
+    summary: IndexRefreshSummary
+
+
 class ObservationResponse(BaseModel):
     campaign: int
     height_m: float | None

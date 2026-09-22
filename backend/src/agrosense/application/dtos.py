@@ -284,3 +284,58 @@ class ImageryLayerDTO:
     max_zoom: int | None
     opacity: float
 
+
+# ── E10a: indices espectrales por predio ───────────────────────────────────
+
+
+@dataclass(frozen=True)
+class SatelliteScene:
+    """Una imagen satelital disponible, antes de calcular nada."""
+
+    scene_id: str
+    acquired_at: date
+    cloud_cover: float | None
+
+
+@dataclass(frozen=True)
+class SceneStatistics:
+    """Estadisticos de un indice dentro de un poligono, en una escena."""
+
+    mean: float
+    median: float | None
+    minimum: float | None
+    maximum: float | None
+    std: float | None
+    valid_pixels: int
+
+
+@dataclass(frozen=True)
+class IndexReading:
+    """Una lectura publicada: el indice de un predio en una fecha."""
+
+    property_name: str
+    index: str
+    scene_id: str
+    acquired_at: date
+    cloud_cover: float | None
+    mean: float
+    median: float | None
+    minimum: float | None
+    maximum: float | None
+    std: float | None
+    valid_pixels: int
+    reliable: bool
+    reading: str | None
+    source: str
+
+
+@dataclass(frozen=True)
+class ProjectIndexDTO:
+    """La serie de un indice para todo el proyecto, lista para la pantalla."""
+
+    project_id: int
+    index: str
+    properties: list[str]
+    readings: list[IndexReading]
+    last_refreshed_at: datetime | None
+

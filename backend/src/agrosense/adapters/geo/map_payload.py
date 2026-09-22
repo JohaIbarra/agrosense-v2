@@ -23,7 +23,7 @@ from agrosense.domain.rules import plot_key
 
 MAP_VERSION = "2026-09-22-e6.1"
 
-__all__ = ["MAP_VERSION", "build_map"]
+__all__ = ["MAP_VERSION", "build_map", "property_outlines"]
 
 
 def _convex_hull(points: Sequence[tuple[float, float]]) -> list[tuple[float, float]]:
@@ -177,3 +177,34 @@ def _plots(
 
 # Re-exportado para que quien lea el payload sepa de donde sale la marca
 MIN_TREES_FOR_PLOT_METRIC = MIN_SAMPLE_FOR_PERCENT
+
+
+def property_outlines(
+    trees: Sequence[Tree], srid: int
+) -> dict[str, dict]:
+    """Contorno y caja de cada predio, en grados (E10a).
+
+    Es lo que necesita el indice espectral: el poligono sobre el que pedir la
+    estadistica al proveedor. Se deriva de los MISMOS arboles que dibuja el
+    mapa, asi que el NDVI se mide exactamente sobre lo plantado y no sobre una
+    finca dibujada a mano.
+    """
+    ubicados = [t for t in trees if t.coord_x is not None and t.coord_y is not None]
+    if not ubicados:
+        return {}
+    coords = to_wgs84([(t.coord_x, t.coord_y) for t in ubicados], srid)
+    por_predio: dict[str, list[tuple[float, float]]] = {}
+    for t, punto in zip(ubicados, coords, strict=True):
+        por_predio.setdefault(t.locality or "Sin predio", []).append(punto)
+
+    salida = {}
+    for nombre, puntos in sorted(por_predio.items()):
+        lats = [p[0] for p in puntos]
+        lons = [p[1] for p in puntos]
+        salida[nombre] = {
+            "hull": [[round(lat, 7), round(lon, 7)] for lat, lon in _convex_hull(puntos)],
+            "bbox": (min(lons), min(lats), max(lons), max(lats)),
+            "trees": len(puntos),
+        }
+    return salida
+
