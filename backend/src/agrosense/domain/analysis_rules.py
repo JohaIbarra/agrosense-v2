@@ -72,6 +72,29 @@ def normalize_phytosanitary(raw: str | None) -> str | None:
     return _PHYTO_BY_KEY.get(str(raw).strip().casefold())
 
 
+# ── Estado de un arbol en un monitoreo ───────────────────────────────────────
+
+# De mejor a peor, y al final lo que no es un estado sino una ausencia. El
+# orden importa: es el de la leyenda y el de cualquier tabla que los ordene.
+TREE_STATES: tuple[str, ...] = ("bueno", "regular", "malo", "muerto", "sin_dato")
+
+
+def tree_state(alive: bool | None, phytosanitary: str | None) -> str:
+    """En que estado esta el arbol, en una sola palabra.
+
+    Un arbol muerto es "muerto" aunque la fila traiga estado fitosanitario:
+    en campo esa celda suele quedar con el valor del monitoreo anterior, y
+    pintarlo de verde seria afirmar algo que el dato no dice. Si no consta si
+    vive, tampoco se deduce su estado.
+    """
+    if alive is None:
+        return "sin_dato"
+    if not alive:
+        return "muerto"
+    estado = normalize_phytosanitary(phytosanitary)
+    return estado.casefold() if estado else "sin_dato"
+
+
 # ── Tamano minimo de muestra ─────────────────────────────────────────────────
 
 # Por debajo de este numero de arboles, un porcentaje (supervivencia, estado

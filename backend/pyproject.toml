@@ -7,6 +7,10 @@ dependencies = [
     "pandas==2.2.2",
     "pydantic==2.9.2",
     "openpyxl==3.1.5",
+    # E6: proyeccion EPSG:9377 -> WGS84 para el mapa. Trae PROJ, que es la
+    # implementacion de referencia; escribir la inversa a mano se equivoca
+    # en silencio (ver adapters/geo/projection.py).
+    "pyproj==3.8.0",
     # Versiones fijadas tras el escaneo de pip-audit del gate de fase 7
     # (hallazgo R5). fastapi 0.115.0 topaba starlette<0.39.0, lo que dejaba
     # inalcanzable el arreglo del DoS por multipart sin acotar.
