@@ -3,7 +3,8 @@
 Fecha: 2026-09-21 (avance al 2026-09-22). Estado: **aprobado (decisiones en §12)**.
 Avance: **E0 ✅** (`docs/verificacion-e0.md`) · **E1 ✅** (`docs/verificacion-e1.md`;
 falta el login con una cuenta real) · **E2+E3 ✅** (`docs/verificacion-e2e3.md`;
-falta el recorrido en navegador) · siguiente: **E4 · mapa del predio**.
+falta el recorrido en navegador) · **E6 · mapa del predio ✅**
+(`docs/verificacion-e6.md`) · siguiente: **ortofoto opcional por proyecto**.
 
 Reabre dominio y arquitectura (AGENTS.md: «un slice puede reabrir dominio o
 arquitectura cuando revela un requisito no contemplado, con justificación, ADR
@@ -440,7 +441,7 @@ Aquí está el alcance, no la descomposición.
 - Resultado de ingesta con sus avisos agrupados; histórico de monitoreos con
   su fecha editable.
 - **Sin cola de trabajos.** #G se cerró por otra vía (una sentencia por tabla:
-  91.9s → 4.8s) y la carga completa mide ≈18s, así que la cola (ADR-009) sigue
+  91.9s → 4.8s) y la carga completa mide ≈18s, así que la cola (ADR-010) sigue
   pendiente y sin justificación todavía. Ver `docs/adr/008-analisis-como-snapshot.md`.
 
 ### E3 · Análisis exploratorio por monitoreo — ✅ hecho (2026-09-22) · *primer hito usable*
@@ -465,10 +466,17 @@ Aquí está el alcance, no la descomposición.
 - **Contraste**: «plantaste *Lafoensia speciosa*, que según el referente se
   estanca ~5× más que el promedio».
 
-### E6 · Mapa interactivo
-- PostGIS; capas de predio, parcela y árbol.
-- Color por variable: estado, supervivencia, crecimiento, riesgo.
-- Capas adicionales vía `geo_layers`.
+### E6 · Mapa del predio — ✅ hecho (2026-09-22)
+- Árboles sobre imagen satelital (Esri World Imagery), coloreados por estado,
+  con línea de tiempo M1→Mn, filtro por predio e historial del árbol al
+  pincharlo.
+- Mapa de calor por parcela: contorno (casco convexo de sus árboles) teñido
+  por supervivencia.
+- **Sin PostGIS y sin tabla propia** (ADR-009): hoy no hay ninguna pregunta
+  espacial que responder y derivar el mapa cuesta 20 ms. La proyección
+  EPSG:9377 → WGS84 vive en el backend; el frontend recibe grados.
+- Pendiente para cuando haya dato que poner: capas adicionales
+  (`geo_layers`) y color por otras variables (crecimiento, riesgo).
 
 ### E7 · Detección de estancados — *el actual Slice 4*
 - Regresión logística del protocolo; necesita `sampling_unit_code` (E0) para
@@ -534,7 +542,7 @@ Tres dependencias que no son obvias:
 | 2 | **E1 · Identidad y proyectos** | Sin ingeniero no hay «sus proyectos» |
 | 3 | **E2 · Carga de monitoreos** ✅ | Conecta la ingesta que ya existe con una pantalla |
 | 4 | **E3 · Análisis exploratorio** ✅ | 🎯 **Primer hito usable**: el ingeniero sube su Excel y ve su análisis |
-| 5 | **E6 · Mapa del predio** | *Adelantado el 2026-09-22 por decisión del ingeniero*: árboles sobre satélite, coloreados por estado, línea de tiempo M1→Mn, histórico al hacer clic y mapa de calor por parcela. Los datos ya están |
+| 5 | **E6 · Mapa del predio** ✅ | *Adelantado el 2026-09-22 por decisión del ingeniero*: árboles sobre satélite, coloreados por estado, línea de tiempo M1→Mn, histórico al hacer clic y mapa de calor por parcela |
 | 6 | **E6b · Ortofoto por proyecto** *(opcional)* | GeoTIFF propio del proyecto, probado primero con una imagen libre de OpenAerialMap |
 | 7 | **E4 · Comparación temporal** | 🎯 **Cumple la visión central**; también entra en el reporte descargable |
 | 8 | **E10a · NDVI Sentinel-2 por predio** | Cierra el orden aprobado por el ingeniero |
@@ -575,7 +583,8 @@ Se numeran en el orden en que se escriben.
 | ADR-006 | Multi-proyecto e identidad con Supabase Auth | E1 |
 | ADR-007 | Separación entre Proyecto y Referente científico | E5 |
 | ADR-008 | Análisis como snapshot versionado en JSONB | E3 |
-| ADR-009 | Procesamiento asíncrono con cola en Postgres | E2 |
+| ADR-009 | Mapa derivado y proyección en el backend (aceptado 2026-09-22) | E6 |
+| ADR-010 | Procesamiento asíncrono con cola en Postgres | pendiente |
 | ADR-010 | Datos geoespaciales en PostGIS | E6 |
 | ADR-011 | Escala espacial explícita y restricción por resolución | E10 |
 | ADR-012 | LLM local: AgroSense calcula, el modelo redacta | E9 |

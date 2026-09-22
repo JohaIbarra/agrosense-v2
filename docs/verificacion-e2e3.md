@@ -111,7 +111,7 @@ sentencia por tabla en la inserción y una en la actualización.
 Con eso, la carga completa del Anexo mide ≈18 s de punta a punta: parseo 2.2 s
 + guardado 4.8 s + lectura 1.6 s + análisis de los cuatro monitoreos 7.4 s +
 snapshots 2.1 s. Por eso ADR-008 decide **no** montar todavía la cola de
-trabajos (ADR-009 sigue pendiente).
+trabajos (el ADR de la cola, ADR-010, sigue pendiente).
 
 ## Errores y seguridad
 

@@ -292,3 +292,25 @@ en toda celda de texto; es el único camino de escritura del libro.
 **Regresión:** `test_field_text_never_becomes_an_excel_formula` recorre las
 nueve hojas y exige cero celdas con `data_type == "f"` (antes: 14).
 
+### Q — `npm audit` señala esbuild y vitest (solo desarrollo)
+
+**Estado:** anotado, sin gate. **Dueño:** el mantenimiento de dependencias.
+
+`npm audit --omit=dev` —el gate de AGENTS.md— da **0 vulnerabilidades**: nada
+de esto llega al navegador del ingeniero. Con las de desarrollo incluidas
+aparecen esbuild ≤0.24.2 (moderada: el servidor de desarrollo responde a
+peticiones de cualquier sitio web) y vitest ≤3.2.5. El arreglo exige
+`npm audit fix --force`, que sube Vite de major y puede romper la
+construcción; se hace con su propio ciclo, no de paso. Mientras tanto: no
+exponer el servidor de desarrollo fuera de `localhost`.
+
+### R — El payload del mapa crece linealmente con los árboles
+
+**Estado:** límite conocido, no deuda. **Dueño:** cuando exista un proyecto
+grande de verdad.
+
+`GET /projects/{id}/map` devuelve todos los árboles y todos los monitoreos en
+una respuesta: ~330 bytes por árbol (279 KB para los 856 del Anexo). A 10 000
+árboles serían ~3 MB, y ahí toca paginar por predio o servir teselas
+vectoriales. Está escrito en ADR-009 para que no se descubra en producción.
+

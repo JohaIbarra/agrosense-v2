@@ -44,7 +44,8 @@
      el análisis de Mk depende de Mk−1). En lectura, un snapshot de otra
      `analysis_version` se recalcula antes de responder: nunca se sirve un
      resultado de una definición vieja.
-  5. **Sin cola de trabajos.** ADR-009 queda pendiente: medido contra Supabase,
+  5. **Sin cola de trabajos.** El ADR de la cola (ADR-010) queda pendiente:
+     medido contra Supabase,
      el análisis de los cuatro monitoreos del dataset de referencia cuesta
      ~7 s y guardar sus snapshots ~2 s, sobre una carga que ahora tarda ~5 s
      (era 92 s, ver #G). Con ~18 s de request completa no hace falta
