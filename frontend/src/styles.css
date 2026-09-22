@@ -688,3 +688,21 @@ code {
   font-size: 14px;
   color: var(--muted);
 }
+
+.opcionales summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.opcionales-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.card-flat {
+  border: none;
+  padding: 0;
+}

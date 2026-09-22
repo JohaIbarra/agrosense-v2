@@ -34,7 +34,7 @@ export function ProjectFormPage() {
         <h1>{editando ? "Editar proyecto" : "Nuevo proyecto"}</h1>
         {!editando && (
           <p className="subtitle">
-            Solo el nombre es obligatorio; el resto puede completarlo después.
+            Solo el nombre es obligatorio. Los demás datos puede completarlos cuando quiera.
           </p>
         )}
       </header>

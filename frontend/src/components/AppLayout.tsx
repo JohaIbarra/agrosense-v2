@@ -18,7 +18,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </NavLink>
         <nav className="topnav" aria-label="Principal">
           <NavLink to="/proyectos">Proyectos</NavLink>
-          <NavLink to="/referente">Referente científico</NavLink>
           <NavLink to="/perfil">Perfil</NavLink>
         </nav>
         <div className="topbar-user">

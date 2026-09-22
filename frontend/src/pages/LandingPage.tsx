@@ -13,13 +13,7 @@ const CAPACIDADES = [
   {
     titulo: "Tus proyectos, separados",
     texto:
-      "Cada proyecto con su contrato, predios, intervención y marco legal. Solo tú ves los tuyos.",
-    estado: "Disponible",
-  },
-  {
-    titulo: "Referente científico",
-    texto:
-      "Qué especies se estancan o mueren más que el promedio, estimado con modelos mixtos sobre 856 árboles monitoreados cuatro veces.",
+      "Crea un proyecto con solo su nombre y organiza ahí tus monitoreos. Solo tú ves los tuyos.",
     estado: "Disponible",
   },
   {

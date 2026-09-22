@@ -1,6 +1,10 @@
 /**
  * Formulario de proyecto, para crear y para editar (campos de la decisión D7).
  *
+ * Al crear solo se piden los datos mínimos: el ingeniero viene a cargar su
+ * Excel, no a llenar una ficha. El resto (responsable, intervención, marco)
+ * queda plegado en la edición.
+ *
  * No valida reglas de negocio: los vocabularios vienen del backend
  * (GET /api/v1/catalogs) y las reglas (fechas coherentes, cantidades
  * positivas) las aplica el dominio; su mensaje se muestra tal cual.
@@ -106,56 +110,63 @@ export function ProjectForm({ catalogs, project, submitLabel, onSubmit }: Props)
   return (
     <form className="project-form" onSubmit={submit}>
       <fieldset className="card">
-        <legend>Identificación</legend>
+        <legend>Proyecto</legend>
         {text("name", "Nombre del proyecto *", { required: true, maxLength: 200 })}
         {text("contract_code", "Código de contrato", { maxLength: 100 })}
-        <label className="field field-wide">
-          <span>Objetivo de la intervención</span>
-          <textarea rows={3} value={values.objective} onChange={set("objective")} />
-        </label>
-      </fieldset>
-
-      <fieldset className="card">
-        <legend>Responsable</legend>
-        <p className="muted field-wide">
-          El ingeniero a cargo es usted: el proyecto queda asociado a su cuenta.
-        </p>
-        {text("executing_org", "Empresa u organización ejecutora", { maxLength: 200 })}
-        {text("contracting_entity", "Entidad contratante", { maxLength: 200 })}
-      </fieldset>
-
-      <fieldset className="card">
-        <legend>Ubicación</legend>
         {text("department", "Departamento", { maxLength: 100 })}
         {text("municipality", "Municipio", { maxLength: 100 })}
-        {text("locality", "Vereda o referencia", { maxLength: 200 })}
-        <p className="muted field-wide">
-          Los predios y parcelas se registran solos al cargar el Excel de monitoreo.
-        </p>
       </fieldset>
 
-      <fieldset className="card">
-        <legend>Intervención</legend>
-        {select("intervention_type", "Tipo de intervención", catalogs.intervention_types)}
-        {text("area_ha", "Área (ha)", { type: "number", step: "any", min: 0 })}
-        {text("planted_individuals", "Individuos plantados", { type: "number", step: 1, min: 0 })}
-        {text("planting_density", "Densidad (ind/ha)", { type: "number", step: "any", min: 0 })}
-        {text("establishment_date", "Fecha de siembra", { type: "date" })}
-        {text("start_date", "Inicio del proyecto", { type: "date" })}
-        {text("end_date", "Fin del proyecto", { type: "date" })}
-      </fieldset>
+      {project && (
+        <details className="card opcionales">
+          <summary>Datos adicionales del proyecto (opcional)</summary>
+          <div className="opcionales-cuerpo">
+          <fieldset className="card card-flat">
+            <legend>Responsable</legend>
+            <p className="muted field-wide">
+              El ingeniero a cargo es usted: el proyecto queda asociado a su cuenta.
+            </p>
+            {text("executing_org", "Empresa u organización ejecutora", { maxLength: 200 })}
+            {text("contracting_entity", "Entidad contratante", { maxLength: 200 })}
+          </fieldset>
 
-      <fieldset className="card">
-        <legend>Marco</legend>
-        {select("legal_framework", "Marco legal / obligación", catalogs.legal_frameworks)}
-        {text("environmental_authority", "Autoridad ambiental", { maxLength: 200 })}
-        {project && select("status", "Estado", catalogs.project_statuses)}
-        {text("coordinate_srid", "Sistema de coordenadas (EPSG)", {
-          type: "number",
-          step: 1,
-          placeholder: String(catalogs.default_srid),
-        })}
-      </fieldset>
+          <fieldset className="card card-flat">
+            <legend>Ubicación</legend>
+            {text("locality", "Vereda o referencia", { maxLength: 200 })}
+            <label className="field field-wide">
+              <span>Objetivo de la intervención</span>
+              <textarea rows={3} value={values.objective} onChange={set("objective")} />
+            </label>
+            <p className="muted field-wide">
+              Los predios y parcelas se registran solos al cargar el Excel de monitoreo.
+            </p>
+          </fieldset>
+
+          <fieldset className="card card-flat">
+            <legend>Intervención</legend>
+            {select("intervention_type", "Tipo de intervención", catalogs.intervention_types)}
+            {text("area_ha", "Área (ha)", { type: "number", step: "any", min: 0 })}
+            {text("planted_individuals", "Individuos plantados", { type: "number", step: 1, min: 0 })}
+            {text("planting_density", "Densidad (ind/ha)", { type: "number", step: "any", min: 0 })}
+            {text("establishment_date", "Fecha de siembra", { type: "date" })}
+            {text("start_date", "Inicio del proyecto", { type: "date" })}
+            {text("end_date", "Fin del proyecto", { type: "date" })}
+          </fieldset>
+
+          <fieldset className="card card-flat">
+            <legend>Marco</legend>
+            {select("legal_framework", "Marco legal / obligación", catalogs.legal_frameworks)}
+            {text("environmental_authority", "Autoridad ambiental", { maxLength: 200 })}
+            {select("status", "Estado", catalogs.project_statuses)}
+            {text("coordinate_srid", "Sistema de coordenadas (EPSG)", {
+              type: "number",
+              step: 1,
+              placeholder: String(catalogs.default_srid),
+            })}
+          </fieldset>
+          </div>
+        </details>
+      )}
 
       {error && (
         <p className="form-error" role="alert">
