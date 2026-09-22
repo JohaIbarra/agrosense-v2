@@ -316,6 +316,78 @@ class MonitoringAnalysisResponse(BaseModel):
     sections: list[AnalysisSection]
 
 
+# ── E6: mapa del predio ────────────────────────────────────────────────────
+
+
+class MapBounds(BaseModel):
+    """Extension que encuadra el mapa, en grados WGS84."""
+
+    south: float
+    west: float
+    north: float
+    east: float
+
+
+class MapTree(BaseModel):
+    """Un arbol ubicado. `states` y `heights` se indexan por el NUMERO DE
+    MONITOREO COMO CADENA ("1", "2", …): JSON no admite claves numericas."""
+
+    id: str
+    species: str | None
+    property: str | None
+    plot: str | None
+    plot_key: str | None
+    lat: float
+    lon: float
+    elevation_m: float | None
+    states: dict[str, str] = Field(
+        description="Estado por monitoreo: bueno · regular · malo · muerto · sin_dato."
+    )
+    heights: dict[str, float | None]
+
+
+class PlotMetric(BaseModel):
+    n: int
+    survival: float = Field(description="Porcentaje 0-100 de arboles vivos en ese monitoreo.")
+    mean_height: float | None
+
+
+class MapPlot(BaseModel):
+    """Una parcela: su contorno para el mapa de calor y sus cifras."""
+
+    key: str
+    property: str | None
+    plot: str | None
+    n: int
+    low_sample: bool = Field(description="Menos arboles que el minimo para un porcentaje.")
+    centroid: dict[str, float]
+    hull: list[list[float]] = Field(
+        description="Contorno [[lat, lon], …]. Con 1 o 2 arboles no hay poligono."
+    )
+    metrics: dict[str, PlotMetric]
+
+
+class ProjectMapResponse(BaseModel):
+    """Todo el mapa del proyecto en una respuesta (E6).
+
+    Incluye TODOS los monitoreos para que la linea de tiempo se mueva sin
+    volver a pedir datos. Las coordenadas llegan ya proyectadas a WGS84: el
+    frontend no sabe de sistemas de referencia.
+    """
+
+    project_id: int
+    version: str
+    srid: int
+    monitorings: list[int]
+    properties: list[str]
+    bounds: MapBounds | None
+    without_coordinates: int = Field(
+        description="Arboles del proyecto sin coordenada: no se dibujan, se cuentan."
+    )
+    trees: list[MapTree]
+    plots: list[MapPlot]
+
+
 class ObservationResponse(BaseModel):
     campaign: int
     height_m: float | None

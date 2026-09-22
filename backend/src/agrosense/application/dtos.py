@@ -255,3 +255,19 @@ class ModelVarianceDTO:
     components: list[VarianceComponentDTO]
     species_to_plot_ratio: float | None
     interpretation: str
+
+
+# ── E6: mapa del predio ────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class ProjectMapDTO:
+    """El mapa de un proyecto: el payload que arma `adapters/geo`, sin tocar.
+
+    La capa de aplicacion no inspecciona su contenido; solo lo acompana del
+    proyecto al que pertenece. La forma la fija el contrato de la API.
+    """
+
+    project_id: int
+    payload: dict
+
