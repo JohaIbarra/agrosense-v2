@@ -116,9 +116,16 @@ export function ProjectDetailPage() {
             {label(p.status)}
           </span>
         </div>
-        <Link to={`/proyectos/${p.id}/editar`} className="btn btn-ghost">
-          Editar
-        </Link>
+        <div className="head-actions head-actions-row">
+          {(monitorings.data?.length ?? 0) > 0 && (
+            <Link to={`/proyectos/${p.id}/mapa`} className="btn btn-ghost">
+              Ver mapa
+            </Link>
+          )}
+          <Link to={`/proyectos/${p.id}/editar`} className="btn btn-ghost">
+            Editar
+          </Link>
+        </div>
       </header>
 
       <UploadPanel projectId={p.id} onUploaded={reload} />

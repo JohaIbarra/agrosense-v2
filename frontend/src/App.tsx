@@ -8,6 +8,7 @@
  *   /proyectos/:id          ficha del proyecto
  *   /proyectos/:id/editar   editar proyecto
  *   /proyectos/:id/monitoreos/:numero   análisis del monitoreo (E3)
+ *   /proyectos/:id/mapa     mapa del predio (E6, carga diferida)
  *   /referente              referente científico (antes /analytics)
  *   /perfil                 perfil del ingeniero
  *
@@ -15,7 +16,7 @@
  * proxy de desarrollo reenvía al backend.
  */
 import { Navigate, Route, Routes } from "react-router-dom";
-import type { ReactNode } from "react";
+import { Suspense, lazy, type ReactNode } from "react";
 
 import { RequireAuth } from "./auth/RequireAuth";
 import { AppLayout } from "./components/AppLayout";
@@ -27,6 +28,12 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { ProjectFormPage } from "./pages/ProjectFormPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
+
+// Leaflet y el mapa solo se descargan cuando alguien abre el mapa: son ~150 kB
+// que no tienen por qué entrar en la ruta de proyectos (deuda #O).
+const MapPage = lazy(() =>
+  import("./map/MapPage").then((m) => ({ default: m.MapPage })),
+);
 
 function Privada({ children }: { children: ReactNode }) {
   return (
@@ -48,6 +55,16 @@ export function App() {
       <Route
         path="/proyectos/:id/monitoreos/:numero"
         element={<Privada><MonitoringAnalysisPage /></Privada>}
+      />
+      <Route
+        path="/proyectos/:id/mapa"
+        element={
+          <Privada>
+            <Suspense fallback={<p className="state">Cargando el mapa…</p>}>
+              <MapPage />
+            </Suspense>
+          </Privada>
+        }
       />
       <Route path="/referente" element={<Privada><AnalyticsPage /></Privada>} />
       <Route path="/perfil" element={<Privada><ProfilePage /></Privada>} />

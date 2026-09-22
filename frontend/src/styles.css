@@ -988,3 +988,83 @@ code {
   border-top: 1px solid var(--border);
   padding-top: 12px;
 }
+
+/* ── E6: mapa del predio ──────────────────────────────────────────────── */
+
+.map-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.map-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: 1rem;
+  align-items: start;
+}
+
+.map-canvas {
+  height: min(70vh, 640px);
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  background: #101410;
+}
+
+.map-side {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.state-dot {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  margin-right: 0.45rem;
+  vertical-align: baseline;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+.map-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+
+.map-card h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.05rem;
+}
+
+.map-card .data-table {
+  font-size: 0.85rem;
+}
+
+.head-actions-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .map-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

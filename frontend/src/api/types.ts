@@ -236,3 +236,57 @@ export interface MonitoringAnalysis {
   summary: SummaryItem[];
   sections: AnalysisSection[];
 }
+
+// ── E6: mapa del predio ───────────────────────────────────────────────────
+
+export type TreeState = "bueno" | "regular" | "malo" | "muerto" | "sin_dato";
+
+export interface MapBounds {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+}
+
+export interface MapTree {
+  id: string;
+  species: string | null;
+  property: string | null;
+  plot: string | null;
+  plot_key: string | null;
+  lat: number;
+  lon: number;
+  elevation_m: number | null;
+  /** Indexado por número de monitoreo como cadena: JSON no tiene claves numéricas. */
+  states: Record<string, TreeState>;
+  heights: Record<string, number | null>;
+}
+
+export interface PlotMetric {
+  n: number;
+  survival: number;
+  mean_height: number | null;
+}
+
+export interface MapPlot {
+  key: string;
+  property: string | null;
+  plot: string | null;
+  n: number;
+  low_sample: boolean;
+  centroid: { lat: number; lon: number };
+  hull: number[][];
+  metrics: Record<string, PlotMetric>;
+}
+
+export interface ProjectMap {
+  project_id: number;
+  version: string;
+  srid: number;
+  monitorings: number[];
+  properties: string[];
+  bounds: MapBounds | null;
+  without_coordinates: number;
+  trees: MapTree[];
+  plots: MapPlot[];
+}
