@@ -94,6 +94,7 @@ def test_payload_is_json_and_versioned(m2):
         "estado_fitosanitario",
         "edades",
         "dap",
+        "comparacion",
     ]
 
 

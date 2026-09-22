@@ -80,6 +80,7 @@ def test_analysis_endpoint_returns_the_seven_sheets(client):
         "estado_fitosanitario",
         "edades",
         "dap",
+        "comparacion",
     ]
     assert body["previous"] is None and body["monitoring"] == 1
     assert len(body["input_hash"]) == 64

@@ -122,7 +122,12 @@ def upload_campaign(
     analyzed: list[int] = []
     if analysis_repo is not None and engine is not None:
         try:
-            analyzed = refresh_project_analyses(project_id, analysis_repo, engine)
+            analyzed = refresh_project_analyses(
+                project_id,
+                analysis_repo,
+                engine,
+                project_repo.monitoring_dates(project_id),
+            )
         except Exception:
             # Los datos ya estan guardados: no se responde un error por algo
             # que se puede recalcular. `analyzed` vacio le dice al cliente que

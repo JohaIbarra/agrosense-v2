@@ -53,6 +53,7 @@ def test_one_sheet_per_analysis_plus_summary_and_raw(workbook):
         "Estado fitosanitario",
         "Edades",
         "DAP",
+        "Comparación",
         "Datos crudos",
     ]
 
@@ -165,3 +166,21 @@ def test_field_text_never_becomes_an_excel_formula():
     assert formulas == [], f"celdas ejecutables en el reporte: {formulas[:3]}"
     crudos = wb["Datos crudos"]
     assert _find(crudos, hostil).data_type == "s"
+
+
+def test_the_comparison_sheet_carries_the_interval(workbook):
+    """E4: el reporte descargable incluye la comparación entre monitoreos."""
+    data, wb = workbook
+    ws = wb["Comparación"]
+    seccion = next(s for s in data.analysis.payload["sections"] if s["id"] == "comparacion")
+    tabla = next(t for t in seccion["tables"] if t["id"] == "comparacion-resumen")
+    assert ws["A1"].value == seccion["title"]
+
+    # el número de la hoja es el del payload, sin recalcular
+    esperado = tabla["footer"][0]["deaths"]
+    encontrados = [
+        c.value for row in ws.iter_rows() for c in row if isinstance(c.value, int | float)
+    ]
+    assert esperado in encontrados
+    _find(ws, "Vivos al inicio")
+    _find(ws, "Crecimiento medio (m)")

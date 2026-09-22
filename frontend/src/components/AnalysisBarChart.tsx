@@ -44,6 +44,15 @@ const STATUS_COLORS: Record<string, string> = {
   pct_good: "#0ca30c",
   pct_fair: "#fab219",
   pct_poor: "#d03b3b",
+  // Comparación entre monitoreos (E4): el estado al que llegó cada árbol, y
+  // la mortalidad, llevan los mismos colores que en el resto del producto.
+  to_bueno: "#0ca30c",
+  to_regular: "#fab219",
+  to_malo: "#d03b3b",
+  to_muerto: "#4b4b4b",
+  to_sin_dato: "#b9b9b9",
+  mortality: "#d03b3b",
+  stagnant_pct: "#fab219",
 };
 
 const HORIZONTAL_FROM = 7;

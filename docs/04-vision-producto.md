@@ -4,7 +4,8 @@ Fecha: 2026-09-21 (avance al 2026-09-22). Estado: **aprobado (decisiones en §12
 Avance: **E0 ✅** (`docs/verificacion-e0.md`) · **E1 ✅** (`docs/verificacion-e1.md`;
 falta el login con una cuenta real) · **E2+E3 ✅** (`docs/verificacion-e2e3.md`;
 falta el recorrido en navegador) · **E6 + E6b ✅**
-(`docs/verificacion-e6.md`) · siguiente: **E4 · comparación entre monitoreos**.
+(`docs/verificacion-e6.md`) · **E4 ✅** (`docs/verificacion-e4.md`) ·
+siguiente: **E10a · NDVI Sentinel-2 por predio**.
 
 Reabre dominio y arquitectura (AGENTS.md: «un slice puede reabrir dominio o
 arquitectura cuando revela un requisito no contemplado, con justificación, ADR
@@ -455,11 +456,15 @@ Aquí está el alcance, no la descomposición.
 - Tamaño mínimo de muestra: un % de supervivencia con menos de 5 árboles se
   marca en vez de presentarse como robusto.
 
-### E4 · Comparación temporal — *la visión central*
-- M1→M2, M2→M3, M3→M4…
-- Crecimiento (anualizado si hay fechas), estancamiento, mortalidad y cambio
-  fitosanitario del intervalo; evolución por especie y por parcela.
-- Reutiliza el motor de E3.
+### E4 · Comparación temporal — ✅ hecho (2026-09-22) · *la visión central*
+- M1→M2, M2→M3, M3→M4: mortalidad, estancamiento, contracciones, crecimiento
+  (anualizado cuando hay fechas) y matriz de transición fitosanitaria, por
+  predio, por especie y por parcela.
+- **Sin tabla `comparison_analyses`**: es una sección más del snapshot que ya
+  existe (ADR-008), así que hereda el recálculo, el `.xlsx`, la pestaña y la
+  trazabilidad. La tabla propia habría duplicado disparador e invalidación.
+- Las fechas de los monitoreos entran ahora en el `input_hash`: corregir una
+  fecha recalcula el análisis, porque cambia el crecimiento anualizado.
 
 ### E5 · Referente científico
 - Reencuadre del Slice 5 (§4): versionado y renombrado.
@@ -549,7 +554,7 @@ Tres dependencias que no son obvias:
 | 4 | **E3 · Análisis exploratorio** ✅ | 🎯 **Primer hito usable**: el ingeniero sube su Excel y ve su análisis |
 | 5 | **E6 · Mapa del predio** ✅ | *Adelantado el 2026-09-22 por decisión del ingeniero*: árboles sobre satélite, coloreados por estado, línea de tiempo M1→Mn, histórico al hacer clic y mapa de calor por parcela |
 | 6 | **E6b · Ortofoto por proyecto** ✅ *(por dirección; el archivo propio, pendiente de decisión)* | Probada con una imagen libre de OpenAerialMap |
-| 7 | **E4 · Comparación temporal** | 🎯 **Cumple la visión central**; también entra en el reporte descargable |
+| 7 | **E4 · Comparación temporal** ✅ | 🎯 **Cumple la visión central**; entra también en el reporte descargable |
 | 8 | **E10a · NDVI Sentinel-2 por predio** | Cierra el orden aprobado por el ingeniero |
 | — | **E5 · Referente + contraste** | Barato: el referente ya existe, falta conectarlo |
 | 9 | **E9 · IA** | Solo necesita E3 y E4; se puede adelantar en paralelo con E6 |

@@ -21,7 +21,8 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from datetime import date
 
 import pandas as pd
 
@@ -34,11 +35,11 @@ from agrosense.domain.analysis_rules import (
     normalize_phytosanitary,
 )
 from agrosense.domain.entities import Observation, StatusSemantic, Tree
-from agrosense.domain.rules import plot_key
+from agrosense.domain.rules import MAX_CONTRACTION_M, STAGNATION_THRESHOLD_M, plot_key
 
 # Cambiar CUALQUIER definicion o forma del resultado = nueva version. Los
 # snapshots con otra version se recalculan al leerse (provenance, ADR-008).
-ANALYSIS_VERSION = "2026-09-22-e3.1"
+ANALYSIS_VERSION = "2026-09-22-e4.1"
 
 NO_PROPERTY = "Sin predio"
 NO_DESIGN = "Sin diseño florístico"
@@ -106,11 +107,21 @@ def build_frame(trees: Sequence[Tree], observations: Sequence[Observation]) -> p
     return frame
 
 
-def input_hash(trees: Sequence[Tree], observations: Sequence[Observation]) -> str:
-    """Huella de los datos de entrada: ata un snapshot a lo que lo produjo."""
+def input_hash(
+    trees: Sequence[Tree],
+    observations: Sequence[Observation],
+    dates: Mapping[int, date] | None = None,
+) -> str:
+    """Huella de los datos de entrada: ata un snapshot a lo que lo produjo.
+
+    Las FECHAS entran en la huella desde E4: el crecimiento anualizado depende
+    de ellas, asi que corregir la fecha de un monitoreo tiene que recalcular
+    el analisis igual que corregir una altura.
+    """
     payload = {
         "trees": sorted(t.model_dump_json() for t in trees),
         "observations": sorted(o.model_dump_json() for o in observations),
+        "dates": {str(k): v.isoformat() for k, v in sorted((dates or {}).items())},
     }
     return hashlib.sha256(json.dumps(payload).encode()).hexdigest()
 
@@ -222,9 +233,12 @@ def _low_flag(n: int) -> dict:
 
 
 class _Ctx:
-    def __init__(self, frame: pd.DataFrame, number: int):
+    def __init__(
+        self, frame: pd.DataFrame, number: int, dates: Mapping[int, date] | None = None
+    ):
         self.frame = frame
         self.k = number
+        self.dates: dict[int, date] = dict(dates or {})
         previos = sorted(m for m in frame["monitoring"].unique() if m < number)
         self.prev: int | None = int(previos[-1]) if previos else None
         self.monitorings = sorted(int(m) for m in frame["monitoring"].unique() if m <= number)
@@ -252,6 +266,47 @@ class _Ctx:
 
     def m(self, number: int | None) -> str:
         return f"M{number}"
+
+    @property
+    def interval_years(self) -> float | None:
+        """Anos entre el monitoreo anterior y el actual, si ambos tienen fecha.
+
+        Sin fechas devuelve None y el analisis NO anualiza: un crecimiento de
+        30 cm en seis meses y otro en dos anos no son el mismo dato, y
+        presentarlos juntos como "crecimiento" ya es una comparacion honesta;
+        inventar el denominador no lo seria.
+        """
+        if self.prev is None:
+            return None
+        a, b = self.dates.get(self.prev), self.dates.get(self.k)
+        if a is None or b is None:
+            return None
+        dias = (b - a).days
+        return dias / 365.25 if dias > 0 else None
+
+    def pairs(self, prop: str | None = None) -> pd.DataFrame:
+        """Un renglon por arbol censado en Mk-1 Y en Mk, con ambas medidas.
+
+        Es la base de todo el intervalo: quien murio, quien crecio y quien no.
+        """
+        if self.prev is None:
+            return pd.DataFrame(
+                columns=["tree_id", "species", "property", "plot", "h_prev", "h_cur",
+                         "alive_prev", "alive_cur", "phyto_prev", "phyto_cur", "growth"]
+            )
+        prev = self.at(self.prev, prop)[
+            ["tree_id", "species", "property", "plot", "height", "alive", "phyto"]
+        ].rename(columns={"height": "h_prev", "alive": "alive_prev", "phyto": "phyto_prev"})
+        cur = self.at(self.k, prop)[["tree_id", "height", "alive", "phyto"]].rename(
+            columns={"height": "h_cur", "alive": "alive_cur", "phyto": "phyto_cur"}
+        )
+        par = prev.merge(cur, on="tree_id", how="inner")
+        # Solo cuenta el intervalo de quien estaba VIVO al empezar: un arbol
+        # ya muerto en Mk-1 no puede volver a morir ni crecer.
+        par = par[par["alive_prev"] == True]  # noqa: E712
+        par["growth"] = par["h_cur"] - par["h_prev"]
+        par.loc[par["alive_cur"] != True, "growth"] = None  # noqa: E712
+        return par
 
 
 # ── 1. Composicion ───────────────────────────────────────────────────────────
@@ -1053,6 +1108,227 @@ def _dap(ctx: _Ctx) -> dict:
 # ── Entrada publica ──────────────────────────────────────────────────────────
 
 
+# ── 8. Comparacion entre monitoreos (E4) ─────────────────────────────────────
+
+_PHYTO_TO = (*PHYTOSANITARY_STATES, "Muerto", "Sin dato")
+
+
+def _to_key(destino: str) -> str:
+    """Clave de columna para un estado de llegada (`Sin dato` -> to_sin_dato)."""
+    return "to_" + _slug(destino).replace("-", "_")
+
+
+def _interval_stats(par: pd.DataFrame, years: float | None) -> dict:
+    """Las cifras del intervalo para un grupo de arboles ya emparejados."""
+    vivos_antes = len(par)
+    muertos = int((par["alive_cur"] != True).sum())  # noqa: E712
+    medidos = par.dropna(subset=["growth"])
+    crecimiento = _mean(medidos["growth"])
+    fila = {
+        "alive_prev": vivos_antes,
+        "deaths": muertos,
+        "mortality": _pct_of(muertos, vivos_antes),
+        "measured": int(len(medidos)),
+        "stagnant": int((medidos["growth"] <= STAGNATION_THRESHOLD_M).sum()),
+        "contractions": int((medidos["growth"] < -MAX_CONTRACTION_M).sum()),
+        "growth": crecimiento,
+    }
+    fila["stagnant_pct"] = _pct_of(fila["stagnant"], fila["measured"])
+    if years:
+        fila["growth_year"] = None if crecimiento is None else crecimiento / years
+    return fila
+
+
+def _interval_cols(years: float | None, first: dict) -> list[dict]:
+    cols = [
+        first,
+        _int("alive_prev", "Vivos al inicio"),
+        _int("deaths", "Muertos"),
+        _pct("mortality", "Mortalidad"),
+        _int("measured", "Medidos en ambos"),
+        _int("stagnant", "Estancados"),
+        _pct("stagnant_pct", "% estancados"),
+        _int("contractions", "Contracciones"),
+        _dec("growth", "Crecimiento medio (m)", 3),
+    ]
+    if years:
+        cols.append(_dec("growth_year", "Crecimiento (m/año)", 3))
+    return cols
+
+
+def _comparison(ctx: _Ctx) -> dict:
+    """Que cambio entre Mk-1 y Mk: la vision central del producto (E4)."""
+    k, prev = ctx.k, ctx.prev
+    mk, mp = ctx.m(k), ctx.m(prev)
+    if prev is None:
+        return {
+            "id": "comparacion",
+            "title": "Comparación entre monitoreos",
+            "description": "Qué cambió entre un monitoreo y el siguiente.",
+            "notes": [
+                "Este es el primer monitoreo del proyecto: no hay intervalo que "
+                "comparar todavía. La comparación aparece a partir del segundo."
+            ],
+            "tables": [],
+            "charts": [],
+        }
+
+    years = ctx.interval_years
+    par = ctx.pairs()
+    notes = [
+        f"Solo entran los árboles vivos en {mp} y censados también en {mk}: "
+        "quien ya estaba muerto no puede morir ni crecer otra vez.",
+        f"Estancado = creció {STAGNATION_THRESHOLD_M * 100:.0f} cm o menos; "
+        f"contracción = perdió más de {MAX_CONTRACTION_M * 100:.0f} cm de altura.",
+    ]
+    if years:
+        notes.append(
+            f"El intervalo mide {years:.2f} años, así que el crecimiento también "
+            "se presenta anualizado (m/año)."
+        )
+    else:
+        notes.append(
+            "Sin la fecha de uno de los dos monitoreos no se puede anualizar el "
+            "crecimiento: registre las fechas para comparar intervalos de "
+            "distinta duración."
+        )
+
+    tables, charts = [], []
+
+    # a) Resumen por predio, con el proyecto entero en el pie
+    filas = []
+    for prop in ctx.properties:
+        sub = par[par["property"] == prop]
+        if sub.empty:
+            continue
+        filas.append({"property": prop, **_interval_stats(sub, years), **_low_flag(len(sub))})
+    total = {"property": "Proyecto", **_interval_stats(par, years)}
+    resumen = _table(
+        "comparacion-resumen",
+        f"Qué pasó entre {mp} y {mk}, por predio",
+        _interval_cols(years, _text("property", "Predio")),
+        filas,
+        footer=[total],
+        notes=notes,
+    )
+    tables.append(resumen)
+    charts.append(
+        _chart(
+            "comparacion-mortalidad-predio",
+            f"Mortalidad y estancamiento del intervalo {mp} → {mk}",
+            resumen["id"],
+            "property",
+            ["mortality", "stagnant_pct"],
+            y_label="%",
+            percent=True,
+        )
+    )
+
+    # b) Por especie, dentro de cada predio (donde se decide que replantar)
+    for prop in ctx.properties:
+        sub = par[par["property"] == prop]
+        if sub.empty:
+            continue
+        filas_sp = []
+        for sp in sorted(sub["species"].unique()):
+            g = sub[sub["species"] == sp]
+            filas_sp.append({"species": sp, **_interval_stats(g, years), **_low_flag(len(g))})
+        tabla = _table(
+            f"comparacion-especie-{_slug(prop)}",
+            f"Intervalo {mp} → {mk} por especie — {prop}",
+            _interval_cols(years, _text("species", "Especie")),
+            filas_sp,
+            prop=prop,
+            notes=[f"{len(sub)} árboles vivos en {mp}."],
+        )
+        tables.append(tabla)
+        charts.append(
+            _chart(
+                f"comparacion-crecimiento-{_slug(prop)}",
+                f"Crecimiento medio por especie — {prop}",
+                tabla["id"],
+                "species",
+                ["growth"],
+                y_label="m",
+                prop=prop,
+            )
+        )
+
+    # c) Por parcela: si el problema es del sitio y no de la especie
+    filas_plot = []
+    for plot in sorted(x for x in par["plot"].dropna().unique()):
+        g = par[par["plot"] == plot]
+        filas_plot.append({"plot": plot, **_interval_stats(g, years), **_low_flag(len(g))})
+    if filas_plot:
+        tables.append(
+            _table(
+                "comparacion-parcela",
+                f"Intervalo {mp} → {mk} por parcela",
+                _interval_cols(years, _text("plot", "Parcela")),
+                filas_plot,
+                notes=[
+                    "La parcela es la unidad de muestreo del archivo "
+                    "(«Código de unidad muestreo»)."
+                ],
+            )
+        )
+
+    # d) Transicion fitosanitaria: de que estado a cual
+    transicion = []
+    for antes in PHYTOSANITARY_STATES:
+        sub = par[par["phyto_prev"] == antes]
+        fila = {"from": antes, "total": int(len(sub))}
+        vivos = sub[sub["alive_cur"] == True]  # noqa: E712
+        for destino in _PHYTO_TO:
+            if destino == "Muerto":
+                n = int((sub["alive_cur"] != True).sum())  # noqa: E712
+            elif destino == "Sin dato":
+                n = int(vivos["phyto_cur"].isna().sum())
+            else:
+                n = int((vivos["phyto_cur"] == destino).sum())
+            fila[_to_key(destino)] = n
+        transicion.append(fila)
+    if any(f["total"] for f in transicion):
+        tabla_estado = _table(
+            "comparacion-estado",
+            f"Cambio de estado fitosanitario {mp} → {mk}",
+            [
+                _text("from", f"Estado en {mp}"),
+                _int("total", f"Árboles en {mp}"),
+                *[_int(_to_key(d), d, group=f"Estado en {mk}") for d in _PHYTO_TO],
+            ],
+            transicion,
+            notes=[
+                "Cada fila reparte los árboles que estaban en ese estado según "
+                f"cómo llegaron a {mk}. La diagonal es «siguió igual»."
+            ],
+        )
+        tables.append(tabla_estado)
+        charts.append(
+            _chart(
+                "comparacion-estado-chart",
+                f"A dónde fue cada estado de {mp}",
+                tabla_estado["id"],
+                "from",
+                [_to_key(d) for d in _PHYTO_TO],
+                stacked=True,
+                y_label="árboles",
+            )
+        )
+
+    return {
+        "id": "comparacion",
+        "title": f"Comparación {mp} → {mk}",
+        "description": (
+            f"Qué le pasó a cada árbol entre {mp} y {mk}: quién murió, quién creció "
+            "y quién se quedó igual."
+        ),
+        "notes": [],
+        "tables": tables,
+        "charts": charts,
+    }
+
+
 def _summary(ctx: _Ctx) -> list[dict]:
     ak = ctx.at(ctx.k)
     vivos, muertos = _status_counts(ak)
@@ -1088,11 +1364,59 @@ def _summary(ctx: _Ctx) -> list[dict]:
             "unit": "m",
             "value": _clean(_mean(vk["height"])),
         },
+        *_interval_summary(ctx),
     ]
 
 
+def _interval_summary(ctx: _Ctx) -> list[dict]:
+    """Las dos cifras del intervalo que encabezan la comparacion (E4).
+
+    Solo aparecen cuando hay intervalo: en el primer monitoreo no existen, y
+    un cero seria una afirmacion falsa (nadie murio porque nada ha pasado).
+    """
+    if ctx.prev is None:
+        return []
+    par = ctx.pairs()
+    if par.empty:
+        return []
+    stats = _interval_stats(par, ctx.interval_years)
+    intervalo = f"{ctx.m(ctx.prev)} → {ctx.m(ctx.k)}"
+    resumen = [
+        {
+            "key": "interval_mortality",
+            "label": f"Mortalidad {intervalo}",
+            "kind": "percent",
+            "decimals": 1,
+            "value": _clean(stats["mortality"]),
+        },
+        {
+            "key": "interval_growth",
+            "label": f"Crecimiento medio {intervalo}",
+            "kind": "decimal",
+            "decimals": 3,
+            "unit": "m",
+            "value": _clean(stats["growth"]),
+        },
+    ]
+    if "growth_year" in stats:
+        resumen.append(
+            {
+                "key": "interval_growth_year",
+                "label": "Crecimiento anualizado",
+                "kind": "decimal",
+                "decimals": 3,
+                "unit": "m/año",
+                "value": _clean(stats["growth_year"]),
+            }
+        )
+    return resumen
+
+
 def analyze_monitoring(
-    trees: Sequence[Tree], observations: Sequence[Observation], number: int
+    trees: Sequence[Tree],
+    observations: Sequence[Observation],
+    number: int,
+    dates: Mapping[int, date] | None = None,
 ) -> dict:
     """Las 7 hojas del Anexo 1 para el monitoreo `number`, frente al anterior.
 
@@ -1102,7 +1426,7 @@ def analyze_monitoring(
     frame = build_frame(trees, observations)
     if frame.empty or number not in set(frame["monitoring"].unique()):
         raise ValueError(f"El monitoreo M{number} no tiene observaciones.")
-    ctx = _Ctx(frame, number)
+    ctx = _Ctx(frame, number, dates)
     return {
         "analysis_version": ANALYSIS_VERSION,
         "monitoring": number,
@@ -1118,6 +1442,7 @@ def analyze_monitoring(
             _phytosanitary(ctx),
             _development(ctx),
             _dap(ctx),
+            _comparison(ctx),
         ],
     }
 
@@ -1127,10 +1452,19 @@ class ExploratoryAnalysisEngine:
 
     version = ANALYSIS_VERSION
 
-    def fingerprint(self, trees: Sequence[Tree], observations: Sequence[Observation]) -> str:
-        return input_hash(trees, observations)
+    def fingerprint(
+        self,
+        trees: Sequence[Tree],
+        observations: Sequence[Observation],
+        dates: Mapping[int, date] | None = None,
+    ) -> str:
+        return input_hash(trees, observations, dates)
 
     def analyze(
-        self, trees: Sequence[Tree], observations: Sequence[Observation], number: int
+        self,
+        trees: Sequence[Tree],
+        observations: Sequence[Observation],
+        number: int,
+        dates: Mapping[int, date] | None = None,
     ) -> dict:
-        return analyze_monitoring(trees, observations, number)
+        return analyze_monitoring(trees, observations, number, dates)

@@ -40,7 +40,9 @@ def _monitoring(project_repo, project_id: int, number: int):
     return monitoring
 
 
-def refresh_project_analyses(project_id: int, analysis_repo, engine) -> list[int]:
+def refresh_project_analyses(
+    project_id: int, analysis_repo, engine, dates: dict[int, date] | None = None
+) -> list[int]:
     """Recalcula el analisis de TODOS los monitoreos del proyecto.
 
     Todos y no solo los del ultimo archivo: una carga puede corregir valores
@@ -52,8 +54,10 @@ def refresh_project_analyses(project_id: int, analysis_repo, engine) -> list[int
     numbers = sorted({o.campaign for o in observations})
     if not numbers:
         return []
-    fingerprint = engine.fingerprint(trees, observations)
-    snapshots = {n: engine.analyze(trees, observations, n) for n in numbers}
+    # Las fechas entran en el calculo (crecimiento anualizado, E4) y por tanto
+    # en la huella: corregir una fecha recalcula el analisis.
+    fingerprint = engine.fingerprint(trees, observations, dates)
+    snapshots = {n: engine.analyze(trees, observations, n, dates) for n in numbers}
     analysis_repo.save_snapshots(project_id, snapshots, engine.version, fingerprint)
     return numbers
 
@@ -90,7 +94,9 @@ def get_monitoring_analysis(
     monitoring = _monitoring(project_repo, project_id, number)
     snapshot = analysis_repo.get_snapshot(project_id, number)
     if snapshot is None or snapshot.analysis_version != engine.version:
-        refresh_project_analyses(project_id, analysis_repo, engine)
+        refresh_project_analyses(
+            project_id, analysis_repo, engine, project_repo.monitoring_dates(project_id)
+        )
         snapshot = analysis_repo.get_snapshot(project_id, number)
     if snapshot is None:
         # El monitoreo existe pero ningun arbol tiene observacion en el

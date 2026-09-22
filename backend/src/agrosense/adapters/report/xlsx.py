@@ -34,6 +34,7 @@ _SHEET_NAMES = {
     "estado_fitosanitario": "Estado fitosanitario",
     "edades": "Edades",
     "dap": "DAP",
+    "comparacion": "Comparación",
 }
 
 _GREEN = "2F6B3A"
