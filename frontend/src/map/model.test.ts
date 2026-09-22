@@ -34,6 +34,7 @@ const DATA: ProjectMap = {
   properties: ["Guayabal", "Tres Jotas"],
   bounds: { south: 5.79, west: -75.39, north: 5.81, east: -75.38 },
   without_coordinates: 0,
+  imagery: [],
   trees: [
     tree("G1", "Guayabal", { "1": "bueno", "2": "bueno", "3": "muerto" }, { "1": 0.4, "2": 0.7 }),
     tree("G2", "Guayabal", { "1": "bueno", "2": "regular" }),

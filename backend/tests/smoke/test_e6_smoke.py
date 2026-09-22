@@ -143,3 +143,41 @@ def test_un_proyecto_de_otro_ingeniero_no_tiene_mapa(session, project):
             MapBuilder(),
         )
     assert exc.value.code == "PROJECT_NOT_FOUND"
+
+
+def test_la_capa_de_imagen_vive_y_muere_con_su_proyecto(session, project):
+    """UNIQUE(project_id, name) en Postgres y cascada real al borrar."""
+    from sqlalchemy.exc import IntegrityError
+
+    from agrosense.adapters.db.repository import ImageryRepository
+
+    repo = ImageryRepository(session)
+    repo.create(
+        project.id,
+        name="Ortofoto 2024",
+        tile_template="https://tiles.openaerialmap.org/abc/0/def/{z}/{x}/{y}.png",
+        attribution="OpenAerialMap, CC-BY 4.0",
+        min_zoom=None,
+        max_zoom=21,
+        opacity=0.8,
+    )
+    with pytest.raises(IntegrityError):
+        repo.create(
+            project.id,
+            name="Ortofoto 2024",
+            tile_template="https://otro.example.org/{z}/{x}/{y}.png",
+            attribution=None,
+            min_zoom=None,
+            max_zoom=None,
+            opacity=1.0,
+        )
+    session.rollback()
+    assert len(repo.list_for_project(project.id)) == 1
+
+    pid = project.id
+    session.execute(text("DELETE FROM projects WHERE id = :i"), {"i": pid})
+    session.commit()
+    n = session.execute(
+        text("SELECT COUNT(*) FROM imagery_layers WHERE project_id = :p"), {"p": pid}
+    ).scalar()
+    assert n == 0

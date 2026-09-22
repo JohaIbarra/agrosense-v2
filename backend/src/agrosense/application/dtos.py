@@ -271,3 +271,16 @@ class ProjectMapDTO:
     project_id: int
     payload: dict
 
+
+@dataclass(frozen=True)
+class ImageryLayerDTO:
+    """Una capa de imagen del proyecto (E6b): donde esta, no la imagen."""
+
+    id: int
+    name: str
+    tile_template: str
+    attribution: str | None
+    min_zoom: int | None
+    max_zoom: int | None
+    opacity: float
+

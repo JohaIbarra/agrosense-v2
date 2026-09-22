@@ -3,8 +3,8 @@
 Fecha: 2026-09-21 (avance al 2026-09-22). Estado: **aprobado (decisiones en §12)**.
 Avance: **E0 ✅** (`docs/verificacion-e0.md`) · **E1 ✅** (`docs/verificacion-e1.md`;
 falta el login con una cuenta real) · **E2+E3 ✅** (`docs/verificacion-e2e3.md`;
-falta el recorrido en navegador) · **E6 · mapa del predio ✅**
-(`docs/verificacion-e6.md`) · siguiente: **ortofoto opcional por proyecto**.
+falta el recorrido en navegador) · **E6 + E6b ✅**
+(`docs/verificacion-e6.md`) · siguiente: **E4 · comparación entre monitoreos**.
 
 Reabre dominio y arquitectura (AGENTS.md: «un slice puede reabrir dominio o
 arquitectura cuando revela un requisito no contemplado, con justificación, ADR
@@ -475,6 +475,11 @@ Aquí está el alcance, no la descomposición.
 - **Sin PostGIS y sin tabla propia** (ADR-009): hoy no hay ninguna pregunta
   espacial que responder y derivar el mapa cuesta 20 ms. La proyección
   EPSG:9377 → WGS84 vive en el backend; el frontend recibe grados.
+- **Ortofoto por proyecto (E6b)**: el proyecto registra su ortofoto como
+  plantilla de teselas (`imagery_layers`, migración `f1b2c3d4e5a7`) y el mapa
+  la dibuja bajo los árboles, con opacidad y créditos. Probado con una imagen
+  libre de OpenAerialMap. **Subir el GeoTIFF propio queda pendiente de una
+  decisión del ingeniero**: exige almacenamiento, conversión a COG y tilador.
 - Pendiente para cuando haya dato que poner: capas adicionales
   (`geo_layers`) y color por otras variables (crecimiento, riesgo).
 
@@ -543,7 +548,7 @@ Tres dependencias que no son obvias:
 | 3 | **E2 · Carga de monitoreos** ✅ | Conecta la ingesta que ya existe con una pantalla |
 | 4 | **E3 · Análisis exploratorio** ✅ | 🎯 **Primer hito usable**: el ingeniero sube su Excel y ve su análisis |
 | 5 | **E6 · Mapa del predio** ✅ | *Adelantado el 2026-09-22 por decisión del ingeniero*: árboles sobre satélite, coloreados por estado, línea de tiempo M1→Mn, histórico al hacer clic y mapa de calor por parcela |
-| 6 | **E6b · Ortofoto por proyecto** *(opcional)* | GeoTIFF propio del proyecto, probado primero con una imagen libre de OpenAerialMap |
+| 6 | **E6b · Ortofoto por proyecto** ✅ *(por dirección; el archivo propio, pendiente de decisión)* | Probada con una imagen libre de OpenAerialMap |
 | 7 | **E4 · Comparación temporal** | 🎯 **Cumple la visión central**; también entra en el reporte descargable |
 | 8 | **E10a · NDVI Sentinel-2 por predio** | Cierra el orden aprobado por el ingeniero |
 | — | **E5 · Referente + contraste** | Barato: el referente ya existe, falta conectarlo |

@@ -390,6 +390,38 @@ class ObservationRow(Base):
 # Cuando exista multi-proyecto de verdad, esto pide un ADR, no una columna.
 
 
+class ImageryLayerRow(Base):
+    """Capa de imagen de un proyecto: su ortofoto (E6b, ADR-009).
+
+    Guardamos una PLANTILLA DE TESELAS, no el archivo. La imagen vive donde el
+    ingeniero la tenga (OpenAerialMap, un TiTiler, su plataforma de drones) y
+    la carga el navegador. Subir y tilar el GeoTIFF propio exige
+    almacenamiento y un tilador: es otra decision, no esta.
+
+    Varias por proyecto (nombre unico dentro del proyecto): una ortofoto por
+    campana, por ejemplo.
+    """
+
+    __tablename__ = "imagery_layers"
+    __table_args__ = (
+        UniqueConstraint("project_id", "name", name="uq_imagery_layer_project_name"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    tile_template: Mapped[str] = mapped_column(String(1000), nullable=False)
+    attribution: Mapped[str | None] = mapped_column(String(300))
+    min_zoom: Mapped[int | None] = mapped_column(Integer)
+    max_zoom: Mapped[int | None] = mapped_column(Integer)
+    opacity: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
+
+
 class MonitoringAnalysisRow(Base):
     """Snapshot del analisis exploratorio de UN monitoreo (E3, ADR-008).
 

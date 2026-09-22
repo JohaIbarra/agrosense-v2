@@ -22,6 +22,7 @@ interface Dibujado {
   tooltip?: string;
 }
 const dibujado: Dibujado[] = [];
+const teselas: { url: string; opacity?: number }[] = [];
 let capasLimpiadas = 0;
 
 vi.mock("leaflet", () => {
@@ -53,7 +54,22 @@ vi.mock("leaflet", () => {
   return {
     default: {
       map: () => ({ remove: () => {}, fitBounds: () => {} }),
-      tileLayer: () => ({ addTo: () => {} }),
+      // `addTo` devuelve la capa, como en Leaflet: el codigo guarda esa
+    // referencia para poder quitarla despues.
+    tileLayer: (url: string, options: any) => {
+      const capa = { url, opacity: options?.opacity };
+      const self = {
+        addTo: () => {
+          teselas.push(capa);
+          return self;
+        },
+        remove: () => {
+          const i = teselas.indexOf(capa);
+          if (i >= 0) teselas.splice(i, 1);
+        },
+      };
+      return self;
+    },
       layerGroup: () => group,
       circleMarker: marca("circle"),
       polygon: marca("polygon"),
@@ -70,6 +86,14 @@ const MAPA: ProjectMap = {
   properties: ["Guayabal", "Tres Jotas"],
   bounds: { south: 5.799, west: -75.388, north: 5.804, east: -75.384 },
   without_coordinates: 3,
+  imagery: [
+    {
+      id: 11, name: "Ortofoto 2024",
+      tile_template: "https://tiles.openaerialmap.org/abc/0/def/{z}/{x}/{y}.png",
+      attribution: "Santiago Pastor (OpenAerialMap, CC-BY 4.0)",
+      min_zoom: null, max_zoom: 21, opacity: 0.8,
+    },
+  ],
   trees: [
     {
       id: "G_1", species: "Cedrela montana", property: "Guayabal", plot: "11",
@@ -137,6 +161,7 @@ import { MapPage as MapPageBajoPrueba } from "./MapPage";
 
 beforeEach(() => {
   dibujado.length = 0;
+  teselas.length = 0;
   capasLimpiadas = 0;
 });
 
@@ -210,5 +235,44 @@ describe("mapa del predio", () => {
     expect(poligono.tooltip).toContain("88.9 % vivos de 9");
     const linea = dibujado.find((d) => d.kind === "circle")!;
     expect(linea.tooltip).toContain("muestra pequeña");
+  });
+
+  it("empieza con el satélite y sin ortofoto encima", async () => {
+    mockApi();
+    renderMapa();
+    await waitFor(() => expect(dibujado.length).toBe(3));
+    expect(teselas).toHaveLength(1);
+    expect(teselas[0].url).toContain("World_Imagery");
+  });
+
+  it("al elegir la ortofoto la añade con la opacidad que tiene guardada", async () => {
+    mockApi();
+    renderMapa();
+    await waitFor(() => expect(dibujado.length).toBe(3));
+
+    await userEvent.click(screen.getByRole("radio", { name: "Ortofoto 2024" }));
+    await waitFor(() => expect(teselas).toHaveLength(2));
+    expect(teselas[1].url).toContain("tiles.openaerialmap.org");
+    expect(teselas[1].opacity).toBe(0.8);
+  });
+
+  it("volver a «solo satélite» quita la ortofoto", async () => {
+    mockApi();
+    renderMapa();
+    await waitFor(() => expect(dibujado.length).toBe(3));
+    await userEvent.click(screen.getByRole("radio", { name: "Ortofoto 2024" }));
+    await waitFor(() => expect(teselas).toHaveLength(2));
+
+    await userEvent.click(screen.getByRole("radio", { name: "Solo satélite" }));
+    await waitFor(() => expect(teselas).toHaveLength(1));
+  });
+
+  it("el formulario explica que la imagen no se sube", async () => {
+    mockApi();
+    renderMapa();
+    await waitFor(() => expect(dibujado.length).toBe(3));
+    await userEvent.click(screen.getByRole("button", { name: "Añadir ortofoto…" }));
+    expect(screen.getByLabelText("Dirección de las teselas")).toBeInTheDocument();
+    expect(screen.getByText(/solo guarda su dirección/)).toBeInTheDocument();
   });
 });

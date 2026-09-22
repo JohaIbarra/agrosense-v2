@@ -289,4 +289,24 @@ export interface ProjectMap {
   without_coordinates: number;
   trees: MapTree[];
   plots: MapPlot[];
+  imagery: ImageryLayer[];
+}
+
+export interface ImageryLayer {
+  id: number;
+  name: string;
+  tile_template: string;
+  attribution: string | null;
+  min_zoom: number | null;
+  max_zoom: number | null;
+  opacity: number;
+}
+
+export interface ImageryLayerCreate {
+  name: string;
+  tile_template: string;
+  attribution?: string | null;
+  min_zoom?: number | null;
+  max_zoom?: number | null;
+  opacity?: number | null;
 }

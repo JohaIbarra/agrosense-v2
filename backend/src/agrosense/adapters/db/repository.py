@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from agrosense.adapters.db.models import (
     CampaignFile,
     Engineer,
+    ImageryLayerRow,
     MonitoringAnalysisRow,
     MonitoringRow,
     ObservationRow,
@@ -711,6 +712,54 @@ class AnalyticsRepository:
             "plots": len(plots),
             "variance": len(variance),
         }
+
+
+class ImageryRepository:
+    """Capas de imagen de un proyecto (E6b).
+
+    Las capas se identifican SIEMPRE dentro de su proyecto: un id suelto no da
+    acceso a la capa de otro.
+    """
+
+    def __init__(self, session: Session):
+        self._s = session
+
+    def list_for_project(self, project_id: int) -> list[ImageryLayerRow]:
+        return list(
+            self._s.scalars(
+                select(ImageryLayerRow)
+                .where(ImageryLayerRow.project_id == project_id)
+                .order_by(ImageryLayerRow.id)
+            ).all()
+        )
+
+    def get(self, project_id: int, layer_id: int) -> ImageryLayerRow | None:
+        return self._s.scalar(
+            select(ImageryLayerRow).where(
+                ImageryLayerRow.project_id == project_id, ImageryLayerRow.id == layer_id
+            )
+        )
+
+    def name_taken(self, project_id: int, name: str) -> bool:
+        return (
+            self._s.scalar(
+                select(func.count())
+                .select_from(ImageryLayerRow)
+                .where(ImageryLayerRow.project_id == project_id, ImageryLayerRow.name == name)
+            )
+            or 0
+        ) > 0
+
+    def create(self, project_id: int, **fields) -> ImageryLayerRow:
+        row = ImageryLayerRow(project_id=project_id, **fields)
+        self._s.add(row)
+        self._s.commit()
+        self._s.refresh(row)
+        return row
+
+    def delete(self, layer: ImageryLayerRow) -> None:
+        self._s.delete(layer)
+        self._s.commit()
 
 
 class ProjectAnalysisRepository:

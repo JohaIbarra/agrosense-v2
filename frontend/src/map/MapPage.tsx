@@ -16,8 +16,9 @@ import "leaflet/dist/leaflet.css";
 import { Link, useParams } from "react-router-dom";
 
 import { getProjectMap } from "../api/map";
+import { ImageryPanel } from "./ImageryPanel";
 import { getProject } from "../api/projects";
-import type { MapTree, ProjectMap } from "../api/types";
+import type { ImageryLayer, MapTree, ProjectMap } from "../api/types";
 import { useAsync } from "../hooks/useAsync";
 import {
   ALL_PROPERTIES,
@@ -92,9 +93,13 @@ export function MapPage() {
   const [property, setProperty] = useState(ALL_PROPERTIES);
   const [layer, setLayer] = useState<Layer>("trees");
   const [selected, setSelected] = useState<MapTree | null>(null);
+  const [imageryId, setImageryId] = useState<number | null>(null);
+  const [imageryOpacity, setImageryOpacity] = useState(1);
+  const [recarga, setRecarga] = useState(0);
+  const orthoRef = useRef<L.TileLayer | null>(null);
 
   const project = useAsync((signal) => getProject(projectId, signal), [projectId]);
-  const map = useAsync((signal) => getProjectMap(projectId, signal), [projectId]);
+  const map = useAsync((signal) => getProjectMap(projectId, signal), [projectId, recarga]);
   const data: ProjectMap | null = map.data;
 
   // Al llegar los datos, el monitoreo más reciente es el que se muestra
@@ -122,6 +127,25 @@ export function MapPage() {
       layerRef.current = null;
     };
   }, [data]);
+
+  // La ortofoto elegida, encima del satélite y debajo de los árboles
+  // (Leaflet pinta los marcadores en otro panel, así que nunca los tapa)
+  useEffect(() => {
+    const instance = mapRef.current;
+    if (!instance) return;
+    if (orthoRef.current) {
+      orthoRef.current.remove();
+      orthoRef.current = null;
+    }
+    const capa = data?.imagery.find((c) => c.id === imageryId);
+    if (!capa) return;
+    orthoRef.current = L.tileLayer(capa.tile_template, {
+      attribution: capa.attribution ?? undefined,
+      opacity: imageryOpacity,
+      minZoom: capa.min_zoom ?? undefined,
+      maxZoom: capa.max_zoom ?? undefined,
+    }).addTo(instance);
+  }, [data, imageryId, imageryOpacity]);
 
   // Repintar la capa cuando cambia lo que se mira
   useEffect(() => {
@@ -170,6 +194,12 @@ export function MapPage() {
       }
     }
   }, [data, monitoring, property, layer]);
+
+  function elegirOrtofoto(layerId: number | null) {
+    setImageryId(layerId);
+    const capa: ImageryLayer | undefined = data?.imagery.find((c) => c.id === layerId);
+    if (capa) setImageryOpacity(capa.opacity);
+  }
 
   const trees = useMemo(
     () => (data && monitoring !== null ? visibleTrees(data, monitoring, property) : []),
@@ -311,6 +341,15 @@ export function MapPage() {
               ))}
             </ul>
           )}
+          <ImageryPanel
+            projectId={projectId}
+            layers={d.imagery}
+            selected={imageryId}
+            opacity={imageryOpacity}
+            onSelect={elegirOrtofoto}
+            onOpacity={setImageryOpacity}
+            onChanged={() => setRecarga((n) => n + 1)}
+          />
           {selected ? (
             <TreeCard tree={selected} monitorings={d.monitorings} />
           ) : (

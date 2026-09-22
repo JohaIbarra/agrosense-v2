@@ -367,6 +367,31 @@ class MapPlot(BaseModel):
     metrics: dict[str, PlotMetric]
 
 
+class ImageryLayerCreate(BaseModel):
+    """Alta de una capa de imagen: AgroSense guarda la direccion, no el archivo."""
+
+    name: str = Field(min_length=1, max_length=120)
+    tile_template: str = Field(
+        max_length=1000,
+        description="Plantilla XYZ sobre https, con {z}, {x} e {y}.",
+        examples=["https://tiles.openaerialmap.org/.../{z}/{x}/{y}.png"],
+    )
+    attribution: str | None = Field(default=None, max_length=300)
+    min_zoom: int | None = Field(default=None, ge=0, le=24)
+    max_zoom: int | None = Field(default=None, ge=0, le=24)
+    opacity: float | None = Field(default=None, ge=0, le=1)
+
+
+class ImageryLayerResponse(BaseModel):
+    id: int
+    name: str
+    tile_template: str
+    attribution: str | None
+    min_zoom: int | None
+    max_zoom: int | None
+    opacity: float
+
+
 class ProjectMapResponse(BaseModel):
     """Todo el mapa del proyecto en una respuesta (E6).
 
@@ -386,6 +411,10 @@ class ProjectMapResponse(BaseModel):
     )
     trees: list[MapTree]
     plots: list[MapPlot]
+    imagery: list[ImageryLayerResponse] = Field(
+        default_factory=list,
+        description="Capas de imagen del proyecto, para dibujar bajo los arboles.",
+    )
 
 
 class ObservationResponse(BaseModel):

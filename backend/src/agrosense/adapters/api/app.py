@@ -55,6 +55,11 @@ def create_app() -> FastAPI:
 
     app.include_router(map_router)
 
+    # E6b: capas de imagen (ortofoto) del proyecto
+    from agrosense.adapters.api.routes.imagery import router as imagery_router
+
+    app.include_router(imagery_router)
+
     # Techo del cuerpo ANTES de que el parser de multipart toque disco.
     # Se anade el ultimo para que quede el mas externo de la pila.
     app.add_middleware(BodySizeLimitMiddleware, max_bytes=MAX_UPLOAD_BYTES)
