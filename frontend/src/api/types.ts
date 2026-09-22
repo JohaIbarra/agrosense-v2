@@ -132,5 +132,107 @@ export interface Monitoring {
   monitoring_date: string | null;
   field_crew: string | null;
   recorder: string | null;
+  notes: string | null;
   observations: number;
+}
+
+// ── E2/E3: carga, monitoreos y análisis exploratorio ─────────────────────
+
+export type WarningType =
+  | "contraction"
+  | "revival"
+  | "census_gap"
+  | "event_mismatch"
+  | "project_mismatch"
+  | "unknown_columns";
+
+export interface IngestWarning {
+  type: WarningType;
+  tree_id: string;
+  message: string;
+}
+
+export interface UploadResult {
+  valid: boolean;
+  campaign_id: number | null;
+  trees: number;
+  observations: number;
+  deaths: number;
+  warnings: IngestWarning[];
+  errors: { code: string; message: string }[];
+  monitorings: number[];
+  analyzed: number[];
+}
+
+export interface MonitoringUpdate {
+  monitoring_date?: string | null;
+  notes?: string | null;
+}
+
+export type ColumnKind = "text" | "int" | "decimal" | "percent";
+
+export interface AnalysisColumn {
+  key: string;
+  label: string;
+  kind: ColumnKind;
+  decimals?: number | null;
+  group?: string | null;
+}
+
+export type AnalysisValue = string | number | null | string[];
+export type AnalysisRow = Record<string, AnalysisValue>;
+
+export interface AnalysisTable {
+  id: string;
+  title: string;
+  property: string | null;
+  columns: AnalysisColumn[];
+  rows: AnalysisRow[];
+  footer: AnalysisRow[];
+  notes: string[];
+}
+
+export interface AnalysisChart {
+  id: string;
+  title: string;
+  table: string;
+  kind: "bar";
+  x: string;
+  series: string[];
+  stacked: boolean;
+  percent: boolean;
+  y_label: string;
+  property: string | null;
+}
+
+export interface AnalysisSection {
+  id: string;
+  title: string;
+  description: string;
+  tables: AnalysisTable[];
+  charts: AnalysisChart[];
+  notes: string[];
+}
+
+export interface SummaryItem {
+  key: string;
+  label: string;
+  kind: "int" | "decimal" | "percent";
+  decimals?: number | null;
+  unit?: string | null;
+  value: number | null;
+}
+
+export interface MonitoringAnalysis {
+  project_id: number;
+  monitoring: number;
+  monitoring_date: string | null;
+  previous: number | null;
+  monitorings: number[];
+  properties: string[];
+  analysis_version: string;
+  input_hash: string;
+  computed_at: string;
+  summary: SummaryItem[];
+  sections: AnalysisSection[];
 }

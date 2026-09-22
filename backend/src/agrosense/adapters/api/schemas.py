@@ -4,6 +4,7 @@ FastAPI expone esto como OpenAPI; el frontend genera sus tipos de aqui.
 Los tipos de error/warning documentan los rulings del dominio (slice 1).
 """
 from datetime import date, datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -166,6 +167,13 @@ class UploadResultResponse(BaseModel):
         default_factory=list,
         description="Numeros de monitoreo que traia el archivo (uno o varios, E0).",
     )
+    analyzed: list[int] = Field(
+        default_factory=list,
+        description=(
+            "Monitoreos cuyo analisis exploratorio quedo recalculado tras la carga (E3). "
+            "Vacio si el analisis no pudo calcularse ahora: se calculara al consultarlo."
+        ),
+    )
 
 
 class CampaignResponse(BaseModel):
@@ -210,7 +218,102 @@ class MonitoringResponse(BaseModel):
     )
     field_crew: str | None = None
     recorder: str | None = None
+    notes: str | None = None
     observations: int = Field(description="Observaciones registradas en este monitoreo.")
+
+
+class MonitoringUpdate(BaseModel):
+    """PATCH de un monitoreo (E2): solo los campos presentes se cambian.
+
+    Reglas del dominio (→ 422 INVALID_MONITORING_DATE): la fecha no puede estar
+    en el futuro, y debe quedar despues de la del monitoreo anterior y antes
+    de la del siguiente.
+    """
+
+    monitoring_date: date | None = None
+    notes: str | None = Field(default=None, max_length=2000)
+
+
+# ── E3: analisis exploratorio por monitoreo ────────────────────────────────
+
+
+class AnalysisColumn(BaseModel):
+    key: str
+    label: str
+    kind: Literal["text", "int", "decimal", "percent"] = Field(
+        description="Tipo del valor. `percent` viene en escala 0–100."
+    )
+    decimals: int | None = Field(default=None, description="Decimales con que se muestra.")
+    group: str | None = Field(
+        default=None,
+        description="Encabezado agrupador (p. ej. el diseno florístico sobre «M3 | M4»).",
+    )
+
+
+class AnalysisTable(BaseModel):
+    id: str
+    title: str
+    property: str | None = Field(default=None, description="Predio de la tabla; null = proyecto.")
+    columns: list[AnalysisColumn]
+    rows: list[dict[str, Any]] = Field(
+        description=(
+            "Filas: {key de columna: valor}. `_flags` puede traer `low_sample` cuando el "
+            "porcentaje sale de menos arboles que el minimo del dominio."
+        )
+    )
+    footer: list[dict[str, Any]] = Field(description="Filas de totales o medias generales.")
+    notes: list[str]
+
+
+class AnalysisChart(BaseModel):
+    id: str
+    title: str
+    table: str = Field(description="Id de la tabla de la que salen los datos.")
+    kind: Literal["bar"]
+    x: str = Field(description="Key de la columna de categorias.")
+    series: list[str] = Field(description="Keys de las columnas a graficar.")
+    stacked: bool
+    percent: bool
+    y_label: str
+    property: str | None = None
+
+
+class AnalysisSection(BaseModel):
+    id: str
+    title: str
+    description: str
+    tables: list[AnalysisTable]
+    charts: list[AnalysisChart]
+    notes: list[str] = Field(default_factory=list)
+
+
+class SummaryItem(BaseModel):
+    key: str
+    label: str
+    kind: Literal["int", "decimal", "percent"]
+    decimals: int | None = None
+    unit: str | None = None
+    value: float | int | None
+
+
+class MonitoringAnalysisResponse(BaseModel):
+    """Analisis exploratorio de un monitoreo: las 7 hojas del Anexo 1 (E3).
+
+    Todas las cifras las calcula el backend; el frontend y el reporte .xlsx
+    solo las presentan, con el tipo y los decimales que declara cada columna.
+    """
+
+    project_id: int
+    monitoring: int
+    monitoring_date: date | None
+    previous: int | None = Field(description="Monitoreo con el que se compara (k-1), o null.")
+    monitorings: list[int]
+    properties: list[str]
+    analysis_version: str
+    input_hash: str = Field(description="SHA-256 de los datos de entrada (provenance).")
+    computed_at: datetime
+    summary: list[SummaryItem]
+    sections: list[AnalysisSection]
 
 
 class ObservationResponse(BaseModel):

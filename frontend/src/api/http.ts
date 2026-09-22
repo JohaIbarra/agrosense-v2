@@ -50,16 +50,16 @@ export function buildUrl(path: string, query?: Query): string {
   return qs ? `${path}?${qs}` : path;
 }
 
-export async function request<T>(
-  path: string,
-  options: {
-    method?: string;
-    query?: Query;
-    body?: unknown;
-    signal?: AbortSignal;
-  } = {},
-): Promise<T> {
-  const headers: Record<string, string> = { Accept: "application/json" };
+type RequestOptions = {
+  method?: string;
+  query?: Query;
+  body?: unknown;
+  signal?: AbortSignal;
+};
+
+/** Envía la petición con el token y traduce los errores. Devuelve la respuesta OK. */
+async function send(path: string, options: RequestOptions, accept: string): Promise<Response> {
+  const headers: Record<string, string> = { Accept: accept };
   const token = await tokenProvider();
   if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -100,7 +100,22 @@ export async function request<T>(
     if (response.status === 401) onUnauthorized();
     throw new ApiError(response.status, code, message);
   }
+  return response;
+}
 
+export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const response = await send(path, options, "application/json");
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
+}
+
+/** Archivo binario (p. ej. el reporte .xlsx) con el nombre que propone el servidor. */
+export async function requestFile(
+  path: string,
+  options: RequestOptions = {},
+): Promise<{ blob: Blob; filename: string | null }> {
+  const response = await send(path, options, "*/*");
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = /filename="([^"]+)"/.exec(disposition);
+  return { blob: await response.blob(), filename: match ? match[1] : null };
 }

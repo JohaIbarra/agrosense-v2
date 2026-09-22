@@ -1,6 +1,9 @@
 # 04 — Visión de producto: arquitectura y roadmap
 
-Fecha: 2026-09-21. Estado: **aprobado (decisiones en §12)**. Avance: **E0 ✅** (`docs/verificacion-e0.md`) · **E1 ✅** (`docs/verificacion-e1.md`; falta el login con una cuenta real) · siguiente: **E2**.
+Fecha: 2026-09-21 (avance al 2026-09-22). Estado: **aprobado (decisiones en §12)**.
+Avance: **E0 ✅** (`docs/verificacion-e0.md`) · **E1 ✅** (`docs/verificacion-e1.md`;
+falta el login con una cuenta real) · **E2+E3 ✅** (`docs/verificacion-e2e3.md`;
+falta el recorrido en navegador) · siguiente: **E4 · mapa del predio**.
 
 Reabre dominio y arquitectura (AGENTS.md: «un slice puede reabrir dominio o
 arquitectura cuando revela un requisito no contemplado, con justificación, ADR
@@ -285,7 +288,8 @@ acumulado trae varios (H4).
 > y se consume entero: no se consulta por dentro con SQL. Persistirlo como
 > snapshot inmutable y versionado es lo que permite que un informe diga «en
 > M3 la supervivencia era 82 %» y siga siendo cierto después. El LLM necesita
-> exactamente eso: una entrada estable. Decisión a registrar en ADR-008.
+> exactamente eso: una entrada estable. **ADR-008 aceptado (2026-09-22)**;
+> `monitoring_analyses` existe desde la migración `e5f1a2b3c4d6`.
 
 ### 6.6 Procesamiento
 
@@ -429,18 +433,26 @@ Aquí está el alcance, no la descomposición.
   RLS** detectada en la fase 6.
 - UI: página de inicio, inicio de sesión, lista de proyectos, crear proyecto.
 
-### E2 · Carga de monitoreos
-- Subir el Excel desde la UI (el backend ya existe).
-- Detectar qué monitoreos trae el archivo; pedir su fecha.
-- Cola de trabajos (`jobs`) + worker: la carga deja de ser síncrona.
-  **Cierra la deuda #G.**
-- Resultado de ingesta con sus avisos; histórico de monitoreos.
+### E2 · Carga de monitoreos — ✅ hecho (2026-09-22)
+- Subir el Excel desde la ficha del proyecto, con la fecha del monitoreo.
+- El archivo solo trae **datos crudos de campo**; las hojas de análisis del
+  Anexo no se suben, se calculan.
+- Resultado de ingesta con sus avisos agrupados; histórico de monitoreos con
+  su fecha editable.
+- **Sin cola de trabajos.** #G se cerró por otra vía (una sentencia por tabla:
+  91.9s → 4.8s) y la carga completa mide ≈18s, así que la cola (ADR-009) sigue
+  pendiente y sin justificación todavía. Ver `docs/adr/008-analisis-como-snapshot.md`.
 
-### E3 · Análisis exploratorio por monitoreo — *primer hito usable*
-- Reproduce automáticamente las 7 hojas (§1, H1), con sus mismos cortes.
-- Se calcula en segundo plano al terminar la ingesta; se guarda como snapshot.
-- Tamaño mínimo de muestra: no presentar el % de supervivencia de una especie
-  con 2 árboles como si fuera robusto.
+### E3 · Análisis exploratorio por monitoreo — ✅ hecho (2026-09-22) · *primer hito usable*
+- Reproduce las 7 hojas (§1, H1) con sus mismos cortes; verificado celda a
+  celda contra el Anexo 1 (y encontró dos erratas del trabajo manual).
+- Se calcula al terminar la ingesta, para todos los monitoreos, y se guarda
+  como snapshot versionado con `input_hash`.
+- Tablas ordenables y gráficas en la página + **reporte `.xlsx` descargable**
+  con una hoja por análisis y los datos crudos. Las cifras del archivo y las
+  de la pantalla salen del mismo cálculo del backend.
+- Tamaño mínimo de muestra: un % de supervivencia con menos de 5 árboles se
+  marca en vez de presentarse como robusto.
 
 ### E4 · Comparación temporal — *la visión central*
 - M1→M2, M2→M3, M3→M4…
@@ -506,8 +518,9 @@ Tres dependencias que no son obvias:
 
 - **E0 → E7.** Sin `sampling_unit_code` en la base, el modelo de estancados no
   puede agrupar por parcela y no pasa su propio gate.
-- **E2 → E3 pasa por la cola.** El análisis automático solo es viable cuando
-  el procesamiento sale de la request (H5).
+- ~~**E2 → E3 pasa por la cola.**~~ Resuelto de otra forma (2026-09-22): con
+  #G cerrada, el análisis cabe en la request (≈18s de punta a punta) y corre
+  al terminar la ingesta. La cola queda para cuando un proyecto la necesite.
 - **E3 y E4 → E9.** El LLM no tiene nada que redactar hasta que existan
   snapshots de análisis.
 
@@ -519,16 +532,18 @@ Tres dependencias que no son obvias:
 |---|---|---|
 | 1 | **E0 · Fundación de datos** | Todo lo demás depende de las dimensiones y de los monitoreos como entidad. Construir encima del modelo actual es construir para rehacer |
 | 2 | **E1 · Identidad y proyectos** | Sin ingeniero no hay «sus proyectos» |
-| 3 | **E2 · Carga de monitoreos** | Conecta la ingesta que ya existe con una pantalla, y trae la cola |
-| 4 | **E3 · Análisis exploratorio** | 🎯 **Primer hito usable**: el ingeniero sube su Excel y ve su análisis |
-| 5 | **E4 · Comparación temporal** | 🎯 **Cumple la visión central** |
-| 6 | **E5 · Referente + contraste** | Barato: el referente ya existe, falta conectarlo |
-| 7 | **E6 · Mapa** | Mucho valor visual con datos que ya existen |
-| 8 | **E9 · IA** | Solo necesita E3 y E4; se puede adelantar en paralelo con E6 |
-| 9 | **E7 · Estancados** | Primer modelo de ML |
-| 10 | **E8 · Mortalidad** | Consume E7 |
-| 11 | **E10 · Satélite** | Tras verificar el tamaño de las parcelas |
-| 12 | **E11 · Ortofotos + DL** | Tras conseguir la fuente de imágenes |
+| 3 | **E2 · Carga de monitoreos** ✅ | Conecta la ingesta que ya existe con una pantalla |
+| 4 | **E3 · Análisis exploratorio** ✅ | 🎯 **Primer hito usable**: el ingeniero sube su Excel y ve su análisis |
+| 5 | **E6 · Mapa del predio** | *Adelantado el 2026-09-22 por decisión del ingeniero*: árboles sobre satélite, coloreados por estado, línea de tiempo M1→Mn, histórico al hacer clic y mapa de calor por parcela. Los datos ya están |
+| 6 | **E6b · Ortofoto por proyecto** *(opcional)* | GeoTIFF propio del proyecto, probado primero con una imagen libre de OpenAerialMap |
+| 7 | **E4 · Comparación temporal** | 🎯 **Cumple la visión central**; también entra en el reporte descargable |
+| 8 | **E10a · NDVI Sentinel-2 por predio** | Cierra el orden aprobado por el ingeniero |
+| — | **E5 · Referente + contraste** | Barato: el referente ya existe, falta conectarlo |
+| 9 | **E9 · IA** | Solo necesita E3 y E4; se puede adelantar en paralelo con E6 |
+| 10 | **E7 · Estancados** | Primer modelo de ML |
+| 11 | **E8 · Mortalidad** | Consume E7 |
+| 12 | **E10 · Satélite (resto de índices)** | Tras verificar el tamaño de las parcelas |
+| 13 | **E11 · Ortofotos + DL** | Tras conseguir la fuente de imágenes |
 
 **La IA va antes que los modelos de ML** porque solo necesita los análisis ya
 calculados y el ingeniero la ve de inmediato; E7 y E8 son más arriesgados y

@@ -141,6 +141,50 @@ class UploadResult:
     warnings: list[WarningDTO] = field(default_factory=list)
     # Monitoreos que traia el archivo (E0, decision D1)
     monitorings: list[int] = field(default_factory=list)
+    # Monitoreos cuyo analisis exploratorio quedo recalculado tras la carga (E3)
+    analyzed: list[int] = field(default_factory=list)
+
+
+# ── E2/E3: monitoreos y su analisis exploratorio ───────────────────────────
+
+
+@dataclass(frozen=True)
+class MonitoringDTO:
+    number: int
+    monitoring_date: date | None
+    field_crew: str | None
+    recorder: str | None
+    notes: str | None
+
+
+@dataclass(frozen=True)
+class AnalysisDTO:
+    """Snapshot del analisis exploratorio de un monitoreo (ADR-008).
+
+    `payload` es el resultado del motor tal cual (secciones con tablas tipadas
+    y graficas). La pagina y el reporte .xlsx se construyen de el: nadie mas
+    calcula.
+    """
+
+    project_id: int
+    monitoring: int
+    monitoring_date: date | None
+    analysis_version: str
+    input_hash: str
+    computed_at: datetime
+    payload: dict
+
+
+@dataclass(frozen=True)
+class ReportData:
+    """Todo lo que necesita el reporte .xlsx: el analisis y sus datos crudos."""
+
+    project_name: str
+    project_code: str | None
+    analysis: AnalysisDTO
+    trees: list[Tree]
+    observations: list[Observation]
+    monitoring_dates: dict[int, date]
 
 
 # ── Slice 5: analitica de los modelos mixtos ───────────────────────────────

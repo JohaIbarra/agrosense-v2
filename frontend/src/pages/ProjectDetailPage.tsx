@@ -1,8 +1,12 @@
 /**
- * Ficha de un proyecto: sus datos y sus monitoreos.
+ * Ficha de un proyecto: carga de monitoreos, sus monitoreos (con acceso al
+ * análisis) y sus datos.
  */
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { MonitoringsCard } from "../components/MonitoringsCard";
+import { UploadPanel } from "../components/UploadPanel";
 import { getProject, listMonitorings } from "../api/projects";
 import type { Project } from "../api/types";
 import { useAsync } from "../hooks/useAsync";
@@ -81,7 +85,12 @@ export function ProjectDetailPage() {
   const { id } = useParams();
   const projectId = Number(id);
   const project = useAsync((signal) => getProject(projectId, signal), [projectId]);
-  const monitorings = useAsync((signal) => listMonitorings(projectId, signal), [projectId]);
+  const [version, setVersion] = useState(0);
+  const reload = () => setVersion((v) => v + 1);
+  const monitorings = useAsync(
+    (signal) => listMonitorings(projectId, signal),
+    [projectId, version],
+  );
 
   if (project.loading) return <p className="state">Cargando proyecto…</p>;
   if (project.error) {
@@ -112,38 +121,17 @@ export function ProjectDetailPage() {
         </Link>
       </header>
 
-      <section className="card">
-        <h2>Monitoreos</h2>
-        {monitorings.loading && <p className="muted">Cargando…</p>}
-        {monitorings.data && monitorings.data.length === 0 && (
-          <p className="empty">
-            Aún no hay monitoreos cargados. La carga del Excel desde esta pantalla es lo siguiente
-            en construcción (E2).
-          </p>
-        )}
-        {monitorings.data && monitorings.data.length > 0 && (
-          <table className="comparison">
-            <thead>
-              <tr>
-                <th scope="col">Monitoreo</th>
-                <th scope="col">Fecha</th>
-                <th scope="col">Cuadrilla</th>
-                <th scope="col">Observaciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {monitorings.data.map((m) => (
-                <tr key={m.number}>
-                  <th scope="row">M{m.number}</th>
-                  <td>{fecha(m.monitoring_date) ?? "Sin fecha"}</td>
-                  <td>{m.field_crew ?? "—"}</td>
-                  <td>{m.observations}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+      <UploadPanel projectId={p.id} onUploaded={reload} />
+
+      {monitorings.loading && !monitorings.data && <p className="muted">Cargando monitoreos…</p>}
+      {monitorings.error && (
+        <p className="form-error" role="alert">
+          {monitorings.error.message}
+        </p>
+      )}
+      {monitorings.data && (
+        <MonitoringsCard projectId={p.id} monitorings={monitorings.data} onChanged={reload} />
+      )}
 
       <Datos p={p} />
     </div>

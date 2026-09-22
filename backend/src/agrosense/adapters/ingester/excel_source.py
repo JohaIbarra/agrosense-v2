@@ -21,13 +21,18 @@ import zipfile
 import pandas as pd
 from openpyxl import load_workbook
 
+from agrosense.adapters.ingester.column_mapping import fixed_columns
 from agrosense.adapters.ingester.ingest import ingest_wide
 from agrosense.application.dtos import CampaignData
 from agrosense.application.errors import AppError
 
 logger = logging.getLogger(__name__)
 
-# Hoja del dataset de campo (ADR-004 + AGENTS.md)
+# Hoja PREFERIDA del dataset de campo (ADR-004 + AGENTS.md). Desde E2 no es
+# obligatoria: si el libro no la tiene, se usa la primera hoja cuya cabecera
+# trae la identidad del arbol (ID_MUEST + especie). El Excel del M1 no se
+# llamara «Monitoreo_4», y el Anexo 1 trae siete hojas de resumen que no son
+# datos (sus cabeceras no tienen ID_MUEST).
 SHEET_NAME = "Monitoreo_4"
 
 # Firma de un contenedor ZIP (todo .xlsx/.xlsm lo es)
@@ -47,8 +52,9 @@ MAX_SHEET_CELLS = 2_000_000
 
 # Mensaje unico hacia el cliente: accionable y sin internals (AGENTS.md).
 _UNREADABLE = (
-    "No se pudo leer el archivo como Excel. Verifique que sea un .xlsx valido "
-    f"y que contenga la hoja '{SHEET_NAME}'."
+    "No se pudo leer el archivo como Excel. Verifique que sea un .xlsx valido y "
+    "que tenga una hoja de datos de campo: una fila por arbol, con las columnas "
+    "ID_MUEST y Especie_M1."
 )
 
 
@@ -93,6 +99,22 @@ class ExcelCampaignSource:
         if ratio > MAX_COMPRESSION_RATIO:
             raise _reject(f"ratio de compresion {ratio:.0f}:1 (bomba de descompresion)")
 
+    def _field_sheet(self, wb):
+        """La hoja preferida si existe; si no, la primera con identidad de arbol.
+
+        Solo se lee la PRIMERA fila de cada hoja candidata: decidir cual es la
+        de campo no puede costar leer las demas enteras.
+        """
+        if self._sheet_name in wb.sheetnames:
+            return wb[self._sheet_name]
+        for name in wb.sheetnames:
+            ws = wb[name]
+            header = next(ws.iter_rows(max_row=1, values_only=True), ())
+            mapped = fixed_columns([h for h in header if h is not None])
+            if "tree_id" in mapped and "species" in mapped:
+                return ws
+        raise _reject("ninguna hoja tiene las columnas ID_MUEST y Especie_M1")
+
     def _read_sheet_bounded(self, content: bytes) -> pd.DataFrame:
         """Lee la hoja contando celdas y abortando al pasar el presupuesto.
 
@@ -112,9 +134,7 @@ class ExcelCampaignSource:
             raise _reject(f"no se pudo abrir el libro ({type(exc).__name__})", exc) from exc
 
         try:
-            if self._sheet_name not in wb.sheetnames:
-                raise _reject(f"el libro no tiene la hoja '{self._sheet_name}'")
-            ws = wb[self._sheet_name]
+            ws = self._field_sheet(wb)
             # Igual que pandas: la extension real la fijan las celdas, no la
             # cabecera. Con esto un <dimension> mentiroso no trunca datos.
             ws.reset_dimensions()

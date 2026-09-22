@@ -91,49 +91,35 @@ un campo más al upload. La ingesta reporta lo que ingirió; la analítica calcu
 **Riesgo si se ignora:** alguien grafica "340 muertes de 856 árboles" (40%) y
 contradice el 16% del discovery en la misma pantalla.
 
-## G — El upload de una campaña tarda 79.7s contra Supabase
+## G — El upload de una campaña tardaba 79.7s contra Supabase — ✅ CERRADO (2026-09-22)
 
-**Estado:** deuda con gate duro. **Dueño:** fase 9 (deploy) — bloquea.
+**Cerrado en E2/E3.** `save_ingest` del dataset de referencia (856 árboles,
+3146 observaciones): **91.9s → 4.8s**, dentro del presupuesto de
+`docs/03-architecture.md` (<5s para ~1k árboles).
 
-Medido en la demostración de Task 6 (`docs/verificacion-slice2.md`): subir el
-dataset de referencia (856 árboles, 3146 observaciones) por la API real tardó
-**79.7s**. `docs/03-architecture.md` fija el presupuesto en **<5s para ~1k
-árboles**; son 16x.
+**La causa real no era ninguna de las tres anotadas antes.** Perfilando
+sentencia a sentencia contra Supabase: los 856 árboles entraban en **una**
+sentencia (0.43s) y las 3146 observaciones se partían en **615** (34.9s +
+20.1s + 14.7s + …). El motivo: al pasar los dicts por el `insert()` del ORM,
+SQLAlchemy agrupa las filas por el conjunto de columnas **no nulas**, y en
+campo cada fila tiene un patrón de nulos distinto (un árbol sin copa, otro sin
+estado fitosanitario, otro muerto sin medidas). Cada grupo era un viaje de ida
+y vuelta contra el pooler. No era el volumen: era la forma de los datos.
 
-**Causa:** no es el parseo — el mismo ingest sobre SQLite corre en ~2s. Son
-**tres** causas acumuladas (las dos últimas se descubrieron en el gate de
-fase 7; la redacción original solo tenía la primera):
+**Arreglo** (`adapters/db/repository.py`): `_bulk_insert` usa
+`insert(model.__table__)` en vez del `insert()` del ORM, que emite un único
+`executemany` sin importar el patrón de nulos. Observaciones: 615 sentencias →
+**1** (3146 filas en 1.11s).
 
-1. El coste de los ~4000 INSERT de la primera carga contra el pooler.
-   > **Medido de nuevo el 2026-09-20**, tras hacer la ingesta idempotente:
-   > primer upload **78.6s** (era 79.7s) y segundo upload **5.2s**. Es decir,
-   > quitar el `return_defaults=True` **no** movió la aguja del primer
-   > upload, que era la hipótesis original; solo abarató el segundo, que ya
-   > no inserta árboles. La causa real del coste de los INSERT sigue sin
-   > identificarse: hay que medirla antes de elegir arreglo.
-2. **Un `Engine` y un pool nuevos por cada request** (`deps.py:17` →
-   `session.py:54`, sin caché ni `dispose()`). Cada llamada paga un handshake
-   TCP+TLS: por eso un `GET /projects/999999` que toca una fila costó 2.5s en
-   la evidencia de Task 6. Es el arreglo más barato de los tres.
-3. ~~El endpoint es `async def`~~ → **corregido el 2026-09-20** (#R3). Ya no
-   congela el event loop. Ojo: ahora los uploads son concurrentes, así que la
-   causa 2 pasó de molesta a peligrosa — 40 uploads en paralelo son 40
-   `Engine` nuevos contra el cap de conexiones del pooler.
+**Regresión:** `tests/db/test_ingest_statements.py` cuenta **sentencias**, no
+tiempo — un test de reloj contra una DB remota sería inestable. Exige una
+sentencia por tabla al insertar y una al actualizar, con árboles de patrones
+de nulos deliberadamente distintos.
 
-**Por qué no se cierra ahora:** el flujo es funcionalmente correcto y el gate
-del slice 2 es de comportamiento, no de rendimiento. Optimizar la escritura es
-un cambio con su propio ciclo TDD.
-
-**Gate para cerrarlo:** antes del deploy. Un request síncrono de 80s excede el
-timeout de proxy de la mayoría de free tiers, así que esto **rompe el producto
-desplegado**, no solo lo hace lento. Dos salidas:
-
-1. Insertar los árboles en una sola sentencia y resolver los ids con un
-   `SELECT` por `tree_id` (barato, no cambia arquitectura).
-2. Mover la ingesta a job asíncrono — es el "job queue (requisito futuro, ADR
-   nuevo)" que `docs/03-architecture.md` ya anticipó. Sería ADR-005.
-
-Empezar por (1): si baja de 5s, (2) no hace falta y el ADR no se escribe.
+**Lo que sigue abierto de aquí:** la causa 2 (un `Engine` y un pool nuevos por
+request, `deps.py` → `session.py`) **no se tocó**; sigue costando un handshake
+TCP+TLS por llamada y es peligrosa con uploads concurrentes. Anotada como
+**#N**. La causa 3 (endpoint `async def`) ya estaba corregida.
 
 ## I — Un archivo corregido no elimina lo que ya no trae
 
@@ -224,9 +210,11 @@ literal dentro del JSON. **No es XSS hoy** — la respuesta es `application/json
 y no hay frontend — pero es contenido controlado por quien sube el archivo,
 reflejado sin límite de longitud. Lo mismo en el 201 vía `WarningDTO.message`.
 
-**Gate:** el slice que estrene la UI. Decisión a tomar entonces: acotar la
-longitud del valor interpolado y confirmar que el frontend escapa. Anotado
-aquí para que no se descubra en producción.
+**Gate:** el slice que estrene la UI. **Mitigado en E2/E3 (2026-09-22):** la
+UI ya existe y los avisos se pintan como texto en React (`{aviso.message}`),
+que escapa por construcción — no hay `dangerouslySetInnerHTML` en ninguna
+parte. Queda abierto lo otro: **acotar la longitud del valor interpolado** en
+`domain/errors.py`, que sigue sin límite.
 
 ### K — Dos rutas de error se saltan el envelope `{code, message}`
 
@@ -259,3 +247,48 @@ eso es cualquiera. La campaña anterior sobrevive como provenance, pero los
 
 **Gate:** la épica de auth. Registrado aquí como riesgo aceptado explícito y
 no como detalle enterrado en un docstring.
+
+### N — Un `Engine` y un pool nuevos en cada request
+
+**Estado:** deuda con gate duro. **Dueño:** fase 9 (deploy). **Origen:** era
+la causa 2 de #G; al cerrarse #G por otro motivo, se queda sola.
+
+`deps.py` llama a `session.get_engine()` por request y `session.py` construye
+un `Engine` nuevo sin caché ni `dispose()`. Cada llamada paga un handshake
+TCP+TLS contra el pooler: por eso un `GET /projects/999999`, que toca una
+fila, costó 2.5s en la evidencia del slice 2.
+
+Ahora que los endpoints son síncronos y por tanto concurrentes, es además un
+riesgo de agotar el cap de conexiones: N uploads en paralelo son N `Engine`
+nuevos.
+
+**Arreglo:** cachear el `Engine` a nivel de módulo (es thread-safe y su pool
+existe justo para esto) y cerrarlo en el shutdown de la app.
+
+### O — El bundle del frontend pesa 827 kB
+
+**Estado:** deuda anotada. **Dueño:** épica de mapa (E4), que añadirá otra
+librería pesada.
+
+`npm run build` avisa: `index-*.js` 827 kB (237 kB gzip), por encima del
+límite de 500 kB de Vite. Casi todo es Recharts, que entra entero aunque la
+página de proyectos no dibuje ninguna gráfica.
+
+**Arreglo:** `import()` dinámico de la página de análisis (y luego del mapa),
+que es donde vive la visualización. No urge: en local no se nota y el gzip es
+razonable, pero con el mapa encima conviene hacerlo antes del deploy.
+
+### P — Inyección de fórmulas en el `.xlsx` — ✅ CERRADO el mismo día (2026-09-22)
+
+Encontrado en la revisión de seguridad de E2/E3 y corregido antes del commit.
+openpyxl decide el tipo de celda mirando el valor: una cadena que empiece por
+`=` queda marcada como fórmula y **Excel la ejecuta** al abrir el reporte. La
+especie, el identificador del árbol y las notas de campo vienen del archivo
+que sube el usuario, así que bastaba una celda con `=HYPERLINK(...)` para que
+el reporte descargado la ejecutara en la máquina del ingeniero.
+
+**Arreglo:** `_cell()` en `adapters/report/xlsx.py` fuerza `data_type = "s"`
+en toda celda de texto; es el único camino de escritura del libro.
+**Regresión:** `test_field_text_never_becomes_an_excel_formula` recorre las
+nueve hojas y exige cero celdas con `data_type == "f"` (antes: 14).
+

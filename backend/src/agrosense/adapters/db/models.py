@@ -390,6 +390,42 @@ class ObservationRow(Base):
 # Cuando exista multi-proyecto de verdad, esto pide un ADR, no una columna.
 
 
+class MonitoringAnalysisRow(Base):
+    """Snapshot del analisis exploratorio de UN monitoreo (E3, ADR-008).
+
+    El analisis es derivado: se recalcula entero y se consume entero (pagina y
+    reporte .xlsx), nunca se consulta por dentro con SQL. Por eso vive como un
+    JSON inmutable y versionado, y no como tablas:
+
+      - `analysis_version`: version del calculo que lo produjo. Si el codigo
+        cambia de version, el snapshot se recalcula al leerse;
+      - `input_hash`: huella de los datos de entrada (arboles + observaciones
+        del proyecto). Ata el resultado a lo que lo produjo (AGENTS.md,
+        Data provenance).
+
+    Uno por monitoreo (`UNIQUE(monitoring_id)`): recalcular REEMPLAZA.
+    """
+
+    __tablename__ = "monitoring_analyses"
+    __table_args__ = (
+        UniqueConstraint("monitoring_id", name="uq_monitoring_analysis_monitoring"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    monitoring_id: Mapped[int] = mapped_column(
+        ForeignKey("monitorings.id", ondelete="CASCADE"), nullable=False
+    )
+    analysis_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    input_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+
 def _analytics_updated() -> datetime:
     return _utcnow()
 

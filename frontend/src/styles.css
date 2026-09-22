@@ -706,3 +706,285 @@ code {
   border: none;
   padding: 0;
 }
+
+/* ── E2/E3: carga de monitoreos y análisis exploratorio ─────────── */
+
+.page-wide {
+  max-width: 1320px;
+}
+
+.upload-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+  margin: 12px 0 4px;
+}
+
+.upload-form .field {
+  min-width: 220px;
+}
+
+.upload-result {
+  margin-top: 14px;
+}
+
+.warnings h3 {
+  margin: 12px 0 2px;
+  font-size: 15px;
+}
+
+.warnings details {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: #fcfcfb;
+}
+
+.warnings summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.warnings .count {
+  display: inline-block;
+  min-width: 22px;
+  padding: 0 7px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  font-size: 12px;
+  text-align: center;
+}
+
+.warnings ul {
+  margin: 6px 0 4px;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+.warnings li {
+  overflow-wrap: anywhere;
+}
+
+.date-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.form-error.inline {
+  margin: 0;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.head-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.stat dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.stat dd {
+  margin: 2px 0 0;
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  border: 0;
+  background: none;
+  padding: 10px 14px;
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab-on {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+.analysis-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.analysis-section h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.analysis-section > .muted {
+  margin: -12px 0 0;
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 16px;
+}
+
+.chart-card,
+.data-table {
+  margin: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  min-width: 0;
+}
+
+.chart-card figcaption,
+.data-table figcaption {
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.chart-unit {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.data-table table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table th,
+.data-table td {
+  border: 1px solid #e3e7e4;
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+
+.data-table thead th {
+  background: #2f6b3a;
+  color: #fff;
+  font-weight: 600;
+  vertical-align: bottom;
+}
+
+.data-table thead .group-row th {
+  background: #dce9de;
+  color: var(--text);
+  text-align: center;
+  white-space: normal;
+  font-size: 12px;
+}
+
+.data-table thead .group-row th:not(.grouped) {
+  background: var(--surface);
+  border-color: transparent;
+}
+
+.data-table thead th button {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  white-space: normal;
+}
+
+.data-table thead th button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.sort-mark {
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.data-table .num {
+  text-align: right;
+}
+
+.data-table .text {
+  text-align: left;
+}
+
+.data-table tbody tr:nth-child(even) td {
+  background: #fafbfa;
+}
+
+.data-table tbody tr:hover td {
+  background: #eef6f0;
+}
+
+.data-table tr.low-sample td {
+  background: #fff8e6;
+}
+
+.data-table tfoot td {
+  font-weight: 600;
+  background: #f1f4f1;
+}
+
+.low-mark {
+  color: #b45309;
+}
+
+.empty-cell {
+  text-align: center;
+  color: var(--muted);
+}
+
+.table-notes {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.provenance {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}

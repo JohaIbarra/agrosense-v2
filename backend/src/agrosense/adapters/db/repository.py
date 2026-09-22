@@ -5,6 +5,7 @@ persistencia parcial). El commit lo hace el propio repo en el borde de
 la operacion completa.
 """
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy import func, insert, select, update
 from sqlalchemy.exc import DataError, IntegrityError
@@ -13,6 +14,7 @@ from sqlalchemy.orm import Session
 from agrosense.adapters.db.models import (
     CampaignFile,
     Engineer,
+    MonitoringAnalysisRow,
     MonitoringRow,
     ObservationRow,
     PlotAnalytics,
@@ -25,6 +27,7 @@ from agrosense.adapters.db.models import (
 )
 from agrosense.application.dtos import CampaignData
 from agrosense.application.errors import AppError
+from agrosense.domain.entities import Observation, StatusSemantic, Tree
 from agrosense.domain.errors import ProjectLabelMismatchWarning
 from agrosense.domain.rules import plot_key, validate_tree_identity
 
@@ -41,6 +44,23 @@ def _fit(value: str | None, width: int) -> str | None:
     if value is None or len(value) <= width:
         return value
     return value[: width - 1] + "…"
+
+
+def _bulk_insert(session: Session, model, rows: list[dict]) -> None:
+    """Inserta `rows` en UNA sentencia, cueste lo que cueste el patron de nulos.
+
+    Por que sobre `model.__table__` y no sobre el modelo (regresion #G,
+    medida contra Supabase el 2026-09-22): el `insert()` de ORM agrupa las
+    filas por el conjunto de columnas NO NULAS y emite una sentencia por
+    grupo. En campo cada fila tiene su propio patron de nulos (un arbol sin
+    copa, otro sin estado fitosanitario, otro muerto sin medidas), asi que
+    3146 observaciones salian en **615 sentencias** = 615 viajes de ida y
+    vuelta contra el pooler, 70 de los 92 segundos que tardaba la carga.
+    El INSERT de Core compila la lista de columnas una vez y manda todas las
+    filas en un solo executemany. Gate: tests/db/test_ingest_statements.py.
+    """
+    if rows:
+        session.execute(insert(model.__table__), rows)
 
 
 # Atributos descriptivos de la parcela que se actualizan con el archivo mas
@@ -222,6 +242,29 @@ class ProjectRepository:
             .order_by(MonitoringRow.number)
         ).all()
         return [(m, n) for m, n in rows]
+
+    def get_monitoring(self, project_id: int, number: int) -> MonitoringRow | None:
+        return self._s.scalar(
+            select(MonitoringRow).where(
+                MonitoringRow.project_id == project_id, MonitoringRow.number == number
+            )
+        )
+
+    def monitoring_dates(self, project_id: int) -> dict:
+        """{numero: fecha} de los monitoreos del proyecto que ya tienen fecha."""
+        rows = self._s.execute(
+            select(MonitoringRow.number, MonitoringRow.monitoring_date).where(
+                MonitoringRow.project_id == project_id,
+                MonitoringRow.monitoring_date.is_not(None),
+            )
+        ).all()
+        return {number: fecha for number, fecha in rows}
+
+    def update_monitoring(self, monitoring: MonitoringRow, **fields) -> MonitoringRow:
+        for key, value in fields.items():
+            setattr(monitoring, key, value)
+        self._s.commit()
+        return monitoring
 
     def get_tree_row(
         self, project_id: int, tree_row_id: int
@@ -520,8 +563,9 @@ class CampaignRepository:
                 fila.plot_row_id = plot_ids[key]
 
         if nuevos:
-            self._s.execute(
-                insert(TreeRow),
+            _bulk_insert(
+                self._s,
+                TreeRow,
                 [
                     {
                         "project_id": project_id,
@@ -589,9 +633,10 @@ class CampaignRepository:
             else:
                 a_actualizar.append({"id": obs_id, **fila})
 
-        if a_insertar:
-            self._s.execute(insert(ObservationRow), a_insertar)
+        _bulk_insert(self._s, ObservationRow, a_insertar)
         if a_actualizar:
+            # El UPDATE por clave primaria del ORM ya viaja en un solo
+            # executemany (todas las filas traen las mismas claves).
             self._s.execute(update(ObservationRow), a_actualizar)
         self._s.flush()
 
@@ -666,3 +711,126 @@ class AnalyticsRepository:
             "plots": len(plots),
             "variance": len(variance),
         }
+
+
+class ProjectAnalysisRepository:
+    """Datos del proyecto para el analisis exploratorio y sus snapshots (E3).
+
+    `load_dataset` devuelve ENTIDADES DE DOMINIO (`Tree`, `Observation`), no
+    filas del ORM: el motor de analisis no sabe nada de SQLAlchemy, y asi
+    recibe exactamente lo mismo que produce la ingesta.
+    """
+
+    def __init__(self, session: Session):
+        self._s = session
+
+    def load_dataset(self, project_id: int) -> tuple[list[Tree], list[Observation]]:
+        """Todos los arboles y observaciones del proyecto, en dos consultas."""
+        tree_rows = self._s.execute(
+            select(TreeRow, PlotRow, PropertyRow)
+            .outerjoin(PlotRow, PlotRow.id == TreeRow.plot_row_id)
+            .outerjoin(PropertyRow, PropertyRow.id == PlotRow.property_id)
+            .where(TreeRow.project_id == project_id)
+            .order_by(TreeRow.id)
+        ).all()
+        trees: list[Tree] = []
+        tree_ids: dict[int, str] = {}
+        for t, plot, prop in tree_rows:
+            tree_ids[t.id] = t.tree_id
+            trees.append(
+                Tree(
+                    tree_id=t.tree_id,
+                    species=t.species,
+                    family=t.family,
+                    common_name=t.common_name,
+                    guild=t.guild,
+                    plot_id=plot.plot_label if plot else None,
+                    locality=prop.name if prop else None,
+                    coord_x=t.coord_x,
+                    coord_y=t.coord_y,
+                    elevation_m=t.elevation_m,
+                    sampling_unit_code=plot.sampling_unit_code if plot else None,
+                    monitoring_unit=plot.monitoring_unit if plot else None,
+                    floristic_design=plot.floristic_design if plot else None,
+                    associated_cover=plot.associated_cover if plot else None,
+                    establishment_cover=plot.establishment_cover if plot else None,
+                )
+            )
+
+        obs_rows = self._s.execute(
+            select(
+                ObservationRow.tree_row_id,
+                MonitoringRow.number,
+                ObservationRow.height_m,
+                ObservationRow.crown_diameter_m,
+                ObservationRow.dap_cm,
+                ObservationRow.dap_status,
+                ObservationRow.phytosanitary,
+                ObservationRow.alive,
+                ObservationRow.field_notes,
+            )
+            .join(MonitoringRow, MonitoringRow.id == ObservationRow.monitoring_id)
+            .where(MonitoringRow.project_id == project_id)
+            .order_by(ObservationRow.tree_row_id, MonitoringRow.number)
+        ).all()
+        observations = [
+            Observation(
+                tree_id=tree_ids[r.tree_row_id],
+                campaign=r.number,
+                height_m=r.height_m,
+                crown_diameter_m=r.crown_diameter_m,
+                dap_cm=r.dap_cm,
+                dap_status=StatusSemantic(r.dap_status),
+                phytosanitary=r.phytosanitary,
+                alive=r.alive,
+                colonization=None,
+                field_notes=r.field_notes,
+            )
+            for r in obs_rows
+            if r.tree_row_id in tree_ids
+        ]
+        return trees, observations
+
+    def get_snapshot(self, project_id: int, number: int) -> MonitoringAnalysisRow | None:
+        return self._s.scalar(
+            select(MonitoringAnalysisRow)
+            .join(MonitoringRow, MonitoringRow.id == MonitoringAnalysisRow.monitoring_id)
+            .where(MonitoringRow.project_id == project_id, MonitoringRow.number == number)
+        )
+
+    def save_snapshots(
+        self,
+        project_id: int,
+        snapshots: dict[int, dict],
+        analysis_version: str,
+        input_hash: str,
+    ) -> list[MonitoringAnalysisRow]:
+        """Reemplaza los snapshots de esos monitoreos en UNA transaccion."""
+        monitorings = {
+            m.number: m
+            for m in self._s.scalars(
+                select(MonitoringRow).where(MonitoringRow.project_id == project_id)
+            ).all()
+        }
+        saved = []
+        try:
+            for number, payload in snapshots.items():
+                monitoring = monitorings[number]
+                row = self._s.scalar(
+                    select(MonitoringAnalysisRow).where(
+                        MonitoringAnalysisRow.monitoring_id == monitoring.id
+                    )
+                )
+                if row is None:
+                    row = MonitoringAnalysisRow(project_id=project_id, monitoring_id=monitoring.id)
+                    self._s.add(row)
+                row.analysis_version = analysis_version
+                row.input_hash = input_hash
+                row.payload = payload
+                row.computed_at = datetime.now(UTC)
+                saved.append(row)
+            self._s.commit()
+        except Exception:
+            self._s.rollback()
+            raise
+        return saved

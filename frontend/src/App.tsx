@@ -7,6 +7,7 @@
  *   /proyectos/nuevo        crear proyecto
  *   /proyectos/:id          ficha del proyecto
  *   /proyectos/:id/editar   editar proyecto
+ *   /proyectos/:id/monitoreos/:numero   análisis del monitoreo (E3)
  *   /referente              referente científico (antes /analytics)
  *   /perfil                 perfil del ingeniero
  *
@@ -21,6 +22,7 @@ import { AppLayout } from "./components/AppLayout";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { LandingPage } from "./pages/LandingPage";
 import { LoginPage } from "./pages/LoginPage";
+import { MonitoringAnalysisPage } from "./pages/MonitoringAnalysisPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { ProjectFormPage } from "./pages/ProjectFormPage";
@@ -43,6 +45,10 @@ export function App() {
       <Route path="/proyectos/nuevo" element={<Privada><ProjectFormPage /></Privada>} />
       <Route path="/proyectos/:id" element={<Privada><ProjectDetailPage /></Privada>} />
       <Route path="/proyectos/:id/editar" element={<Privada><ProjectFormPage /></Privada>} />
+      <Route
+        path="/proyectos/:id/monitoreos/:numero"
+        element={<Privada><MonitoringAnalysisPage /></Privada>}
+      />
       <Route path="/referente" element={<Privada><AnalyticsPage /></Privada>} />
       <Route path="/perfil" element={<Privada><ProfilePage /></Privada>} />
       <Route path="/analytics" element={<Navigate to="/referente" replace />} />

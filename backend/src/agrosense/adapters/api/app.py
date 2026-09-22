@@ -45,6 +45,11 @@ def create_app() -> FastAPI:
 
     app.include_router(me_router)
 
+    # E2/E3: fecha del monitoreo, analisis exploratorio y reporte .xlsx
+    from agrosense.adapters.api.routes.monitorings import router as monitorings_router
+
+    app.include_router(monitorings_router)
+
     # Techo del cuerpo ANTES de que el parser de multipart toque disco.
     # Se anade el ultimo para que quede el mas externo de la pila.
     app.add_middleware(BodySizeLimitMiddleware, max_bytes=MAX_UPLOAD_BYTES)

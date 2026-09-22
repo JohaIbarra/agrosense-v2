@@ -14,6 +14,7 @@ Contratos:
     GET    /projects/{project_id}                  → 200 ProjectResponse | 404
     PATCH  /projects/{project_id}                  → 200 ProjectResponse | 404/409/422  (E1)
     POST   /projects/{project_id}/campaigns        → 201 UploadResultResponse | 400/404/409/422
+                                     (multipart: file + monitoring_date opcional, E2)
     GET    /projects/{project_id}/campaigns        → 200 list[CampaignResponse] | 404
     GET    /projects/{project_id}/trees            → 200 list[TreeRowResponse] | 404
     GET    /projects/{project_id}/trees/{tree_row_id}/observations
@@ -24,11 +25,13 @@ from __future__ import annotations
 
 import os
 from dataclasses import asdict
+from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
+from agrosense.adapters.analysis.engine import ExploratoryAnalysisEngine
 from agrosense.adapters.api.deps import CurrentEngineer, get_session
 from agrosense.adapters.api.errors import raise_for_value_error
 from agrosense.adapters.api.schemas import (
@@ -42,7 +45,11 @@ from agrosense.adapters.api.schemas import (
     UploadResultResponse,
     WarningItem,
 )
-from agrosense.adapters.db.repository import CampaignRepository, ProjectRepository
+from agrosense.adapters.db.repository import (
+    CampaignRepository,
+    ProjectAnalysisRepository,
+    ProjectRepository,
+)
 from agrosense.adapters.ingester.excel_source import ExcelCampaignSource
 from agrosense.application.dtos import EngineerDTO, ProjectSummary, UploadResult
 from agrosense.application.errors import AppError
@@ -127,6 +134,7 @@ def _to_upload_response(dto: UploadResult) -> UploadResultResponse:
         ],
         errors=[],
         monitorings=dto.monitorings,
+        analyzed=dto.analyzed,
     )
 
 
@@ -202,6 +210,7 @@ def upload_campaign_endpoint(
     file: UploadFile,
     session: SessionDep,
     engineer: CurrentEngineer,
+    monitoring_date: Annotated[date | None, Form()] = None,
 ) -> UploadResultResponse:
     """Sube una campaña de monitoreo a un proyecto del ingeniero.
 
@@ -210,6 +219,10 @@ def upload_campaign_endpoint(
     despacha al threadpool los endpoints síncronos; como corrutina, este
     trabajo congelaba el event loop y el worker dejaba de atender cualquier
     otra request. Es la tercera lección de v1 en AGENTS.md.
+
+    `monitoring_date` (E2) fecha el monitoreo MÁS RECIENTE que trae el archivo.
+    Al terminar, el análisis exploratorio de todos los monitoreos del proyecto
+    queda recalculado (E3, `analyzed` en la respuesta).
     """
     proj_repo = ProjectRepository(session)
     camp_repo = CampaignRepository(session)
@@ -223,6 +236,10 @@ def upload_campaign_endpoint(
             campaign_repo=camp_repo,
             source=ExcelCampaignSource(),
             owner_id=engineer.id,
+            monitoring_date=monitoring_date,
+            today=date.today(),
+            analysis_repo=ProjectAnalysisRepository(session),
+            engine=ExploratoryAnalysisEngine(),
         )
     except ValueError as exc:
         raise_for_value_error(exc)
@@ -337,6 +354,7 @@ def list_monitorings_endpoint(
             monitoring_date=m.monitoring_date,
             field_crew=m.field_crew,
             recorder=m.recorder,
+            notes=m.notes,
             observations=n,
         )
         for m, n in repo.get_monitorings(project_id)
