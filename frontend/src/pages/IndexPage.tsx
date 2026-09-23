@@ -27,6 +27,7 @@ import type { IndexReading, IndexRefreshSummary, ProjectIndex } from "../api/typ
 import { formatDate } from "../analysis/format";
 import { SERIES_COLORS } from "../components/AnalysisBarChart";
 import { useAsync } from "../hooks/useAsync";
+import { formatNdviTick, ndviDomain, plottableNdvi } from "./ndviAxis";
 
 /** Una fila por fecha, una columna por predio: es lo que dibuja la línea. */
 function toSeries(data: ProjectIndex) {
@@ -137,7 +138,10 @@ export function IndexPage() {
   }
 
   const data = indice.data!;
-  const series = toSeries(data);
+  // Lo imposible se aparta ANTES de medir el eje: así una lectura corrupta no
+  // arrastra la escala de las demás (ver `ndviAxis.ts`).
+  const { series, descartadas } = plottableNdvi(toSeries(data), data.properties);
+  const dominioY = ndviDomain(data.readings.map((r) => r.mean));
 
   return (
     <div className="page page-wide">
@@ -189,7 +193,13 @@ export function IndexPage() {
                   stroke="#d1d5db"
                 />
                 <YAxis
-                  domain={[0, 1]}
+                  // `allowDataOverflow` es lo que ANCLA el eje: sin él,
+                  // `domain` es solo un mínimo y Recharts lo estira hasta
+                  // abarcar cualquier valor por absurdo que sea.
+                  domain={dominioY}
+                  allowDataOverflow
+                  tickFormatter={formatNdviTick}
+                  width={52}
                   tick={{ fontSize: 12, fill: "#52514e" }}
                   stroke="#d1d5db"
                 />
@@ -219,6 +229,18 @@ export function IndexPage() {
             Fuente: {data.readings[0].source}. Cada punto es la media del índice dentro del
             contorno del predio en esa fecha; las filas marcadas cubren muy pocos píxeles para
             promediar con confianza.
+            {descartadas > 0 && (
+              <>
+                {" "}
+                <strong>
+                  {descartadas === 1
+                    ? "Una medición quedó fuera de la gráfica"
+                    : `${descartadas} mediciones quedaron fuera de la gráfica`}
+                </strong>{" "}
+                porque su valor no puede ser un NDVI (el índice va de −1 a 1). Siguen en la
+                tabla para que pueda revisarlas.
+              </>
+            )}
           </p>
         </>
       )}

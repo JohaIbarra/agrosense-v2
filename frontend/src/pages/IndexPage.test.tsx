@@ -7,8 +7,20 @@
  */
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+// En jsdom el contenedor responsivo mide 0 px y Recharts no dibuja nada: sin
+// esto no hay ejes que inspeccionar. Es la ÚNICA razón del mock.
+vi.mock("recharts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("recharts")>();
+  return {
+    ...actual,
+    ResponsiveContainer: ({ children }: { children: React.ReactElement }) =>
+      React.cloneElement(children, { width: 700, height: 320 }),
+  };
+});
 
 import { IndexPage } from "./IndexPage";
 import type { IndexReading, ProjectIndex } from "../api/types";
@@ -144,6 +156,47 @@ describe("NDVI por predio", () => {
     expect(
       await screen.findByText(/planetary-computer\/sentinel-2-l2a/),
     ).toBeInTheDocument();
+  });
+
+  it("el eje Y muestra NDVI decimal, aunque llegue una lectura imposible", async () => {
+    // Regresión: el eje llegó a mostrar «41158156». `domain={[0,1]}` sin
+    // `allowDataOverflow` es un mínimo, no un anclaje, así que una sola
+    // lectura corrupta estiraba la escala a decenas de millones.
+    const corrupta: ProjectIndex = {
+      ...CON_DATOS,
+      readings: [
+        ...CON_DATOS.readings,
+        lectura("Guayabal", "2024-12-28", 41158156),
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers(),
+          json: async () => (url === "/projects/7" ? PROYECTO : corrupta),
+        }),
+      ),
+    );
+    const { container } = renderPagina();
+    await screen.findByText(/Verdor del predio/);
+    await waitFor(() =>
+      expect(container.querySelector(".recharts-yAxis")).toBeInTheDocument(),
+    );
+
+    const etiquetas = [
+      ...container.querySelectorAll(".recharts-yAxis .recharts-cartesian-axis-tick-value"),
+    ].map((t) => t.textContent ?? "");
+
+    expect(etiquetas.length).toBeGreaterThan(0);
+    for (const etiqueta of etiquetas) {
+      expect(etiqueta).toMatch(/^-?\d\.\d{2}$/); // 0.45, -0.20… nunca 41158156
+      expect(Math.abs(Number(etiqueta))).toBeLessThanOrEqual(1);
+    }
+    // Y el descarte se dice, no se esconde.
+    expect(screen.getByText(/no puede ser un NDVI/)).toBeInTheDocument();
   });
 
   it("un fallo del proveedor se muestra tal cual, sin perder la página", async () => {
