@@ -1096,7 +1096,11 @@ class AIReportRepository:
                 row, project_id, monitoring_id, model_name, prompt_version, input_hash, content,
                 unverified_numbers,
             )
-            self._s.commit()
+            try:
+                self._s.commit()
+            except Exception:
+                self._s.rollback()
+                raise
         except Exception:
             self._s.rollback()
             raise
