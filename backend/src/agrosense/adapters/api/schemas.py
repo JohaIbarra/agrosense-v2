@@ -591,6 +591,8 @@ class SpeciesContrastResponse(BaseModel):
 class AIReportResponse(BaseModel):
     """Borrador de informe generado por IA de un monitoreo (E9, UC-IA1/2/3)."""
 
+    model_config = {"protected_namespaces": ()}
+
     project_id: int
     monitoring: int
     model_name: str
