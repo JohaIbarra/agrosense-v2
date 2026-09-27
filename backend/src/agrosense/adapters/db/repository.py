@@ -970,3 +970,21 @@ class ProjectAnalysisRepository:
             self._s.rollback()
             raise
         return saved
+
+
+class ProjectSpeciesRepository:
+    """Especies plantadas de un proyecto, para el contraste con el referente
+    cientifico (E5, UC-AN3)."""
+
+    def __init__(self, session: Session):
+        self._s = session
+
+    def list_species(self, project_id: int) -> list[tuple[str, int]]:
+        """(especie, arboles distintos) del proyecto, especie ascendente."""
+        stmt = (
+            select(TreeRow.species, func.count(TreeRow.id))
+            .where(TreeRow.project_id == project_id)
+            .group_by(TreeRow.species)
+            .order_by(TreeRow.species)
+        )
+        return [(species, int(count)) for species, count in self._s.execute(stmt).all()]
