@@ -349,3 +349,15 @@ export interface IndexRefreshSummary {
 export interface IndexRefresh extends ProjectIndex {
   summary: IndexRefreshSummary;
 }
+
+// ── E5: contraste de especies del proyecto con el referente (UC-AN3) ──────
+
+export interface SpeciesContrast {
+  species: string;
+  n_trees_in_project: number;
+  has_reference: boolean;
+  gremio: string | null;
+  stall_risk: Risk | null;
+  mortality_risk: Risk | null;
+  narrative: string;
+}
