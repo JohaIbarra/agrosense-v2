@@ -50,6 +50,8 @@ from agrosense.application.use_cases.read_analytics import (
     variance_decomposition,
 )
 
+# E1: el referente tambien exige sesion (ADR-006). No hay dato sensible, pero
+# toda la API es para ingenieros autenticados y la regla es una sola.
 router = APIRouter(
     prefix="/api/v1/reference",
     tags=["reference"],
@@ -58,6 +60,8 @@ router = APIRouter(
 
 SessionDep = Annotated[Session, Depends(get_session)]
 
+# Techo del top-N: es un atajo de lectura para el dashboard, no un listado
+# paginado. Quien quiera el ranking completo pide /species.
 MAX_TOP = 30
 
 
