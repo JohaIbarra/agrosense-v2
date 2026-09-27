@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from agrosense.application.dtos import RiskDTO, SpeciesContrastDTO
+from agrosense.application.errors import AppError
 from agrosense.application.use_cases.read_analytics import (
     MODEL_MORTALITY,
     MODEL_STALL,
@@ -25,12 +26,37 @@ _SIN_REFERENCIA = (
 )
 
 
+class ProjectOwnershipReader(Protocol):
+    def get_owned(self, project_id: int, owner_id: str) -> object | None: ...
+
+
 class ProjectSpeciesReader(Protocol):
     def list_species(self, project_id: int) -> list[tuple[str, int]]: ...
 
 
+class ReferenceEffectRow(Protocol):
+    """Lo unico que el caso de uso lee de una fila de efectos por especie."""
+
+    species_name: str
+    effect_stall: float | None
+    se_stall: float | None
+    or_stall: float | None
+    or_stall_lo: float | None
+    or_stall_hi: float | None
+    sig_stall: bool | None
+    effect_mort: float | None
+    se_mort: float | None
+    or_mort: float | None
+    or_mort_lo: float | None
+    or_mort_hi: float | None
+    sig_mort: bool | None
+    gremio: str | None
+
+
 class ReferenceSpeciesReader(Protocol):
-    def get_species(self, name: str) -> object | None: ...
+    def active_model(self) -> object | None: ...
+
+    def list_species(self) -> list[ReferenceEffectRow]: ...
 
 
 def _narrative(species: str, n_trees: int, stall: RiskDTO, mortality: RiskDTO) -> str:
@@ -44,12 +70,39 @@ def _narrative(species: str, n_trees: int, stall: RiskDTO, mortality: RiskDTO) -
 
 def contrast_project_species(
     project_id: int,
-    project_repo: ProjectSpeciesReader,
+    owner_id: str,
+    project_repo: ProjectOwnershipReader,
+    species_repo: ProjectSpeciesReader,
     reference_repo: ReferenceSpeciesReader,
 ) -> list[SpeciesContrastDTO]:
+    """Contrasta las especies plantadas de `project_id` con el referente activo.
+
+    Orden de las validaciones (deliberado): primero la propiedad del
+    proyecto, despues si hay una version publicada del referente. Un proyecto
+    ajeno debe dar 404 PROJECT_NOT_FOUND sin revelar nada del estado del
+    referente.
+
+    Raises:
+        AppError("PROJECT_NOT_FOUND"): `project_id` no es del `owner_id`.
+        AppError("REFERENCE_NOT_LOADED"): no hay ninguna version publicada
+            del referente (`scripts/load_analytics.py` no se ha corrido).
+    """
+    if project_repo.get_owned(project_id, owner_id) is None:
+        raise AppError("PROJECT_NOT_FOUND", f"El proyecto {project_id} no existe.")
+
+    if reference_repo.active_model() is None:
+        raise AppError(
+            "REFERENCE_NOT_LOADED",
+            "El referente no esta publicado. Ejecute scripts/load_analytics.py.",
+        )
+
+    # Se resuelve la version activa UNA vez: una fila por especie, no una
+    # consulta por especie plantada (evita N+1 contra el referente).
+    effects = {row.species_name: row for row in reference_repo.list_species()}
+
     out: list[SpeciesContrastDTO] = []
-    for species, n_trees in project_repo.list_species(project_id):
-        row = reference_repo.get_species(species)
+    for species, n_trees in species_repo.list_species(project_id):
+        row = effects.get(species)
         if row is None:
             out.append(
                 SpeciesContrastDTO(

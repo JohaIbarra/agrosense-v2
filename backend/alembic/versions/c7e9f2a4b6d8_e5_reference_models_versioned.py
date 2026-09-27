@@ -1,6 +1,7 @@
 """E5: referente cientifico versionado (reference_models + efectos por version)
 
-docs/superpowers/plans/2026-09-27-e5-referente-cientifico.md, docs/04-vision-producto.md §6.7.
+docs/superpowers/plans/2026-09-27-e5-referente-cientifico.md, docs/04-vision-producto.md §6.7,
+docs/adr/007-separacion-proyecto-referente.md.
 
 Reemplaza `species_analytics` / `plot_analytics` (Slice 5, sin version) por
 `reference_species_effects` / `reference_plot_effects`, y anade
@@ -8,9 +9,16 @@ Reemplaza `species_analytics` / `plot_analytics` (Slice 5, sin version) por
 ahora cuelgan de `reference_models`, que registra CADA corrida de los
 modelos mixtos con su `is_active`.
 
-Se dropean y recrean en vez de ALTER: no hay datos de produccion que
-preservar (deploy bloqueado, ver Roadmap) y la PK cambia de columna simple a
-compuesta (version, nivel) porque ahora conviven varias versiones.
+Se dropean y recrean en vez de ALTER (la PK cambia de columna simple a
+compuesta -version, nivel- porque ahora conviven varias versiones). Lo
+UNICO que se pierde al aplicar esta migracion es el referente mismo, y es
+regenerable: sale de un CSV versionado
+(`backend/data/processed/efectos_aleatorios*.csv`) via
+`python scripts/load_analytics.py`, no de datos capturados en campo. Tras
+`alembic upgrade head` hay que volver a publicarlo con ese script antes de
+que UC-AN3 y el ranking del referente vuelvan a responder (sin version
+activa, `REFERENCE_NOT_LOADED`). El downgrade deja las tablas de Slice-5
+vacias, sin las filas que tenia esta version.
 
 Revision ID: c7e9f2a4b6d8
 Revises: a2c4e6f8b1d3
@@ -39,6 +47,19 @@ def upgrade() -> None:
         sa.Column('computed_at', sa.DateTime(timezone=True), nullable=False),
         sa.Column('is_active', sa.Boolean(), nullable=False),
         sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('version', name='uq_reference_models_version'),
+    )
+    # A lo sumo UNA fila activa (ADR-007): indice unico parcial, no solo
+    # disciplina de `ReferenceRepository.publish_version`. `sqlite_where`
+    # ademas de `postgresql_where` porque los tests locales corren sobre
+    # SQLite y ambos dialectos soportan indices parciales.
+    op.create_index(
+        'uq_reference_models_single_active',
+        'reference_models',
+        ['is_active'],
+        unique=True,
+        postgresql_where=sa.text('is_active'),
+        sqlite_where=sa.text('is_active'),
     )
 
     op.drop_table('species_analytics')
@@ -147,6 +168,7 @@ def downgrade() -> None:
         'ix_reference_species_effects_or_stall', table_name='reference_species_effects'
     )
     op.drop_table('reference_species_effects')
+    op.drop_index('uq_reference_models_single_active', table_name='reference_models')
     op.drop_table('reference_models')
 
     # Recrea las tablas del Slice 5 tal como las dejo b1c4a7f20e51, para que

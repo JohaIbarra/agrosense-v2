@@ -13,8 +13,8 @@ ReferenceSpeciesEffect, ReferencePlotEffect, VarianceComponent) que no son
 parte de ese grafo: no cuelgan de Project ni tienen FKs hacia el. Son el
 resultado ya ajustado de los modelos mixtos sobre el dataset de referencia
 (`backend/data/processed/efectos_aleatorios*.csv`), cargado por
-`scripts/load_analytics.py`. Se modelan aparte a proposito — ver el docstring
-de ReferenceModel.
+`scripts/load_analytics.py`. Se modelan aparte a proposito — ver ADR-007
+(docs/adr/007-separacion-proyecto-referente.md).
 """
 from datetime import UTC, date, datetime
 
@@ -27,11 +27,13 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Table,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -503,14 +505,27 @@ def _analytics_updated() -> datetime:
 #
 # Sin FK hacia `projects`: los efectos se estimaron sobre el dataset de
 # referencia completo (856 arboles, 30 especies), que es conceptualmente
-# "la evidencia del programa", no de un proyecto. Ver models.SpeciesAnalytics
-# original y ADR pendiente si esto deja de ser cierto.
+# "la evidencia del programa", no de un proyecto — decision documentada en
+# ADR-007 (docs/adr/007-separacion-proyecto-referente.md).
 
 
 class ReferenceModel(Base):
     """Una corrida versionada de los modelos mixtos de estancamiento/mortalidad."""
 
     __tablename__ = "reference_models"
+    __table_args__ = (
+        UniqueConstraint("version", name="uq_reference_models_version"),
+        # A lo sumo UNA fila activa (ADR-007): forzado por la base, no solo
+        # por `ReferenceRepository.publish_version`. `sqlite_where` ademas de
+        # `postgresql_where` porque los tests locales corren sobre SQLite.
+        Index(
+            "uq_reference_models_single_active",
+            "is_active",
+            unique=True,
+            postgresql_where=text("is_active"),
+            sqlite_where=text("is_active"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     version: Mapped[str] = mapped_column(String(50), nullable=False)

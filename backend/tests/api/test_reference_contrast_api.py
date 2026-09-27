@@ -164,3 +164,32 @@ def test_a_foreign_project_is_404(client_and_session):
     )
     assert r.status_code == 404
     assert r.json()["detail"]["code"] == "PROJECT_NOT_FOUND"
+
+
+def test_no_reference_published_is_404(client_and_session):
+    """I-1: sin version activa, el contraste no debe fingir «sin referencia»
+    especie por especie (eso significa algo distinto: el REFERENTE existe
+    pero no cubre esa especie). Aqui el referente entero no esta publicado."""
+    client, Session = client_and_session
+
+    pid = client.post("/projects", json={"name": "Sin referente"}).json()["id"]
+    client.post(
+        f"/projects/{pid}/campaigns",
+        files={"file": ("m.xlsx", _excel(["Lafoensia speciosa"]), XLSX)},
+    )
+
+    r = client.get(f"/projects/{pid}/reference-contrast")
+    assert r.status_code == 404
+    assert r.json()["detail"]["code"] == "REFERENCE_NOT_LOADED"
+
+
+def test_foreign_project_is_404_even_when_nothing_is_published(client_and_session):
+    """I-2: orden explicito del brief — propiedad primero, referente despues."""
+    client, Session = client_and_session
+    pid = client.post("/projects", json={"name": "Ajeno sin referente"}).json()["id"]
+
+    r = client.get(
+        f"/projects/{pid}/reference-contrast", headers=bearer(ENGINEER_B)
+    )
+    assert r.status_code == 404
+    assert r.json()["detail"]["code"] == "PROJECT_NOT_FOUND"

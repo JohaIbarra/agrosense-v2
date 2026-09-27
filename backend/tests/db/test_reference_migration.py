@@ -76,6 +76,25 @@ def test_primary_keys(migrated_engine, table, pk):
     assert real == sorted(pk)
 
 
+def test_reference_models_version_is_unique(migrated_engine):
+    """I-3: dos versiones no pueden compartir `version` (uq_reference_models_version)."""
+    nombres = {
+        u["name"] for u in inspect(migrated_engine).get_unique_constraints("reference_models")
+    }
+    assert "uq_reference_models_version" in nombres
+
+
+def test_reference_models_single_active_index_exists(migrated_engine):
+    """I-3: a lo sumo UNA fila con `is_active` en toda la tabla, forzado por
+    un indice unico parcial (WHERE is_active) — no solo por disciplina de la
+    aplicacion."""
+    indices = {
+        i["name"]: i for i in inspect(migrated_engine).get_indexes("reference_models")
+    }
+    assert "uq_reference_models_single_active" in indices
+    assert indices["uq_reference_models_single_active"]["unique"]
+
+
 def test_variance_components_is_unique_per_version_model_and_grouping(migrated_engine):
     nombres = {
         u["name"] for u in inspect(migrated_engine).get_unique_constraints(

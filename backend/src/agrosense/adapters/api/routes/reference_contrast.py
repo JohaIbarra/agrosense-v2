@@ -19,7 +19,6 @@ from agrosense.adapters.db.repository import (
     ReferenceRepository,
 )
 from agrosense.application.dtos import RiskDTO, SpeciesContrastDTO
-from agrosense.application.errors import AppError
 from agrosense.application.use_cases.contrast_species import contrast_project_species
 
 router = APIRouter()
@@ -58,14 +57,14 @@ def _to_response(dto: SpeciesContrastDTO) -> SpeciesContrastResponse:
 def get_reference_contrast_endpoint(
     project_id: int, session: SessionDep, engineer: CurrentEngineer
 ) -> list[SpeciesContrastResponse]:
-    project = ProjectRepository(session).get_owned(project_id, engineer.id)
-    if project is None:
-        raise_for_value_error(
-            AppError("PROJECT_NOT_FOUND", f"El proyecto {project_id} no existe.")
+    try:
+        dtos = contrast_project_species(
+            project_id,
+            engineer.id,
+            ProjectRepository(session),
+            ProjectSpeciesRepository(session),
+            ReferenceRepository(session),
         )
-    dtos = contrast_project_species(
-        project_id,
-        ProjectSpeciesRepository(session),
-        ReferenceRepository(session),
-    )
+    except ValueError as exc:
+        raise_for_value_error(exc)
     return [_to_response(d) for d in dtos]

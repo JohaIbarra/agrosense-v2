@@ -1,9 +1,19 @@
-"""UC-AN3: contrastar las especies plantadas de un proyecto con el referente."""
+"""UC-AN3: contrastar las especies plantadas de un proyecto con el referente.
+
+Signature (I-2): la propiedad del proyecto se valida DENTRO del caso de uso
+(patron `_owned_project` de `project_index.py`), no en la route. Orden (I-2):
+propiedad primero, REFERENCE_NOT_LOADED despues (I-1).
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+import pytest
+
+from agrosense.application.errors import AppError
 from agrosense.application.use_cases.contrast_species import contrast_project_species
+
+OWNER = "engineer-a"
 
 
 @dataclass
@@ -24,7 +34,24 @@ class _FakeEffect:
     gremio: str | None = None
 
 
+class _FakeProject:
+    """Objeto opaco: al caso de uso solo le importa si `get_owned` devuelve
+    algo o None, nunca sus atributos."""
+
+
 class _FakeProjectRepo:
+    """Repositorio de PROPIEDAD (`ProjectRepository.get_owned`)."""
+
+    def __init__(self, *, owned: bool = True):
+        self._owned = owned
+
+    def get_owned(self, project_id: int, owner_id: str) -> _FakeProject | None:
+        return _FakeProject() if self._owned else None
+
+
+class _FakeSpeciesRepo:
+    """Repositorio de especies DEL PROYECTO (`ProjectSpeciesRepository.list_species`)."""
+
     def __init__(self, species: list[tuple[str, int]]):
         self._species = species
 
@@ -33,15 +60,22 @@ class _FakeProjectRepo:
 
 
 class _FakeReferenceRepo:
-    def __init__(self, rows: dict[str, _FakeEffect]):
-        self._rows = rows
+    """Repositorio del referente: version activa + efectos de esa version."""
 
-    def get_species(self, name: str):
-        return self._rows.get(name)
+    def __init__(self, rows: dict[str, _FakeEffect] | None = None, *, active: bool = True):
+        self._rows = rows or {}
+        self._active = active
+
+    def active_model(self):
+        return object() if self._active else None
+
+    def list_species(self) -> list[_FakeEffect]:
+        return list(self._rows.values())
 
 
 def test_species_with_significant_reference_effect_gets_a_narrative():
-    project_repo = _FakeProjectRepo([("Lafoensia speciosa", 12)])
+    project_repo = _FakeProjectRepo()
+    species_repo = _FakeSpeciesRepo([("Lafoensia speciosa", 12)])
     reference_repo = _FakeReferenceRepo({
         "Lafoensia speciosa": _FakeEffect(
             species_name="Lafoensia speciosa",
@@ -53,7 +87,7 @@ def test_species_with_significant_reference_effect_gets_a_narrative():
         ),
     })
 
-    out = contrast_project_species(1, project_repo, reference_repo)
+    out = contrast_project_species(1, OWNER, project_repo, species_repo, reference_repo)
 
     assert len(out) == 1
     dto = out[0]
@@ -68,10 +102,11 @@ def test_species_with_significant_reference_effect_gets_a_narrative():
 
 
 def test_species_absent_from_the_reference_is_marked_not_an_error():
-    project_repo = _FakeProjectRepo([("Especie inventada", 3)])
+    project_repo = _FakeProjectRepo()
+    species_repo = _FakeSpeciesRepo([("Especie inventada", 3)])
     reference_repo = _FakeReferenceRepo({})
 
-    out = contrast_project_species(1, project_repo, reference_repo)
+    out = contrast_project_species(1, OWNER, project_repo, species_repo, reference_repo)
 
     assert len(out) == 1
     dto = out[0]
@@ -82,12 +117,15 @@ def test_species_absent_from_the_reference_is_marked_not_an_error():
 
 
 def test_project_without_trees_returns_an_empty_list():
-    out = contrast_project_species(1, _FakeProjectRepo([]), _FakeReferenceRepo({}))
+    out = contrast_project_species(
+        1, OWNER, _FakeProjectRepo(), _FakeSpeciesRepo([]), _FakeReferenceRepo({})
+    )
     assert out == []
 
 
 def test_mixes_species_with_and_without_reference():
-    project_repo = _FakeProjectRepo([
+    project_repo = _FakeProjectRepo()
+    species_repo = _FakeSpeciesRepo([
         ("Especie inventada", 1),
         ("Lafoensia speciosa", 5),
     ])
@@ -95,6 +133,46 @@ def test_mixes_species_with_and_without_reference():
         "Lafoensia speciosa": _FakeEffect(species_name="Lafoensia speciosa", or_stall=4.94),
     })
 
-    out = contrast_project_species(1, project_repo, reference_repo)
+    out = contrast_project_species(1, OWNER, project_repo, species_repo, reference_repo)
 
     assert [d.has_reference for d in out] == [False, True]
+
+
+# ── I-2: la propiedad se valida en el caso de uso ──────────────────────────
+
+def test_foreign_project_raises_project_not_found():
+    project_repo = _FakeProjectRepo(owned=False)
+    species_repo = _FakeSpeciesRepo([("Lafoensia speciosa", 1)])
+    reference_repo = _FakeReferenceRepo(
+        {"Lafoensia speciosa": _FakeEffect(species_name="Lafoensia speciosa")}
+    )
+
+    with pytest.raises(AppError) as exc_info:
+        contrast_project_species(1, OWNER, project_repo, species_repo, reference_repo)
+
+    assert exc_info.value.code == "PROJECT_NOT_FOUND"
+
+
+# ── I-1: sin version activa, el contraste dice que no hay referente ───────
+
+def test_no_active_reference_version_raises_reference_not_loaded():
+    project_repo = _FakeProjectRepo()
+    species_repo = _FakeSpeciesRepo([("Lafoensia speciosa", 1)])
+    reference_repo = _FakeReferenceRepo(active=False)
+
+    with pytest.raises(AppError) as exc_info:
+        contrast_project_species(1, OWNER, project_repo, species_repo, reference_repo)
+
+    assert exc_info.value.code == "REFERENCE_NOT_LOADED"
+
+
+def test_ownership_is_checked_before_reference_not_loaded():
+    """Orden explicito del brief: propiedad primero, referente despues."""
+    project_repo = _FakeProjectRepo(owned=False)
+    species_repo = _FakeSpeciesRepo([])
+    reference_repo = _FakeReferenceRepo(active=False)
+
+    with pytest.raises(AppError) as exc_info:
+        contrast_project_species(1, OWNER, project_repo, species_repo, reference_repo)
+
+    assert exc_info.value.code == "PROJECT_NOT_FOUND"

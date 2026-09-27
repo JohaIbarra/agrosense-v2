@@ -122,6 +122,24 @@ def test_publish_is_all_or_nothing(session):
     assert session.query(ReferenceModel).count() == 0
 
 
+def test_publishing_three_versions_leaves_exactly_one_active(session):
+    """I-3: `publish_version` desactiva TODAS las filas activas anteriores con
+    un UPDATE masivo antes de insertar la version nueva, no solo la que trae
+    `active_model()` en memoria. Un indice unico parcial en la base ya
+    impide dos filas activas (test_reference_migration.py); esto prueba que
+    `publish_version` nunca deja que se llegue a intentarlo."""
+    repo = ReferenceRepository(session)
+    for v in ("v1", "v2", "v3"):
+        repo.publish_version(
+            _model(v),
+            [ReferenceSpeciesEffect(species_name="Lafoensia speciosa", or_stall=1.0)],
+            [], [],
+        )
+    activos = session.query(ReferenceModel).filter(ReferenceModel.is_active.is_(True)).count()
+    assert activos == 1
+    assert repo.active_model().version == "v3"
+
+
 def test_failed_publish_leaves_the_previous_active_version_untouched(session):
     """Si v2 falla al publicarse, v1 sigue activa (todo o nada, ADR-004)."""
     repo = ReferenceRepository(session)

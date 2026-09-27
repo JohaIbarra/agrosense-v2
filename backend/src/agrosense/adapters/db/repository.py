@@ -722,15 +722,22 @@ class ReferenceRepository:
     ) -> ReferenceModel:
         """Publica una version nueva del referente (ADR-004: todo o nada).
 
-        Desactiva la version activa (si hay) e inserta la nueva, ya activa,
-        con sus tres tablas de efectos estampadas con su `reference_model_id`.
-        La version anterior NO se borra: sigue en la base para trazabilidad,
-        solo deja de ser la que leen `list_species` / `get_species` / etc.
+        Desactiva TODAS las filas activas (un UPDATE masivo, no solo la que
+        devuelve `active_model()`: eso protege contra que alguna otra fila
+        quedara activa por fuera de esta clase) e inserta la nueva, ya
+        activa, con sus tres tablas de efectos estampadas con su
+        `reference_model_id`. La version anterior NO se borra: sigue en la
+        base para trazabilidad, solo deja de ser la que leen `list_species` /
+        `get_species` / etc. El indice unico parcial
+        `uq_reference_models_single_active` (ADR-007) es la garantia de
+        ultima instancia: esta desactivacion es la primera.
         """
         try:
-            previous = self.active_model()
-            if previous is not None:
-                previous.is_active = False
+            self._s.execute(
+                update(ReferenceModel)
+                .where(ReferenceModel.is_active.is_(True))
+                .values(is_active=False)
+            )
             model.is_active = True
             self._s.add(model)
             self._s.flush()  # asigna model.id antes de estampar las filas
