@@ -48,11 +48,33 @@
      ADR-010 (cola de trabajos) sigue pendiente: con un ingeniero generando
      un borrador a la vez, esto no agota el threadpool. Se revisa si algún
      día hay generación concurrente real.
-  6. **Provenance.** `ai_reports.input_hash` guarda
-     `f"{analysis_version}:{snapshot.input_hash}"`: si el snapshot cambia,
-     el borrador guardado se sigue sirviendo pero marcado `stale`, nunca se
-     regenera solo.
-  7. **Desvío de `docs/04-vision-producto.md` §6.10.** Allí `ai_reports`
+  6. **Provenance, por monitoreo.** `ai_reports.input_hash` guarda
+     `f"{analysis_version}:{sha256(JSON canónico de build_report_figures)}"`
+     (`application/use_cases/ai_report.py: _figures_fingerprint`) — NO el
+     `input_hash` del snapshot, que resume el dataset del PROYECTO entero.
+     Con esa versión anterior, subir un monitoreo nuevo (p. ej. M5) volvía
+     "stale" los borradores de M1-M4 aunque sus propias cifras no hubieran
+     cambiado un dígito: el fingerprint se ata a lo que el LLM realmente
+     vio, no a todo lo que cambió en el proyecto. Un único helper calcula
+     el fingerprint tanto al generar como al leer, para que nunca diverjan.
+  7. **La conexión de BD se libera antes de llamar al LLM.** La generación
+     bloquea hasta 180 s; sin este paso, esa conexión quedaba reservada en
+     transacción todo ese tiempo. `AIReportRepository.release()` hace
+     `rollback()` (no hay escritura pendiente en ese punto: el snapshot ya
+     se leyó/guardó antes) y `generate_ai_report` lo llama después de leer
+     el snapshot y armar las figuras, antes de `llm.generate`. La capa de
+     aplicación sigue sin importar SQLAlchemy: `release()` es un método más
+     del puerto del repositorio, igual que `get`/`save`.
+  8. **Opciones deterministas.** La petición a Ollama fija
+     `options: {temperature: 0.2, seed: 42}` (constantes del módulo,
+     `adapters/llm/ollama.py`): un borrador técnico debe ser reproducible
+     con las mismas cifras, no variar en cada "Regenerar". No se guardan
+     por fila — sería redundante con las constantes ya fijas en el código —
+     sino que su presencia se registra subiendo `PROMPT_VERSION` a
+     `2026-09-27-e9.2`: el contrato de provenance es "misma versión de
+     prompt implica mismo comportamiento de generación", y ese
+     comportamiento cambió aunque el texto del prompt no.
+  9. **Desvío de `docs/04-vision-producto.md` §6.10.** Allí `ai_reports`
      era genérica (`subject_type` + `subject_id`). Aquí lleva
      `project_id` + `monitoring_id` con `UNIQUE(monitoring_id)` y claves
      foráneas reales: el único sujeto que existe es el monitoreo (ADR-008,
@@ -60,14 +82,23 @@
      migración.
 
 - **Consecuencias:**
-  - Un informe nunca puede citar una cifra que AgroSense no calculó: el
-    peor caso es un número inventado marcado como no verificado, no una
-    cifra falsa sin aviso.
+  - La guardia de números AVISA, no impide: un borrador puede llegar a
+    citar una cifra que AgroSense no calculó, pero queda marcada como
+    `unverified_numbers` para que el ingeniero decida qué hacer — nunca se
+    corrige ni se bloquea sola.
   - El prompt es deliberadamente pequeño: cabe en el contexto de un modelo
     de 3B sin necesidad de recortar información a mitad de generación.
   - Deuda explícita: sin cola de trabajos (ADR-010) y sin fine-tuning. Un
     fine-tuning solo se justifica cuando existan suficientes informes
     reales para evaluarlo — hoy no hay ninguno.
+  - Un proxy inverso con timeout de 60 s (frecuente en despliegues
+    detrás de Nginx/Cloudflare) cortaría la respuesta al ingeniero antes de
+    los 180 s que puede tardar Ollama, aunque el backend siga trabajando y
+    termine guardando el borrador igual — el ingeniero vería un error de
+    conexión y tendría que refrescar para verlo. Solución pendiente:
+    ADR-010 (endpoint `202` + polling), que además resolvería el límite del
+    threadpool si algún día hay generación concurrente real. Hoy queda
+    como deuda documentada, no bloqueante para este slice.
   - Producción de Ollama sigue abierta (D4): si el entorno de despliegue no
     puede correr un LLM local, el puerto `LLMClient` es el único punto que
     cambia.
