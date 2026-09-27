@@ -8,12 +8,13 @@ entidades: Project 1-N PropertyRow (predio) 1-N PlotRow (unidad de muestreo)
 1-N TreeRow, y Project 1-N MonitoringRow 1-N ObservationRow. Un archivo subido
 (CampaignFile) puede traer varios monitoreos: relacion N:N.
 
-Slice 5 anade dos tablas ANALITICAS (SpeciesAnalytics, PlotAnalytics) que no
-son parte de ese grafo: no cuelgan de Project ni tienen FKs hacia el. Son el
+Slice 5 (luego versionado en E5) anade tablas ANALITICAS (ReferenceModel,
+ReferenceSpeciesEffect, ReferencePlotEffect, VarianceComponent) que no son
+parte de ese grafo: no cuelgan de Project ni tienen FKs hacia el. Son el
 resultado ya ajustado de los modelos mixtos sobre el dataset de referencia
 (`backend/data/processed/efectos_aleatorios*.csv`), cargado por
 `scripts/load_analytics.py`. Se modelan aparte a proposito — ver el docstring
-de SpeciesAnalytics.
+de ReferenceModel.
 """
 from datetime import UTC, date, datetime
 
@@ -371,25 +372,6 @@ class ObservationRow(Base):
         return self.monitoring.number
 
 
-# ── Slice 5: analitica (efectos de los modelos mixtos) ─────────────────────
-#
-# Estas dos tablas son un CACHE DE LECTURA de una estimacion offline, no
-# datos de monitoreo. Por eso:
-#
-#   - No cuelgan de `projects`: los efectos se estimaron sobre el dataset de
-#     referencia completo (856 arboles, 42-45 parcelas, 30 especies), que
-#     hoy es un solo proyecto pero conceptualmente es "la evidencia del
-#     programa", no "los datos de este proyecto". Meterles un project_id
-#     ahora seria inventar una dimension que el modelo estadistico no tiene.
-#   - La PK es el nombre (especie / codigo de parcela) porque es como
-#     llegan del CSV de efectos aleatorios y como los pide la API.
-#   - Los campos de estancamiento y mortalidad son nullable: una parcela
-#     puede tener efecto en un modelo y no en el otro (el panel de
-#     mortalidad tiene 45 parcelas, el de estancamiento 42).
-#
-# Cuando exista multi-proyecto de verdad, esto pide un ADR, no una columna.
-
-
 class SatelliteIndexValueRow(Base):
     """Un indice espectral (NDVI) de un predio en una escena (E10a, ADR-011).
 
@@ -507,19 +489,53 @@ def _analytics_updated() -> datetime:
     return _utcnow()
 
 
-class SpeciesAnalytics(Base):
-    """Efecto aleatorio por especie en los modelos mixtos de estancamiento y
-    mortalidad (`lme4::glmer` binomial), en escala log-odds respecto a la
-    media global.
+# ── E5: referente cientifico versionado (efectos de los modelos mixtos) ────
+#
+# `reference_models` es la version: cada fila es UNA corrida completa de los
+# modelos mixtos (lme4::glmer binomial). Las tres tablas de efectos cuelgan
+# de una version por `reference_model_id`, y su PK ahora es compuesta
+# (version, nivel): asi conviven varias versiones sin pisarse.
+#
+# `is_active` marca cual version sirve la API hoy. Publicar una version
+# nueva NO borra las anteriores (antes de E5 una recarga borraba la version
+# vieja sin rastro, doc 04-vision-producto.md §6.7) — quedan en la base,
+# consultables por su `reference_model_id`, fuera de lectura por defecto.
+#
+# Sin FK hacia `projects`: los efectos se estimaron sobre el dataset de
+# referencia completo (856 arboles, 30 especies), que es conceptualmente
+# "la evidencia del programa", no de un proyecto. Ver models.SpeciesAnalytics
+# original y ADR pendiente si esto deja de ser cierto.
+
+
+class ReferenceModel(Base):
+    """Una corrida versionada de los modelos mixtos de estancamiento/mortalidad."""
+
+    __tablename__ = "reference_models"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    version: Mapped[str] = mapped_column(String(50), nullable=False)
+    source_dataset: Mapped[str] = mapped_column(String(300), nullable=False)
+    method: Mapped[str] = mapped_column(String(100), nullable=False)
+    n_observations: Mapped[int | None] = mapped_column(Integer)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class ReferenceSpeciesEffect(Base):
+    """Efecto aleatorio por especie de UNA version del referente.
 
     `effect_*` es el log-odds; `or_* = exp(effect_*)`; `or_*_lo/hi` son los
     extremos del IC 95% YA exponenciados (`exp(efecto +- 1.96*se)`).
-    `sig_*` es True cuando el IC 95% en log-odds no cruza 0 — equivalente a
-    que el IC del OR no cruce 1.
+    `sig_*` es True cuando el IC 95% en log-odds no cruza 0.
     """
 
-    __tablename__ = "species_analytics"
+    __tablename__ = "reference_species_effects"
 
+    reference_model_id: Mapped[int] = mapped_column(
+        ForeignKey("reference_models.id", ondelete="CASCADE"), primary_key=True
+    )
     species_name: Mapped[str] = mapped_column(String(300), primary_key=True)
 
     # Estancamiento
@@ -547,21 +563,14 @@ class SpeciesAnalytics(Base):
     )
 
 
-class PlotAnalytics(Base):
-    """Efecto aleatorio por parcela (`Codigo de unidad muestreo`).
+class ReferencePlotEffect(Base):
+    """Efecto aleatorio por parcela (`Codigo de unidad muestreo`) de UNA version."""
 
-    Es la contraparte espacial de SpeciesAnalytics y la razon por la que la
-    validacion cruzada agrupa por parcela y no por arbol: la parcela explica
-    ICC 0.07 del estancamiento y 0.09 de la mortalidad.
+    __tablename__ = "reference_plot_effects"
 
-    No lleva IC ni `sig_*`: solo 3 de 42 parcelas resultaron significativas en
-    estancamiento y 1 de 45 en mortalidad, asi que el ranking por parcela se
-    presenta como magnitud, no como hallazgo. El `se_*` queda para que la UI
-    pueda dibujar la barra de incertidumbre.
-    """
-
-    __tablename__ = "plot_analytics"
-
+    reference_model_id: Mapped[int] = mapped_column(
+        ForeignKey("reference_models.id", ondelete="CASCADE"), primary_key=True
+    )
     plot_code: Mapped[str] = mapped_column(String(100), primary_key=True)
     localidad: Mapped[str | None] = mapped_column(String(200))
 
@@ -580,21 +589,19 @@ class PlotAnalytics(Base):
 
 
 class VarianceComponent(Base):
-    """Descomposicion de varianza de cada modelo mixto (una fila por
-    modelo x nivel de agrupamiento).
-
-    Alimenta `GET /api/v1/analytics/variance-decomposition`, que es el
-    endpoint que sostiene la lectura estrategica del slice: en estancamiento
-    la especie pesa 2.7x mas que la parcela (ICC 0.190 vs 0.071); en
-    mortalidad pesan casi igual (0.102 vs 0.091).
-    """
+    """Descomposicion de varianza de UNA version (una fila por modelo x nivel)."""
 
     __tablename__ = "variance_components"
     __table_args__ = (
-        UniqueConstraint("model", "grouping", name="uq_variance_model_grouping"),
+        UniqueConstraint(
+            "reference_model_id", "model", "grouping", name="uq_variance_model_grouping"
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    reference_model_id: Mapped[int] = mapped_column(
+        ForeignKey("reference_models.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     model: Mapped[str] = mapped_column(String(20), nullable=False)  # stall | mortality
     grouping: Mapped[str] = mapped_column(String(20), nullable=False)  # especie | parcela
     variance: Mapped[float] = mapped_column(Float, nullable=False)
