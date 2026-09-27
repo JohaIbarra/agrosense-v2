@@ -158,7 +158,7 @@ Contract → Implement → Verify → Review → Siguiente Slice
 
 | Aspecto | Estado |
 |---|---|
-| Tabla `ai_reports` (un borrador por monitoreo, `input_hash` atado al snapshot) | ✅ |
+| Tabla `ai_reports` (un borrador por monitoreo, `input_hash` atado a las cifras que vio el LLM) | ✅ |
 | Puerto `LLMClient` + adaptador `OllamaClient` (urllib, `qwen2.5:3b` por defecto) | ✅ |
 | Guardia de números: marca cifras del texto que no estaban en el snapshot | ✅ |
 | `GET/POST /projects/{id}/monitorings/{n}/ai-report` (404 `AI_REPORT_NOT_FOUND`, 503 `LLM_UNAVAILABLE`) | ✅ |
@@ -167,8 +167,8 @@ Contract → Implement → Verify → Review → Siguiente Slice
 
 > [!info] Limitaciones conocidas
 > Sin cola de trabajos (ADR-010 pendiente): la generación es una llamada
-> síncrona de hasta 180 s. La guardia no distingue unidades ni rangos de
-> años («2025-2026»). Requiere Ollama corriendo en local.
+> síncrona de hasta 180 s. La guardia no distingue unidades (93,5 y 93,5 % cuentan igual) ni
+> separadores de miles. Requiere Ollama corriendo en local.
 
 Siguiente según `docs/04-vision-producto.md` §11: **E7 · Estancados** (primer modelo de ML).
 
