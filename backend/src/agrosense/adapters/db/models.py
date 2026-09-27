@@ -487,6 +487,46 @@ class MonitoringAnalysisRow(Base):
     payload: Mapped[dict] = mapped_column(JSON, nullable=False)
 
 
+class AIReportRow(Base):
+    """Borrador de informe generado por IA para UN monitoreo (E9, UC-IA1/2/3).
+
+    Cubre el resumen del monitoreo Y la comparacion con el anterior: ambos
+    viven en el MISMO snapshot (`monitoring_analyses`, ADR-008), asi que un
+    solo informe basta -- no hay una tabla `comparison_analyses` de la que
+    colgar un segundo informe (docs/adr/008-analisis-como-snapshot.md).
+
+    `input_hash` ata el borrador al snapshot exacto que lo origino:
+    `f"{analysis_version}:{snapshot.input_hash}"`. Si el analisis se
+    recalcula, el borrador viejo se sigue sirviendo pero marcado "stale" (se
+    detecta comparando este campo contra el snapshot actual,
+    `application/use_cases/ai_report.py`) -- nunca se reescribe solo.
+
+    Uno por monitoreo (`UNIQUE(monitoring_id)`): regenerar REEMPLAZA, igual
+    que el propio snapshot.
+    """
+
+    __tablename__ = "ai_reports"
+    __table_args__ = (
+        UniqueConstraint("monitoring_id", name="uq_ai_report_monitoring"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    monitoring_id: Mapped[int] = mapped_column(
+        ForeignKey("monitorings.id", ondelete="CASCADE"), nullable=False
+    )
+    model_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    input_hash: Mapped[str] = mapped_column(String(100), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    unverified_numbers: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+
 def _analytics_updated() -> datetime:
     return _utcnow()
 
