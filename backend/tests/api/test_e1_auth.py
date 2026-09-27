@@ -38,6 +38,7 @@ def _create(client, name="Restauración Guayabal", headers=None, **extra):
         ("put", "/api/v1/me"),
         ("get", "/api/v1/reference/species"),
         ("get", "/api/v1/reference/variance-decomposition"),
+        ("get", "/projects/1/reference-contrast"),
     ],
 )
 def test_every_route_requires_a_session(anon_client, method, path):

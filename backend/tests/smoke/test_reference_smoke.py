@@ -418,6 +418,11 @@ def test_publishing_twice_keeps_the_active_version_and_the_previous_rows(loaded)
         for (_, a), (_, d) in zip(previous_species, anterior_intacta, strict=True):
             assert a == pytest.approx(d)
     finally:
+        # Una sentencia fallida en el `try` deja la sesion en transaccion
+        # abortada (Postgres: "current transaction is aborted"); sin este
+        # rollback, la primera sentencia de limpieza de abajo revienta con
+        # ese error en vez de limpiar.
+        loaded.rollback()
         if published_id is not None:
             # Borrado explicito por SQL: no dependemos de que el ORM/sesion
             # dispare el CASCADE de la FK (test_e2e3_smoke.py deja la misma

@@ -78,7 +78,7 @@ export function ContrastPage() {
         <h1>Contraste con el Referente científico</h1>
         <p className="subtitle">
           Las especies plantadas en este proyecto, frente a los efectos estimados sobre el
-          dataset de referencia (30 especies, 856 árboles).
+          dataset de referencia.
         </p>
       </header>
 
