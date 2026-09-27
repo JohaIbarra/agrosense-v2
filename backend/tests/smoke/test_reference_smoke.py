@@ -29,8 +29,11 @@ evita en produccion.
 
 Estos tests son de SOLO LECTURA sobre las tablas del referente salvo
 `test_publishing_twice_keeps_the_active_version_and_the_previous_rows`, que
-publica una version nueva (no borra la anterior: publicar nunca borra desde
-E5) y comprueba que ambas versiones sobreviven intactas.
+publica una version nueva y comprueba que ambas versiones sobreviven
+intactas, y despues LIMPIA lo que publico en un `finally`: borra la version
+que acaba de publicar y reactiva la que estaba activa antes de correr. Sin
+esa limpieza, cada corrida contra Supabase real dejaria viva una version
+distinta del referente de forma permanente.
 """
 from __future__ import annotations
 
@@ -344,6 +347,15 @@ def test_publishing_twice_keeps_the_active_version_and_the_previous_rows(loaded)
     y activa esa; lo que debe seguir siendo cierto es que (a) la version
     recien publicada tiene las 30 especies y queda activa, y (b) la version
     que era activa antes sigue en la base, intacta, solo que ya no activa.
+
+    Este es el UNICO test de este archivo que escribe en Supabase real, y
+    publicar cambia cual version esta viva (`is_active`) — no es un efecto
+    secundario inocuo, es EL efecto de `publish_version`. Por eso el `finally`
+    borra lo que este test publico y reactiva la version que estaba activa
+    antes de correr, incluso si una assertion revienta a mitad de camino
+    (convencion de `tests/smoke`: cada test limpia lo que crea, ver
+    `test_e2e3_smoke.py`). Sin version activa previa no hay a que volver, asi
+    que el test se salta en vez de publicar sobre un referente vacio.
     """
     import sys
     from pathlib import Path
@@ -361,6 +373,12 @@ def test_publishing_twice_keeps_the_active_version_and_the_previous_rows(loaded)
         pytest.skip("CSV de los modelos mixtos ausentes")
 
     previous_id = _active_id(loaded)
+    if previous_id is None:
+        pytest.skip(
+            "no hay version activa previa: publicar dejaria el referente sin "
+            "version a la que volver"
+        )
+
     previous_species = loaded.execute(
         text(
             "select species_name, or_stall from reference_species_effects "
@@ -370,29 +388,65 @@ def test_publishing_twice_keeps_the_active_version_and_the_previous_rows(loaded)
     ).all()
     assert len(previous_species) == 30
 
-    bundle = build_bundle(processed)
-    model = load_analytics.build_reference_model(bundle)
-    species, plots, variance = load_analytics.to_orm(bundle)
-    published = ReferenceRepository(loaded).publish_version(model, species, plots, variance)
+    published_id: int | None = None
+    try:
+        bundle = build_bundle(processed)
+        model = load_analytics.build_reference_model(bundle)
+        species, plots, variance = load_analytics.to_orm(bundle)
+        published = ReferenceRepository(loaded).publish_version(model, species, plots, variance)
+        published_id = published.id
 
-    nueva_activa = loaded.execute(
-        text("select count(*) from reference_species_effects where reference_model_id = :id"),
-        {"id": published.id},
-    ).scalar()
-    assert nueva_activa == 30, "la version recien publicada deberia tener las 30 especies"
-    assert _active_id(loaded) == published.id
+        nueva_activa = loaded.execute(
+            text(
+                "select count(*) from reference_species_effects "
+                "where reference_model_id = :id"
+            ),
+            {"id": published_id},
+        ).scalar()
+        assert nueva_activa == 30, "la version recien publicada deberia tener las 30 especies"
+        assert _active_id(loaded) == published_id
 
-    anterior_intacta = loaded.execute(
-        text(
-            "select species_name, or_stall from reference_species_effects "
-            "where reference_model_id = :id order by species_name"
-        ),
-        {"id": previous_id},
-    ).all()
-    assert len(anterior_intacta) == 30, "la version anterior perdio filas al publicar de nuevo"
-    assert [r[0] for r in previous_species] == [r[0] for r in anterior_intacta]
-    for (_, a), (_, d) in zip(previous_species, anterior_intacta, strict=True):
-        assert a == pytest.approx(d)
+        anterior_intacta = loaded.execute(
+            text(
+                "select species_name, or_stall from reference_species_effects "
+                "where reference_model_id = :id order by species_name"
+            ),
+            {"id": previous_id},
+        ).all()
+        assert len(anterior_intacta) == 30, "la version anterior perdio filas al publicar de nuevo"
+        assert [r[0] for r in previous_species] == [r[0] for r in anterior_intacta]
+        for (_, a), (_, d) in zip(previous_species, anterior_intacta, strict=True):
+            assert a == pytest.approx(d)
+    finally:
+        if published_id is not None:
+            # Borrado explicito por SQL: no dependemos de que el ORM/sesion
+            # dispare el CASCADE de la FK (test_e2e3_smoke.py deja la misma
+            # nota). Reactivar `previous_id` DESPUES de borrar la version
+            # nueva deja a Supabase exactamente como estaba antes del test.
+            loaded.execute(
+                text(
+                    "delete from reference_species_effects "
+                    "where reference_model_id = :id"
+                ),
+                {"id": published_id},
+            )
+            loaded.execute(
+                text("delete from reference_plot_effects where reference_model_id = :id"),
+                {"id": published_id},
+            )
+            loaded.execute(
+                text("delete from variance_components where reference_model_id = :id"),
+                {"id": published_id},
+            )
+            loaded.execute(
+                text("delete from reference_models where id = :id"),
+                {"id": published_id},
+            )
+            loaded.execute(
+                text("update reference_models set is_active = true where id = :id"),
+                {"id": previous_id},
+            )
+            loaded.commit()
 
 
 # ── API contra Postgres ────────────────────────────────────────────────────
