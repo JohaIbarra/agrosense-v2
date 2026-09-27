@@ -11,6 +11,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { downloadReport, getMonitoringAnalysis, getProject } from "../api/projects";
 import type { AnalysisSection, MonitoringAnalysis } from "../api/types";
 import { formatDate, formatSummary } from "../analysis/format";
+import { AIReportPanel } from "../components/AIReportPanel";
 import { AnalysisBarChart } from "../components/AnalysisBarChart";
 import { DataTable } from "../components/DataTable";
 import { useAsync } from "../hooks/useAsync";
@@ -188,6 +189,8 @@ export function MonitoringAnalysisPage() {
       )}
 
       <Section section={section} property={property} />
+
+      <AIReportPanel projectId={projectId} number={number} />
 
       <p className="muted provenance">
         Cálculo {a.analysis_version} · datos {a.input_hash.slice(0, 12)} · calculado{" "}

@@ -769,6 +769,17 @@ code {
   overflow-wrap: anywhere;
 }
 
+.ai-report-content {
+  white-space: pre-wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .date-cell {
   display: inline-flex;
   align-items: center;
