@@ -257,6 +257,21 @@ class ModelVarianceDTO:
     interpretation: str
 
 
+@dataclass(frozen=True)
+class SpeciesContrastDTO:
+    """Una especie plantada en un proyecto, frente al Referente cientifico
+    (E5, UC-AN3). `has_reference=False` cuando la especie no esta entre las
+    del referente: no es un error, se dice en vez de inventar un efecto."""
+
+    species: str
+    n_trees_in_project: int
+    has_reference: bool
+    gremio: str | None
+    stall_risk: RiskDTO | None
+    mortality_risk: RiskDTO | None
+    narrative: str
+
+
 # ── E6: mapa del predio ────────────────────────────────────────────────────
 
 

@@ -89,7 +89,19 @@ def interpret(
     )
 
 
-def _risk(
+def log_odds_ci(effect: float | None, se: float | None) -> tuple[float | None, float | None]:
+    """Reconstruye el IC en log-odds a partir de efecto y error estandar.
+
+    Publica (sin guion bajo) porque `contrast_species.py` (UC-AN3) tambien
+    necesita reconstruir el IC de un efecto de especie, y la formula es la
+    misma: no se duplica.
+    """
+    if effect is None or se is None:
+        return None, None
+    return effect - 1.96 * se, effect + 1.96 * se
+
+
+def build_risk(
     or_value: float | None,
     or_lo: float | None,
     or_hi: float | None,
@@ -109,28 +121,16 @@ def _risk(
     )
 
 
-def _log_ci(effect: float | None, se: float | None) -> tuple[float | None, float | None]:
-    """Reconstruye el IC en log-odds a partir de efecto y error estandar.
-
-    No se persiste porque es derivable y porque lo que la UI dibuja es el OR;
-    se recalcula aqui para que la respuesta pueda cotejarse contra el CSV del
-    modelo mixto sin abrir la base de datos.
-    """
-    if effect is None or se is None:
-        return None, None
-    return effect - 1.96 * se, effect + 1.96 * se
-
-
 def _species_dto(row) -> SpeciesAnalyticsDTO:
-    lo_s, hi_s = _log_ci(row.effect_stall, row.se_stall)
-    lo_m, hi_m = _log_ci(row.effect_mort, row.se_mort)
+    lo_s, hi_s = log_odds_ci(row.effect_stall, row.se_stall)
+    lo_m, hi_m = log_odds_ci(row.effect_mort, row.se_mort)
     return SpeciesAnalyticsDTO(
         species=row.species_name,
-        stall_risk=_risk(
+        stall_risk=build_risk(
             row.or_stall, row.or_stall_lo, row.or_stall_hi,
             lo_s, hi_s, row.sig_stall, MODEL_STALL,
         ),
-        mortality_risk=_risk(
+        mortality_risk=build_risk(
             row.or_mort, row.or_mort_lo, row.or_mort_hi,
             lo_m, hi_m, row.sig_mort, MODEL_MORTALITY,
         ),
@@ -141,19 +141,19 @@ def _species_dto(row) -> SpeciesAnalyticsDTO:
 
 
 def _plot_dto(row) -> PlotAnalyticsDTO:
-    lo_s, hi_s = _log_ci(row.effect_stall, row.se_stall)
-    lo_m, hi_m = _log_ci(row.effect_mort, row.se_mort)
+    lo_s, hi_s = log_odds_ci(row.effect_stall, row.se_stall)
+    lo_m, hi_m = log_odds_ci(row.effect_mort, row.se_mort)
     return PlotAnalyticsDTO(
         plot_code=row.plot_code,
         localidad=row.localidad,
         # Las parcelas no llevan `sig_*` persistido (solo 3 de 42 y 1 de 45
         # resultaron significativas): se deriva del IC reconstruido, con la
         # misma regla que las especies.
-        stall_risk=_risk(
+        stall_risk=build_risk(
             row.or_stall, _exp(lo_s), _exp(hi_s), lo_s, hi_s,
             _sig(lo_s, hi_s), MODEL_STALL,
         ),
-        mortality_risk=_risk(
+        mortality_risk=build_risk(
             row.or_mort, _exp(lo_m), _exp(hi_m), lo_m, hi_m,
             _sig(lo_m, hi_m), MODEL_MORTALITY,
         ),
