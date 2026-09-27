@@ -126,6 +126,22 @@ Contract → Implement → Verify → Review → Siguiente Slice
 > La estadística está cerrada: los CSV de `backend/data/processed/` son la
 > fuente de verdad y el slice los traduce a tablas, API y UI.
 
+### E5: Referente científico + contraste ✅ (2026-09-27)
+
+> Plan: `docs/superpowers/plans/2026-09-27-e5-referente-cientifico.md`.
+> El Slice 5 pasa a ser el **Referente científico** (`docs/04-vision-producto.md` §4).
+
+| Aspecto | Estado |
+|---|---|
+| `reference_models` versionado (`is_active`); publicar ya no borra la versión anterior (UC-R2) | ✅ |
+| Tablas `reference_species_effects` / `reference_plot_effects` / `variance_components` por versión | ✅ |
+| Contrato `/api/v1/analytics` → `/api/v1/reference` | ✅ |
+| UC-AN3: `GET /projects/{id}/reference-contrast` + página «Contraste con el referente» | ✅ |
+| Especies del proyecto normalizadas igual que las del referente (NBSP, NFC) | ✅ |
+| Tests: 596 backend + 101 frontend | ✅ |
+
+Siguiente según `docs/04-vision-producto.md` §11: **E9 · IA con Ollama**, luego E7 (Estancados, primer modelo de ML).
+
 ---
 
 ## Cronograma Estimado
