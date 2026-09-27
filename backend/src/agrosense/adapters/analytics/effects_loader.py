@@ -49,7 +49,7 @@ def normalize_level(raw: object) -> str:
     aparece como `'Inga punctata\\xa0'`, con un espacio duro (NBSP) pegado al
     final que viene del Excel original. Sin normalizar:
 
-      - la PK de `species_analytics` acepta `'Inga punctata\\xa0'` y
+      - la PK de `reference_species_effects` acepta `'Inga punctata\\xa0'` y
         `'Inga punctata'` como dos taxones distintos;
       - el join con el panel no casa, asi que esa especie se queda sin gremio
         ni conteos;
@@ -160,7 +160,7 @@ def read_effects(path: Path, grupo: str) -> pd.DataFrame:
     """Lee un `efectos_aleatorios*.csv` y se queda con un nivel de agrupamiento.
 
     El CSV mezcla especies y parcelas en la misma tabla; sin el filtro por
-    `grupo`, los codigos de parcela acabarian en `species_analytics`.
+    `grupo`, los codigos de parcela acabarian en `reference_species_effects`.
     """
     df = pd.read_csv(path, encoding=EFFECTS_ENCODING)
     faltan = {"nivel", "efecto", "se", "grupo", "lo", "hi"} - set(df.columns)

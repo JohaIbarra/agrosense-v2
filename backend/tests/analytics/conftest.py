@@ -43,7 +43,7 @@ def analytics_client():
     from agrosense.adapters.api.app import create_app
     from agrosense.adapters.api.deps import get_session, get_token_verifier
     from agrosense.adapters.db.models import Base
-    from agrosense.adapters.db.repository import AnalyticsRepository
+    from agrosense.adapters.db.repository import ReferenceRepository
 
     from agrosense.adapters.analytics.effects_loader import build_bundle  # isort: skip
 
@@ -59,7 +59,9 @@ def analytics_client():
     bundle = build_bundle(PROCESSED)
     seed = TestingSession()
     try:
-        AnalyticsRepository(seed).replace_all(*load_analytics.to_orm(bundle))
+        model = load_analytics.build_reference_model(bundle, version="test")
+        species, plots, variance = load_analytics.to_orm(bundle)
+        ReferenceRepository(seed).publish_version(model, species, plots, variance)
     finally:
         seed.close()
 

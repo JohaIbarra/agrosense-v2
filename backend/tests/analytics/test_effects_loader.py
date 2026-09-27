@@ -229,3 +229,36 @@ def test_odds_ratio_and_significance_rules():
     # IC que cruza 0 -> no concluyente
     assert is_significant(-0.25, 0.81) is False
     assert is_significant(None, 0.5) is None
+
+
+# ── Versionado y ORM ──────────────────────────────────────────────────────
+
+def test_to_orm_produces_versioned_rows_without_a_reference_model_id_yet():
+    """`to_orm` no estampa `reference_model_id`: eso lo hace `publish_version`
+    (Task 2), que es quien conoce el id recien asignado."""
+    import sys
+    from pathlib import Path
+
+    SCRIPTS = Path(__file__).parents[2] / "scripts"
+    if str(SCRIPTS) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS))
+    import load_analytics
+
+    from agrosense.adapters.analytics.effects_loader import build_bundle
+
+    processed = Path(__file__).parents[2] / "data" / "processed"
+    if not (processed / "efectos_aleatorios.csv").exists():
+        import pytest
+        pytest.skip("CSV de los modelos mixtos ausentes")
+
+    bundle = build_bundle(processed)
+    species, plots, variance = load_analytics.to_orm(bundle)
+    assert len(species) == len(bundle.species)
+    assert all(row.reference_model_id is None for row in species)
+
+    model = load_analytics.build_reference_model(bundle, version="test-v1")
+    assert model.source_dataset == "data/raw/anexo1.xlsx"
+    assert model.method == "lme4::glmer binomial"
+    assert model.n_observations == sum(s.n_observations or 0 for s in bundle.species)
+    assert model.n_observations > 0
+    assert model.is_active is False  # lo activa publish_version, no el builder

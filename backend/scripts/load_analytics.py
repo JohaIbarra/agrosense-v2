@@ -1,28 +1,30 @@
-"""Carga inicial de la analitica del slice 5 en PostgreSQL.
+"""Carga y publicacion versionada del Referente cientifico (E5).
 
 Lee los efectos de los modelos mixtos ya ajustados (`data/processed/*.csv`) y
-reemplaza el contenido de `species_analytics`, `plot_analytics` y
-`variance_components`.
+PUBLICA una version nueva: crea una fila en `reference_models` y sus tres
+tablas de efectos, y desactiva la version anterior sin borrarla (E5,
+docs/04-vision-producto.md §6.7 — antes de esto, `replace_all` borraba la
+version previa sin rastro).
 
 Uso:
-    python scripts/load_analytics.py                 # carga a DATABASE_URL
-    python scripts/load_analytics.py --dry-run       # no escribe, solo reporta
+    python scripts/load_analytics.py                    # publica en DATABASE_URL
+    python scripts/load_analytics.py --dry-run          # no escribe, solo reporta
+    python scripts/load_analytics.py --version v2       # etiqueta explicita
     python scripts/load_analytics.py --processed-dir otra/ruta
 
-Requiere que la migracion `b1c4a7f20e51` este aplicada (`alembic upgrade head`).
+Requiere que la migracion `c7e9f2a4b6d8` este aplicada (`alembic upgrade head`).
 
 Este script NO re-estima nada. Los modelos mixtos (`lme4::glmer` binomial) ya
 se corrieron sobre `data/raw/anexo1.xlsx`; los CSV son la fuente de verdad y
-este script solo los traduce a filas. Es idempotente: cada corrida borra y
-recarga las tres tablas en una sola transaccion.
+este script solo los traduce a filas y las publica como una version.
 """
 from __future__ import annotations
 
 import argparse
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
-# El script se ejecuta desde backend/ sin instalar el paquete en modo editable.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from agrosense.adapters.analytics.effects_loader import (  # noqa: E402
@@ -30,85 +32,79 @@ from agrosense.adapters.analytics.effects_loader import (  # noqa: E402
     build_bundle,
 )
 from agrosense.adapters.db.models import (  # noqa: E402
-    PlotAnalytics,
-    SpeciesAnalytics,
+    ReferenceModel,
+    ReferencePlotEffect,
+    ReferenceSpeciesEffect,
     VarianceComponent,
 )
-from agrosense.adapters.db.repository import AnalyticsRepository  # noqa: E402
+from agrosense.adapters.db.repository import ReferenceRepository  # noqa: E402
 from agrosense.adapters.db.session import get_session_factory  # noqa: E402
 
 DEFAULT_PROCESSED = Path(__file__).resolve().parents[1] / "data" / "processed"
+SOURCE_DATASET = "data/raw/anexo1.xlsx"
+METHOD = "lme4::glmer binomial"
 
 
 def to_orm(bundle: AnalyticsBundle) -> tuple[
-    list[SpeciesAnalytics], list[PlotAnalytics], list[VarianceComponent]
+    list[ReferenceSpeciesEffect], list[ReferencePlotEffect], list[VarianceComponent]
 ]:
-    """Traduce las filas del loader a instancias del ORM.
+    """Traduce las filas del loader a instancias del ORM, sin version todavia.
 
-    El loader no conoce SQLAlchemy a proposito: asi la transformacion se
-    puede probar (y el `sig_*` verificar) sin levantar una base de datos.
+    `reference_model_id` lo asigna `ReferenceRepository.publish_version`,
+    que es quien conoce el id recien insertado de `reference_models`.
     """
     species = [
-        SpeciesAnalytics(
+        ReferenceSpeciesEffect(
             species_name=r.species_name,
-            effect_stall=r.effect_stall,
-            se_stall=r.se_stall,
-            or_stall=r.or_stall,
-            or_stall_lo=r.or_stall_lo,
-            or_stall_hi=r.or_stall_hi,
+            effect_stall=r.effect_stall, se_stall=r.se_stall,
+            or_stall=r.or_stall, or_stall_lo=r.or_stall_lo, or_stall_hi=r.or_stall_hi,
             sig_stall=r.sig_stall,
-            effect_mort=r.effect_mort,
-            se_mort=r.se_mort,
-            or_mort=r.or_mort,
-            or_mort_lo=r.or_mort_lo,
-            or_mort_hi=r.or_mort_hi,
+            effect_mort=r.effect_mort, se_mort=r.se_mort,
+            or_mort=r.or_mort, or_mort_lo=r.or_mort_lo, or_mort_hi=r.or_mort_hi,
             sig_mort=r.sig_mort,
-            n_observations=r.n_observations,
-            n_trees=r.n_trees,
-            gremio=r.gremio,
+            n_observations=r.n_observations, n_trees=r.n_trees, gremio=r.gremio,
         )
         for r in bundle.species
     ]
     plots = [
-        PlotAnalytics(
-            plot_code=r.plot_code,
-            localidad=r.localidad,
-            effect_stall=r.effect_stall,
-            se_stall=r.se_stall,
-            or_stall=r.or_stall,
-            effect_mort=r.effect_mort,
-            se_mort=r.se_mort,
-            or_mort=r.or_mort,
+        ReferencePlotEffect(
+            plot_code=r.plot_code, localidad=r.localidad,
+            effect_stall=r.effect_stall, se_stall=r.se_stall, or_stall=r.or_stall,
+            effect_mort=r.effect_mort, se_mort=r.se_mort, or_mort=r.or_mort,
             n_trees=r.n_trees,
         )
         for r in bundle.plots
     ]
     variance = [
         VarianceComponent(
-            model=r.model,
-            grouping=r.grouping,
-            variance=r.variance,
-            sd=r.sd,
-            icc=r.icc,
-            n_levels=r.n_levels,
-            n_observations=r.n_observations,
-            n_events=r.n_events,
+            model=r.model, grouping=r.grouping, variance=r.variance, sd=r.sd, icc=r.icc,
+            n_levels=r.n_levels, n_observations=r.n_observations, n_events=r.n_events,
         )
         for r in bundle.variance
     ]
     return species, plots, variance
 
 
-def report(bundle: AnalyticsBundle) -> None:
-    """Resumen legible de lo que se va a cargar.
+def build_reference_model(bundle: AnalyticsBundle, version: str | None = None) -> ReferenceModel:
+    """La fila de `reference_models` para esta corrida.
 
-    Imprime los conteos que los tests del slice fijan (30 especies, 8
-    significativas en estancamiento, 1 en mortalidad) para que una corrida
-    manual detecte de inmediato un CSV cambiado.
+    `version` por defecto es un timestamp UTC: no hay un numero de version
+    humano todavia, y un timestamp es unico y ordenable sin coordinacion.
     """
+    return ReferenceModel(
+        version=version or datetime.now(UTC).strftime("%Y%m%d%H%M%S"),
+        source_dataset=SOURCE_DATASET,
+        method=METHOD,
+        n_observations=sum(s.n_observations or 0 for s in bundle.species) or None,
+        is_active=False,  # lo activa ReferenceRepository.publish_version
+    )
+
+
+def report(bundle: AnalyticsBundle, version: str) -> None:
     sig_stall = [s for s in bundle.species if s.sig_stall]
     sig_mort = [s for s in bundle.species if s.sig_mort]
 
+    print(f"Version a publicar: {version}")
     print(f"Especies:  {len(bundle.species)}")
     print(f"Parcelas:  {len(bundle.plots)}")
     print(f"Varianza:  {len(bundle.variance)} filas")
@@ -137,16 +133,10 @@ def report(bundle: AnalyticsBundle) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--processed-dir", type=Path, default=DEFAULT_PROCESSED)
+    parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
-        "--processed-dir",
-        type=Path,
-        default=DEFAULT_PROCESSED,
-        help="Directorio con los CSV de los modelos mixtos",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Lee y valida los CSV sin tocar la base de datos",
+        "--version", default=None, help="Etiqueta de la version (por defecto, timestamp UTC)."
     )
     args = parser.parse_args(argv)
 
@@ -156,10 +146,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    report(bundle)
+    model = build_reference_model(bundle, version=args.version)
+    report(bundle, model.version)
 
     if args.dry_run:
-        print("\n--dry-run: no se escribio nada.")
+        print("\n--dry-run: no se publico nada.")
         return 0
 
     try:
@@ -169,13 +160,14 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     try:
-        counts = AnalyticsRepository(session).replace_all(*to_orm(bundle))
+        species, plots, variance = to_orm(bundle)
+        published = ReferenceRepository(session).publish_version(model, species, plots, variance)
     finally:
         session.close()
 
     print(
-        f"\nCargado: {counts['species']} especies, {counts['plots']} parcelas, "
-        f"{counts['variance']} componentes de varianza."
+        f"\nPublicado reference_models.id={published.id} (version={published.version}): "
+        f"{len(species)} especies, {len(plots)} parcelas, {len(variance)} componentes."
     )
     return 0
 
