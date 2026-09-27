@@ -573,4 +573,16 @@ class ModelVarianceResponse(BaseModel):
     )
     interpretation: str
 
+
+class SpeciesContrastResponse(BaseModel):
+    """Una especie plantada del proyecto, frente al Referente (E5, UC-AN3)."""
+
+    species: str
+    n_trees_in_project: int
+    has_reference: bool
+    gremio: str | None = None
+    stall_risk: RiskResponse | None = None
+    mortality_risk: RiskResponse | None = None
+    narrative: str
+
     model_config = {"populate_by_name": True, "protected_namespaces": ()}
