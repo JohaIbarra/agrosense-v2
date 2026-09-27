@@ -68,3 +68,18 @@ def test_only_this_projects_trees_count(session):
 def test_project_without_trees_is_empty(session):
     p = _project(session)
     assert ProjectSpeciesRepository(session).list_species(p.id) == []
+
+
+def test_merges_raw_variants_that_normalize_to_the_same_species(session):
+    """`.strip()` en la ingesta no toca un NBSP interno ni colapsa espacios
+    dobles (fix round 1, hallazgo 1): dos variantes crudas del mismo nombre
+    deben contarse como UNA especie, con sus arboles sumados."""
+    p = _project(session)
+    session.add_all([
+        TreeRow(project_id=p.id, tree_id="T1", species="Inga\xa0punctata"),
+        TreeRow(project_id=p.id, tree_id="T2", species="Inga  punctata"),
+    ])
+    session.commit()
+
+    rows = ProjectSpeciesRepository(session).list_species(p.id)
+    assert rows == [("Inga punctata", 2)]

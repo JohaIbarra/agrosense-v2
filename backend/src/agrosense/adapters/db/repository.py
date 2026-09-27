@@ -11,6 +11,7 @@ from sqlalchemy import func, insert, select, update
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 
+from agrosense.adapters.analytics.effects_loader import normalize_level
 from agrosense.adapters.db.models import (
     CampaignFile,
     Engineer,
@@ -980,11 +981,24 @@ class ProjectSpeciesRepository:
         self._s = session
 
     def list_species(self, project_id: int) -> list[tuple[str, int]]:
-        """(especie, arboles distintos) del proyecto, especie ascendente."""
+        """(especie, arboles distintos) del proyecto, especie ascendente.
+
+        Normaliza con `normalize_level` (la misma funcion que usa el
+        Referente al publicarse, `adapters/analytics/effects_loader.py`):
+        la ingesta (`wide_to_long.py`) solo hace `.strip()`, asi que un NBSP
+        interno u otro espacio Unicode sobrevive dentro del nombre. Sin
+        normalizar aqui, esa especie nunca casaria contra
+        `reference_species_effects` y `has_reference` saldria False para una
+        especie que SI esta en el referente. Variantes crudas que normalizan
+        al mismo nombre se fusionan sumando sus arboles.
+        """
         stmt = (
             select(TreeRow.species, func.count(TreeRow.id))
             .where(TreeRow.project_id == project_id)
             .group_by(TreeRow.species)
-            .order_by(TreeRow.species)
         )
-        return [(species, int(count)) for species, count in self._s.execute(stmt).all()]
+        counts: dict[str, int] = {}
+        for species, count in self._s.execute(stmt).all():
+            name = normalize_level(species)
+            counts[name] = counts.get(name, 0) + int(count)
+        return sorted(counts.items())

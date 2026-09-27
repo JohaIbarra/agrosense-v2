@@ -131,6 +131,30 @@ def test_project_species_absent_from_the_reference_is_flagged(client_and_session
     assert body[0]["stall_risk"] is None
 
 
+def test_species_with_internal_nbsp_still_matches_the_reference(client_and_session):
+    """La ingesta solo hace `.strip()` (`wide_to_long.py`): un NBSP interno o
+    un espacio doble sobreviven dentro del nombre. El contraste debe
+    normalizar (misma funcion que usa el Referente al publicarse) para que
+    esa especie SI case contra `reference_species_effects` (fix round 1,
+    hallazgo 1)."""
+    client, Session = client_and_session
+    _publish_reference(Session, {"Inga punctata": 2.5})
+
+    pid = client.post("/projects", json={"name": "Contraste NBSP"}).json()["id"]
+    client.post(
+        f"/projects/{pid}/campaigns",
+        files={"file": ("m.xlsx", _excel(["Inga\xa0punctata"]), XLSX)},
+    )
+
+    r = client.get(f"/projects/{pid}/reference-contrast")
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body) == 1
+    assert body[0]["species"] == "Inga punctata"
+    assert body[0]["has_reference"] is True
+    assert body[0]["stall_risk"]["odds_ratio"] == pytest.approx(2.5)
+
+
 def test_a_foreign_project_is_404(client_and_session):
     client, Session = client_and_session
     pid = client.post("/projects", json={"name": "Ajeno"}).json()["id"]

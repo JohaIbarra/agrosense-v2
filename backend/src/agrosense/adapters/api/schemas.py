@@ -558,6 +558,8 @@ class VarianceComponentResponse(BaseModel):
 
 
 class ModelVarianceResponse(BaseModel):
+    model_config = {"populate_by_name": True, "protected_namespaces": ()}
+
     model_name: str = Field(
         description="stall | mortality.",
         # `model_` es prefijo reservado de pydantic v2; el contrato expone
@@ -584,5 +586,3 @@ class SpeciesContrastResponse(BaseModel):
     stall_risk: RiskResponse | None = None
     mortality_risk: RiskResponse | None = None
     narrative: str
-
-    model_config = {"populate_by_name": True, "protected_namespaces": ()}
