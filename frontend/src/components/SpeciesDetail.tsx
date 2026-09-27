@@ -6,47 +6,12 @@
  * "Business rules must not be duplicated in the frontend"). Si esa frase
  * cambiara aquí, la API y el dashboard dirían cosas distintas del mismo dato.
  */
-import type { Risk, SpeciesAnalytics } from "../api/types";
-import { COLORS } from "../theme";
+import type { SpeciesAnalytics } from "../api/types";
+import { RiskBlock } from "./RiskBlock";
 
 interface Props {
   species: SpeciesAnalytics | null;
   onClose: () => void;
-}
-
-function RiskBlock({ label, risk }: { label: string; risk: Risk }) {
-  const color =
-    risk.significant !== true
-      ? COLORS.inconclusive
-      : (risk.odds_ratio ?? 1) > 1
-        ? COLORS.risk
-        : COLORS.protective;
-
-  return (
-    <div className="risk-block">
-      <h4>{label}</h4>
-      {risk.odds_ratio === null ? (
-        <p className="muted">Sin estimación disponible.</p>
-      ) : (
-        <>
-          <p className="risk-or" style={{ color }}>
-            OR {risk.odds_ratio.toFixed(2)}
-            {risk.significant === true ? (
-              <span className="badge badge-sig">IC concluyente</span>
-            ) : (
-              <span className="badge badge-nosig">IC cruza 1</span>
-            )}
-          </p>
-          {risk.or_ci95 && (
-            <p className="muted">
-              IC 95%: [{risk.or_ci95[0].toFixed(2)}, {risk.or_ci95[1].toFixed(2)}]
-            </p>
-          )}
-          <p>{risk.interpretation}</p>
-        </>
-      )}
-    </div>
-  );
 }
 
 export function SpeciesDetail({ species, onClose }: Props) {

@@ -127,6 +127,9 @@ export function ProjectDetailPage() {
               </Link>
             </>
           )}
+          <Link to={`/proyectos/${p.id}/referente-contraste`} className="btn btn-ghost">
+            Contraste con el referente
+          </Link>
           <Link to={`/proyectos/${p.id}/editar`} className="btn btn-ghost">
             Editar
           </Link>
