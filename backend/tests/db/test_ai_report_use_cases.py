@@ -7,6 +7,7 @@ Testing).
 """
 from __future__ import annotations
 
+import copy
 from datetime import date
 
 import pytest
@@ -154,7 +155,15 @@ def test_regenerating_replaces_the_previous_draft(session, project):
     assert leido.content == "segundo"
 
 
-def test_a_recalculated_snapshot_makes_the_saved_draft_stale(session, project):
+def test_changing_another_monitoring_project_wide_hash_does_not_make_this_one_stale(
+    session, project
+):
+    """Regresion (fix wave 2026-09-27, item 3): antes `input_hash` se ataba
+    al fingerprint de TODO el dataset del proyecto, asi que subir M5 (o
+    cualquier cambio que mueva ese fingerprint) marcaba "stale" M1-M4 aunque
+    sus propias cifras (`build_report_figures`) no hubieran cambiado en
+    nada. Ahora se ata solo a esas cifras.
+    """
     _upload(session, project.id, M1)
     project_repo, analysis_repo, report_repo, engine = _repos(session)
     generate_ai_report(
@@ -162,12 +171,98 @@ def test_a_recalculated_snapshot_makes_the_saved_draft_stale(session, project):
         FakeLLMClient("primero"),
     )
 
-    # Simula que el analisis se recalculo con datos distintos (nuevo input_hash),
-    # sin pasar por una reingesta real.
+    # Simula que el fingerprint del PROYECTO cambio (p. ej. otra carga que
+    # afecto a otro monitoreo), sin tocar el payload de M1.
     snapshot = analysis_repo.get_snapshot(project.id, 1)
     analysis_repo.save_snapshots(
-        project.id, {1: snapshot.payload}, snapshot.analysis_version, "hash-distinto",
+        project.id, {1: snapshot.payload}, snapshot.analysis_version, "hash-de-proyecto-distinto",
+    )
+
+    leido = get_ai_report(project.id, 1, OWNER, project_repo, analysis_repo, report_repo, engine)
+    assert leido.stale is False
+
+
+def test_changing_this_monitoring_figures_makes_the_saved_draft_stale(session, project):
+    """Contraparte del test anterior: si las cifras que SI ve el LLM
+    cambian, el borrador debe quedar stale."""
+    _upload(session, project.id, M1)
+    project_repo, analysis_repo, report_repo, engine = _repos(session)
+    generate_ai_report(
+        project.id, 1, OWNER, project_repo, analysis_repo, report_repo, engine,
+        FakeLLMClient("primero"),
+    )
+
+    snapshot = analysis_repo.get_snapshot(project.id, 1)
+    payload_cambiado = copy.deepcopy(snapshot.payload)
+    primero = payload_cambiado["summary"][0]
+    primero["value"] = (primero.get("value") or 0) + 1
+    analysis_repo.save_snapshots(
+        project.id, {1: payload_cambiado}, snapshot.analysis_version, snapshot.input_hash,
     )
 
     leido = get_ai_report(project.id, 1, OWNER, project_repo, analysis_repo, report_repo, engine)
     assert leido.stale is True
+
+
+class _RecordingReportRepo:
+    """Envuelve el repo real y anota el ORDEN en que se llama a cada metodo,
+    para probar que `release()` corre antes que `llm.generate()` (fix wave
+    2026-09-27, item 4)."""
+
+    def __init__(self, inner, calls: list[str]):
+        self._inner = inner
+        self._calls = calls
+
+    def get(self, monitoring_id):
+        return self._inner.get(monitoring_id)
+
+    def release(self):
+        self._calls.append("release")
+        self._inner.release()
+
+    def save(self, *args, **kwargs):
+        self._calls.append("save")
+        return self._inner.save(*args, **kwargs)
+
+
+class _RecordingLLMClient(FakeLLMClient):
+    def __init__(self, response, calls: list[str]):
+        super().__init__(response)
+        self._calls = calls
+
+    def generate(self, prompt: str, system: str) -> str:
+        self._calls.append("generate")
+        return super().generate(prompt, system)
+
+
+def test_release_runs_before_the_llm_call(session, project):
+    """Regresion (fix wave 2026-09-27, item 4): la conexion de BD no debe
+    seguir reservada en transaccion durante la llamada al LLM (hasta 180 s).
+    """
+    _upload(session, project.id, M1)
+    project_repo, analysis_repo, real_report_repo, engine = _repos(session)
+    calls: list[str] = []
+    report_repo = _RecordingReportRepo(real_report_repo, calls)
+    llm = _RecordingLLMClient(
+        "Borrador generado por IA: revise las cifras antes de usarlo.\n\nListo.", calls
+    )
+
+    generate_ai_report(project.id, 1, OWNER, project_repo, analysis_repo, report_repo, engine, llm)
+
+    assert "release" in calls and "generate" in calls
+    assert calls.index("release") < calls.index("generate")
+
+
+def test_the_prompt_never_carries_raw_tree_data(session, project):
+    """Regresion (fix wave 2026-09-27, item 8): el prompt solo lleva las
+    cifras de `build_report_figures`, nunca codigos de arbol ni especies."""
+    _upload(session, project.id, M1)
+    project_repo, analysis_repo, report_repo, engine = _repos(session)
+    llm = FakeLLMClient("Borrador generado por IA: revise las cifras antes de usarlo.\n\nListo.")
+
+    generate_ai_report(project.id, 1, OWNER, project_repo, analysis_repo, report_repo, engine, llm)
+
+    prompt, system = llm.calls[0]
+    for dato_crudo in ("T1", "T2", "Senna viarum"):
+        assert dato_crudo not in prompt
+        assert dato_crudo not in system

@@ -71,3 +71,46 @@ def test_save_again_replaces_it(session, monitoring):
 def test_get_returns_none_when_no_report_yet(session, monitoring):
     _, monitoring_id = monitoring
     assert AIReportRepository(session).get(monitoring_id) is None
+
+
+def test_save_recovers_from_a_concurrent_insert(session, monitoring, monkeypatch):
+    """Regresion (fix wave 2026-09-27, item 5): dos POST simultaneos del
+    mismo monitoreo pueden ver `get()` -> None a la vez y las dos intentan
+    INSERT; la segunda choca contra `uq_ai_report_monitoring`. `save` debe
+    recuperarse releyendo la fila ganadora y actualizandola, no propagar el
+    IntegrityError como un 500.
+    """
+    project_id, monitoring_id = monitoring
+    repo = AIReportRepository(session)
+
+    # La fila "ganadora": como si otra peticion ya hubiera hecho commit
+    # entre nuestro SELECT y nuestro INSERT.
+    session.add(
+        AIReportRow(
+            project_id=project_id,
+            monitoring_id=monitoring_id,
+            model_name="otro-modelo",
+            prompt_version="v0",
+            input_hash="v0:otro",
+            content="ganador de la carrera",
+            unverified_numbers=[],
+        )
+    )
+    session.commit()
+
+    original_get = repo.get
+    llamadas = {"n": 0}
+
+    def _get_que_no_ve_la_fila_la_primera_vez(mid):
+        llamadas["n"] += 1
+        if llamadas["n"] == 1:
+            return None
+        return original_get(mid)
+
+    monkeypatch.setattr(repo, "get", _get_que_no_ve_la_fila_la_primera_vez)
+
+    row = repo.save(project_id, monitoring_id, "qwen2.5:3b", "test-v1", "v1:hash1", "mio", [])
+
+    assert row.content == "mio"
+    todas = session.query(AIReportRow).all()
+    assert len(todas) == 1, "la carrera no debe dejar dos filas para el mismo monitoreo"

@@ -495,11 +495,15 @@ class AIReportRow(Base):
     solo informe basta -- no hay una tabla `comparison_analyses` de la que
     colgar un segundo informe (docs/adr/008-analisis-como-snapshot.md).
 
-    `input_hash` ata el borrador al snapshot exacto que lo origino:
-    `f"{analysis_version}:{snapshot.input_hash}"`. Si el analisis se
-    recalcula, el borrador viejo se sigue sirviendo pero marcado "stale" (se
-    detecta comparando este campo contra el snapshot actual,
-    `application/use_cases/ai_report.py`) -- nunca se reescribe solo.
+    `input_hash` ata el borrador a las cifras EXACTAS que vio el LLM, no al
+    snapshot del proyecto entero: `application/use_cases/ai_report.py:
+    _figures_fingerprint` (fix wave 2026-09-27, item 3). Si esas cifras
+    cambian, el borrador viejo se sigue sirviendo pero marcado "stale" (se
+    detecta comparando este campo contra el fingerprint actual) -- nunca se
+    reescribe solo. Antes se ataba al `input_hash` del snapshot (todo el
+    dataset del proyecto): subir un monitoreo nuevo volvia obsoletos los
+    borradores de TODOS los monitoreos anteriores, aunque sus propias
+    cifras no hubieran cambiado.
 
     Uno por monitoreo (`UNIQUE(monitoring_id)`): regenerar REEMPLAZA, igual
     que el propio snapshot.

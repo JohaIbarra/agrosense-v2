@@ -5,6 +5,8 @@ Se sustituye `_post`, el unico punto que habla HTTP -- mismo patron que
 """
 from __future__ import annotations
 
+import http.client
+
 import pytest
 
 from agrosense.adapters.llm import ollama
@@ -63,3 +65,35 @@ def test_un_fallo_de_red_sale_como_error_de_operacion_no_como_excepcion(monkeypa
 
 def test_el_nombre_del_modelo_es_el_configurado():
     assert ollama.OllamaClient().model_name == ollama.OLLAMA_MODEL
+
+
+def test_la_peticion_pide_opciones_deterministas(llamadas):
+    registro, respuestas = llamadas
+    respuestas.append({"response": "texto"})
+
+    ollama.OllamaClient().generate("cifras: 1", "eres un asistente")
+
+    _, cuerpo = registro[0]
+    assert cuerpo["options"] == {"temperature": 0.2, "seed": 42}
+
+
+def test_un_error_http_de_bajo_nivel_sale_como_error_de_operacion(monkeypatch):
+    def _urlopen(request, timeout=None):
+        raise http.client.BadStatusLine("boom")
+
+    monkeypatch.setattr(ollama.urllib.request, "urlopen", _urlopen)
+
+    with pytest.raises(AppError) as exc:
+        ollama.OllamaClient().generate("x", "y")
+    assert exc.value.code == "LLM_UNAVAILABLE"
+
+
+def test_una_respuesta_no_decodificable_sale_como_error_de_operacion(monkeypatch):
+    def _urlopen(request, timeout=None):
+        raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+
+    monkeypatch.setattr(ollama.urllib.request, "urlopen", _urlopen)
+
+    with pytest.raises(AppError) as exc:
+        ollama.OllamaClient().generate("x", "y")
+    assert exc.value.code == "LLM_UNAVAILABLE"

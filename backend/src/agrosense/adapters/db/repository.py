@@ -1027,6 +1027,35 @@ class AIReportRepository:
             select(AIReportRow).where(AIReportRow.monitoring_id == monitoring_id)
         )
 
+    def release(self) -> None:
+        """Termina la transaccion de lectura abierta por este repo antes de
+        una llamada externa larga (el LLM, hasta 180 s -- fix wave
+        2026-09-27, item 4). `rollback()` y no `commit()` porque en el punto
+        donde se llama no hay escrituras pendientes que confirmar, solo
+        lecturas ya hechas; un rollback las libera sin arriesgar nada.
+        """
+        self._s.rollback()
+
+    def _apply(
+        self,
+        row: AIReportRow,
+        project_id: int,
+        monitoring_id: int,
+        model_name: str,
+        prompt_version: str,
+        input_hash: str,
+        content: str,
+        unverified_numbers: list[str],
+    ) -> None:
+        row.project_id = project_id
+        row.monitoring_id = monitoring_id
+        row.model_name = model_name
+        row.prompt_version = prompt_version
+        row.input_hash = input_hash
+        row.content = content
+        row.unverified_numbers = unverified_numbers
+        row.created_at = datetime.now(UTC)
+
     def save(
         self,
         project_id: int,
@@ -1037,17 +1066,36 @@ class AIReportRepository:
         content: str,
         unverified_numbers: list[str],
     ) -> AIReportRow:
+        """Guarda (o reemplaza) el borrador de `monitoring_id`.
+
+        Carrera de doble POST (fix wave 2026-09-27, item 5): si dos
+        peticiones generan a la vez, ambas pueden ver `get()` -> None y
+        las dos intentan INSERT; la segunda choca contra
+        `uq_ai_report_monitoring`. En vez de que esa peticion falle con un
+        500, se descarta el INSERT, se relee la fila que gano la carrera y
+        se actualiza -- el mismo resultado que si las dos peticiones
+        hubieran llegado en secuencia (gana el ultimo commit).
+        """
+        row = self.get(monitoring_id)
+        nueva = row is None
+        if nueva:
+            row = AIReportRow(project_id=project_id, monitoring_id=monitoring_id)
+            self._s.add(row)
+        self._apply(
+            row, project_id, monitoring_id, model_name, prompt_version, input_hash, content,
+            unverified_numbers,
+        )
         try:
+            self._s.commit()
+        except IntegrityError:
+            self._s.rollback()
             row = self.get(monitoring_id)
             if row is None:
-                row = AIReportRow(project_id=project_id, monitoring_id=monitoring_id)
-                self._s.add(row)
-            row.model_name = model_name
-            row.prompt_version = prompt_version
-            row.input_hash = input_hash
-            row.content = content
-            row.unverified_numbers = unverified_numbers
-            row.created_at = datetime.now(UTC)
+                raise
+            self._apply(
+                row, project_id, monitoring_id, model_name, prompt_version, input_hash, content,
+                unverified_numbers,
+            )
             self._s.commit()
         except Exception:
             self._s.rollback()

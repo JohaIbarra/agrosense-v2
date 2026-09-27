@@ -116,3 +116,73 @@ def test_the_same_invented_number_is_only_reported_once():
     figuras = {"Supervivencia": "93.5%"}
     texto = "La cifra 99 aparece dos veces: 99."
     assert find_unverified_numbers(texto, figuras) == ["99"]
+
+
+# ── Regresion: falsos positivos en texto real de qwen2.5:3b (fix wave
+# 2026-09-27, item 2) ────────────────────────────────────────────────────
+
+
+def test_monitoring_labels_are_not_flagged_as_numbers():
+    figuras = {"Supervivencia": "93.5%"}
+    texto = "Entre M3 y M4 se mantuvo la tendencia observada en M2."
+    assert find_unverified_numbers(texto, figuras) == []
+
+
+def test_a_hyphenated_monitoring_range_does_not_yield_a_negative_number():
+    figuras = {"Supervivencia": "93.5%"}
+    texto = "La comparación M3-M4 confirma la tendencia."
+    assert find_unverified_numbers(texto, figuras) == []
+
+
+def test_a_hyphenated_year_range_does_not_yield_a_negative_number():
+    figuras = {"Inicio": "2025", "Fin": "2026"}
+    texto = "El proyecto se ejecuta entre 2025-2026."
+    assert find_unverified_numbers(texto, figuras) == []
+
+
+def test_numbered_list_markers_are_not_flagged_as_numbers():
+    figuras = {"Supervivencia": "93.5%"}
+    texto = "Recomendaciones:\n1. Revisar las parcelas.\n2) Mantener el monitoreo."
+    assert find_unverified_numbers(texto, figuras) == []
+
+
+def test_a_percent_rounded_to_a_whole_number_verifies_the_known_decimal():
+    # 93.5% escrito como 94% (round(93.5, 0) == 94): verificado, no un
+    # numero inventado.
+    figuras = {"Supervivencia": "93.5%"}
+    texto = "La supervivencia fue del 94%."
+    assert find_unverified_numbers(texto, figuras) == []
+
+
+def test_numbers_in_figure_labels_count_as_known():
+    figuras = {"Altura promedio a los 5 años (m)": "1.20"}
+    texto = "A los 5 años, la altura promedio fue de 1.20 m."
+    assert find_unverified_numbers(texto, figuras) == []
+
+
+def test_an_invented_number_is_still_flagged_alongside_monitoring_labels():
+    figuras = {"Supervivencia": "93.5%"}
+    texto = "Entre M3 y M4, la supervivencia alcanzó un sorprendente 60%."
+    assert find_unverified_numbers(texto, figuras) == ["60%"]
+
+
+def test_a_realistic_spanish_paragraph_with_only_verified_numbers_yields_nothing():
+    figuras = {
+        "Árboles registrados en M2": "856",
+        "Vivos": "800",
+        "Supervivencia": "93.5%",
+        "Altura media": "0.85 m",
+        "Mortalidad (Comparación M1 → M2)": "4.2%",
+        "Crecimiento medio (m) (Comparación M1 → M2)": "0.123",
+    }
+    texto = (
+        "Borrador generado por IA: revise las cifras antes de usarlo.\n\n"
+        "En M2 se registraron 856 árboles, de los cuales 800 están vivos: una "
+        "supervivencia del 94% (93,5% exacto). La altura media alcanzó 0.85 m.\n\n"
+        "Entre M1 y M2 la mortalidad del proyecto fue de 4.2% y el crecimiento "
+        "medio de 0.12 m.\n\n"
+        "Recomendaciones:\n"
+        "1. Revisar las parcelas con mayor mortalidad entre M3-M4.\n"
+        "2. Mantener el monitoreo trimestral.\n"
+    )
+    assert find_unverified_numbers(texto, figuras) == []
