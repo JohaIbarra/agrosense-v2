@@ -52,6 +52,12 @@
      `f"{analysis_version}:{snapshot.input_hash}"`: si el snapshot cambia,
      el borrador guardado se sigue sirviendo pero marcado `stale`, nunca se
      regenera solo.
+  7. **Desvío de `docs/04-vision-producto.md` §6.10.** Allí `ai_reports`
+     era genérica (`subject_type` + `subject_id`). Aquí lleva
+     `project_id` + `monitoring_id` con `UNIQUE(monitoring_id)` y claves
+     foráneas reales: el único sujeto que existe es el monitoreo (ADR-008,
+     no hay `comparison_analyses`). Si aparece otro sujeto, se añade con una
+     migración.
 
 - **Consecuencias:**
   - Un informe nunca puede citar una cifra que AgroSense no calculó: el
