@@ -151,7 +151,26 @@ Contract → Implement → Verify → Review → Siguiente Slice
 > Discrepancia de `comparacion_estancamiento_mortalidad.csv` (0 vs 1 de 45
 > parcelas significativas en mortalidad, doc 04 §14) — diferida.
 
-Siguiente según `docs/04-vision-producto.md` §11: **E9 · IA con Ollama**, luego E7 (Estancados, primer modelo de ML).
+### E9: IA con Ollama ✅ (2026-09-27)
+
+> Plan: `docs/superpowers/plans/2026-09-27-e9-ia-ollama.md`.
+> Decisión de arquitectura: `docs/adr/012-ia-local-con-ollama.md`.
+
+| Aspecto | Estado |
+|---|---|
+| Tabla `ai_reports` (un borrador por monitoreo, `input_hash` atado al snapshot) | ✅ |
+| Puerto `LLMClient` + adaptador `OllamaClient` (urllib, `qwen2.5:3b` por defecto) | ✅ |
+| Guardia de números: marca cifras del texto que no estaban en el snapshot | ✅ |
+| `GET/POST /projects/{id}/monitorings/{n}/ai-report` (404 `AI_REPORT_NOT_FOUND`, 503 `LLM_UNAVAILABLE`) | ✅ |
+| Panel en la página de análisis + descarga `.md` (UC-IA3) + aviso de borrador desactualizado | ✅ |
+| Tests: 652 backend + 110 frontend | ✅ |
+
+> [!info] Limitaciones conocidas
+> Sin cola de trabajos (ADR-010 pendiente): la generación es una llamada
+> síncrona de hasta 180 s. La guardia no distingue unidades ni rangos de
+> años («2025-2026»). Requiere Ollama corriendo en local.
+
+Siguiente según `docs/04-vision-producto.md` §11: **E7 · Estancados** (primer modelo de ML).
 
 ---
 
