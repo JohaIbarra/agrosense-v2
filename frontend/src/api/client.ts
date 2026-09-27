@@ -1,5 +1,5 @@
 /**
- * Acceso a datos del Referente cientifico (`/api/v1/analytics`).
+ * Acceso a datos del Referente cientifico (`/api/v1/reference`).
  *
  * El transporte (URL, token de sesion, errores) vive en `http.ts`.
  */
@@ -15,7 +15,7 @@ import { ApiError, request as http, type Query } from "./http";
 
 export { ApiError };
 
-const BASE = "/api/v1/analytics";
+const BASE = "/api/v1/reference";
 
 function request<T>(path: string, query?: Query, signal?: AbortSignal): Promise<T> {
   return http<T>(`${BASE}${path}`, { query, signal });

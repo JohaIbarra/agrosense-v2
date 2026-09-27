@@ -1,5 +1,5 @@
 /**
- * Tipos del contrato de `/api/v1/analytics/*`.
+ * Tipos del contrato de `/api/v1/reference/*`.
  *
  * Se derivan del OpenAPI que publica FastAPI (AGENTS.md: "The frontend
  * consumes the contract; it never invents its own structure"). Si el contrato

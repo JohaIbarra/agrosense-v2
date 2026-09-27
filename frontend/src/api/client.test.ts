@@ -33,7 +33,7 @@ describe("construcción de URL", () => {
   it("omite los parámetros vacíos en vez de mandar gremio=", async () => {
     const spy = mockFetch([]);
     await fetchSpecies({ gremio: null, sort: "stall_risk" });
-    expect(spy.mock.calls[0][0]).toBe("/api/v1/analytics/species?sort=stall_risk");
+    expect(spy.mock.calls[0][0]).toBe("/api/v1/reference/species?sort=stall_risk");
   });
 
   it("incluye el gremio cuando hay filtro", async () => {
@@ -48,7 +48,7 @@ describe("construcción de URL", () => {
     const spy = mockFetch({});
     await fetchSpeciesDetail("Lafoensia speciosa");
     expect(spy.mock.calls[0][0]).toBe(
-      "/api/v1/analytics/species/Lafoensia%20speciosa",
+      "/api/v1/reference/species/Lafoensia%20speciosa",
     );
   });
 
@@ -75,7 +75,7 @@ describe("errores", () => {
 
   it("distingue 'no cargado' para que la UI lo explique", async () => {
     mockFetch(
-      { detail: { code: "ANALYTICS_NOT_LOADED", message: "Ejecute el script." } },
+      { detail: { code: "REFERENCE_NOT_LOADED", message: "Ejecute el script." } },
       404,
     );
     await expect(fetchVarianceDecomposition()).rejects.toBeInstanceOf(ApiError);
