@@ -18,12 +18,13 @@ from agrosense.adapters.db.models import (
     MonitoringAnalysisRow,
     MonitoringRow,
     ObservationRow,
-    PlotAnalytics,
     PlotRow,
     Project,
     PropertyRow,
+    ReferenceModel,
+    ReferencePlotEffect,
+    ReferenceSpeciesEffect,
     SatelliteIndexValueRow,
-    SpeciesAnalytics,
     TreeRow,
     VarianceComponent,
 )
@@ -643,13 +644,13 @@ class CampaignRepository:
         self._s.flush()
 
 
-class AnalyticsRepository:
-    """Lectura y recarga de las tablas analiticas del slice 5.
+class ReferenceRepository:
+    """Lectura y publicacion versionada del Referente cientifico (E5).
 
-    Es de solo lectura para la API: las escrituras vienen de
-    `scripts/load_analytics.py`, no de un endpoint. Por eso `replace_all` no
-    esta expuesto en ninguna route — recargar la analitica es una operacion
-    de datos, no una accion de usuario.
+    Publicar SIEMPRE anade una version nueva; nunca borra una anterior. Las
+    lecturas (`list_species`, `get_species`, `list_plots`, `list_variance`)
+    filtran por la version activa: la API nunca mezcla efectos de dos
+    corridas distintas del modelo mixto.
     """
 
     def __init__(self, session: Session):
@@ -657,50 +658,89 @@ class AnalyticsRepository:
 
     # ── Lectura ────────────────────────────────────────────────────────────
 
-    def list_species(self, gremio: str | None = None) -> list[SpeciesAnalytics]:
-        stmt = select(SpeciesAnalytics)
-        if gremio is not None:
-            stmt = stmt.where(SpeciesAnalytics.gremio == gremio)
-        return list(self._s.scalars(stmt.order_by(SpeciesAnalytics.species_name)).all())
+    def active_model(self) -> ReferenceModel | None:
+        return self._s.scalar(select(ReferenceModel).where(ReferenceModel.is_active.is_(True)))
 
-    def get_species(self, name: str) -> SpeciesAnalytics | None:
-        return self._s.get(SpeciesAnalytics, name)
-
-    def list_plots(self, localidad: str | None = None) -> list[PlotAnalytics]:
-        stmt = select(PlotAnalytics)
-        if localidad is not None:
-            stmt = stmt.where(PlotAnalytics.localidad == localidad)
-        return list(self._s.scalars(stmt.order_by(PlotAnalytics.plot_code)).all())
-
-    def list_variance(self) -> list[VarianceComponent]:
+    def list_models(self) -> list[ReferenceModel]:
         return list(
             self._s.scalars(
-                select(VarianceComponent).order_by(
-                    VarianceComponent.model, VarianceComponent.grouping
-                )
+                select(ReferenceModel).order_by(ReferenceModel.computed_at.desc())
             ).all()
         )
 
-    # ── Recarga (solo desde el script de carga) ────────────────────────────
+    def list_species(self, gremio: str | None = None) -> list[ReferenceSpeciesEffect]:
+        active = self.active_model()
+        if active is None:
+            return []
+        stmt = select(ReferenceSpeciesEffect).where(
+            ReferenceSpeciesEffect.reference_model_id == active.id
+        )
+        if gremio is not None:
+            stmt = stmt.where(ReferenceSpeciesEffect.gremio == gremio)
+        return list(
+            self._s.scalars(stmt.order_by(ReferenceSpeciesEffect.species_name)).all()
+        )
 
-    def replace_all(
+    def get_species(self, name: str) -> ReferenceSpeciesEffect | None:
+        active = self.active_model()
+        if active is None:
+            return None
+        return self._s.get(ReferenceSpeciesEffect, (active.id, name))
+
+    def list_plots(self, localidad: str | None = None) -> list[ReferencePlotEffect]:
+        active = self.active_model()
+        if active is None:
+            return []
+        stmt = select(ReferencePlotEffect).where(
+            ReferencePlotEffect.reference_model_id == active.id
+        )
+        if localidad is not None:
+            stmt = stmt.where(ReferencePlotEffect.localidad == localidad)
+        return list(self._s.scalars(stmt.order_by(ReferencePlotEffect.plot_code)).all())
+
+    def list_variance(self) -> list[VarianceComponent]:
+        active = self.active_model()
+        if active is None:
+            return []
+        return list(
+            self._s.scalars(
+                select(VarianceComponent)
+                .where(VarianceComponent.reference_model_id == active.id)
+                .order_by(VarianceComponent.model, VarianceComponent.grouping)
+            ).all()
+        )
+
+    # ── Publicacion (UC-R2, solo desde scripts/load_analytics.py) ──────────
+
+    def publish_version(
         self,
-        species: list[SpeciesAnalytics],
-        plots: list[PlotAnalytics],
+        model: ReferenceModel,
+        species: list[ReferenceSpeciesEffect],
+        plots: list[ReferencePlotEffect],
         variance: list[VarianceComponent],
-    ) -> dict[str, int]:
-        """Reemplaza las tres tablas en UNA transaccion (ADR-004: todo o nada).
+    ) -> ReferenceModel:
+        """Publica una version nueva del referente (ADR-004: todo o nada).
 
-        Es un borrado y recarga completos, no un upsert fila a fila: los
-        efectos provienen de un ajuste conjunto sobre todo el panel, asi que
-        mezclar filas de dos corridas distintas daria un ranking que no
-        corresponde a ningun modelo. Si la carga falla a medias, la tabla
-        anterior queda intacta.
+        Desactiva la version activa (si hay) e inserta la nueva, ya activa,
+        con sus tres tablas de efectos estampadas con su `reference_model_id`.
+        La version anterior NO se borra: sigue en la base para trazabilidad,
+        solo deja de ser la que leen `list_species` / `get_species` / etc.
         """
         try:
-            self._s.query(SpeciesAnalytics).delete()
-            self._s.query(PlotAnalytics).delete()
-            self._s.query(VarianceComponent).delete()
+            previous = self.active_model()
+            if previous is not None:
+                previous.is_active = False
+            model.is_active = True
+            self._s.add(model)
+            self._s.flush()  # asigna model.id antes de estampar las filas
+
+            for row in species:
+                row.reference_model_id = model.id
+            for row in plots:
+                row.reference_model_id = model.id
+            for row in variance:
+                row.reference_model_id = model.id
+
             self._s.add_all(species)
             self._s.add_all(plots)
             self._s.add_all(variance)
@@ -708,11 +748,7 @@ class AnalyticsRepository:
         except Exception:
             self._s.rollback()
             raise
-        return {
-            "species": len(species),
-            "plots": len(plots),
-            "variance": len(variance),
-        }
+        return model
 
 
 class ImageryRepository:
