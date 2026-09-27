@@ -5,7 +5,7 @@
  * (docs/04-vision-producto.md, principio 2): esta pantalla solo pide,
  * muestra y avisa.
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { generateAIReport, getAIReport } from "../api/aiReports";
 import type { AIReport } from "../api/types";
@@ -32,13 +32,35 @@ export function AIReportPanel({ projectId, number }: { projectId: number; number
   const [generando, setGenerando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Referencias, no closures: la generación puede tardar hasta 180 s, y si
+  // se compara contra `projectId`/`number` capturados por `generar()` al
+  // llamarse, esa comparación queda fija al monitoreo de ENTONCES, no al de
+  // ahora. Estas refs se actualizan en cada render, así la respuesta tardía
+  // se compara contra el monitoreo que el ingeniero está viendo cuando la
+  // respuesta llega, no cuando la pidió.
+  const projectIdRef = useRef(projectId);
+  const numberRef = useRef(number);
+  projectIdRef.current = projectId;
+  numberRef.current = number;
+
   const actual = generado ?? existente.data;
 
   async function generar() {
     setGenerando(true);
     setError(null);
     try {
-      setGenerado(await generateAIReport(projectId, number));
+      const resultado = await generateAIReport(projectId, number);
+      // Si el ingeniero ya cambió de monitoreo cuando esta respuesta llega,
+      // no es su borrador — se descarta. (El `key` en
+      // MonitoringAnalysisPage ya recrea el panel al cambiar de monitoreo;
+      // esta guarda es la segunda línea de defensa, para cuando el panel no
+      // se desmonta.)
+      if (
+        resultado.project_id === projectIdRef.current &&
+        resultado.monitoring === numberRef.current
+      ) {
+        setGenerado(resultado);
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {

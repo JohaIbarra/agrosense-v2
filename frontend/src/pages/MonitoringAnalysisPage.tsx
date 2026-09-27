@@ -190,7 +190,11 @@ export function MonitoringAnalysisPage() {
 
       <Section section={section} property={property} />
 
-      <AIReportPanel projectId={projectId} number={number} />
+      {/* key: fuerza un panel nuevo por monitoreo. Sin esto, el estado
+          `generado` del panel anterior (cargado por proyecto+numero, pero
+          nunca reiniciado) seguia mostrandose al cambiar de monitoreo con
+          los botones M1..Mn, que NO desmontan esta pagina. */}
+      <AIReportPanel key={`${projectId}-${number}`} projectId={projectId} number={number} />
 
       <p className="muted provenance">
         Cálculo {a.analysis_version} · datos {a.input_hash.slice(0, 12)} · calculado{" "}

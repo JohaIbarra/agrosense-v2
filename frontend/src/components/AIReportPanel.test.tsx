@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { AIReportPanel } from "./AIReportPanel";
@@ -58,5 +58,39 @@ describe("AIReportPanel", () => {
     getByText("Generar borrador").click();
     await waitFor(() => screen.getByText(/Hay 2 árboles/));
     expect(mockedGenerate).toHaveBeenCalledWith(1, 1);
+  });
+
+  it("ignora una generación tardía si el ingeniero ya cambió de monitoreo", async () => {
+    // Regresión: sin la ref al monitoreo actual, el borrador de M1 pisaba
+    // el panel de M2 cuando la generación de 180 s terminaba después de
+    // que el ingeniero ya hubiera cambiado de monitoreo (mismo componente,
+    // sin desmontar — el `key` de la página es la otra mitad del arreglo,
+    // no cubierta por este test unitario).
+    mockedGet.mockResolvedValue(null);
+    let resolverGeneracion!: (value: typeof REPORT) => void;
+    mockedGenerate.mockReturnValue(
+      new Promise((resolve) => {
+        resolverGeneracion = resolve;
+      }),
+    );
+
+    const { rerender, getByText, queryByText } = render(
+      <AIReportPanel projectId={1} number={1} />,
+    );
+    await waitFor(() => getByText("Generar borrador"));
+    getByText("Generar borrador").click();
+    await waitFor(() => expect(mockedGenerate).toHaveBeenCalledWith(1, 1));
+
+    // El ingeniero cambia a M2 antes de que la generación de M1 termine
+    // (la generación pendiente sigue viva; no se espera a que termine).
+    rerender(<AIReportPanel projectId={1} number={2} />);
+
+    // Ahora llega, tarde, la respuesta de la generación de M1.
+    await act(async () => {
+      resolverGeneracion(REPORT); // REPORT.monitoring === 1
+      await Promise.resolve();
+    });
+
+    expect(queryByText(/Hay 2 árboles/)).not.toBeInTheDocument();
   });
 });
