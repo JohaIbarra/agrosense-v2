@@ -95,6 +95,21 @@ def test_effect_tables_reference_a_model_version(migrated_engine, table):
     )
 
 
+@pytest.mark.parametrize("table", REFERENCE_TABLES)
+def test_reference_tables_have_no_project_foreign_key(migrated_engine, table):
+    """Decision de diseno explicita: el referente no cuelga de un proyecto.
+
+    Los efectos se estimaron sobre el dataset completo del programa. Si
+    alguien anade una FK a `projects` sin ADR, este test lo para (regresion
+    del `test_analytics_tables_have_no_project_foreign_key` de Slice 5).
+    """
+    fks = inspect(migrated_engine).get_foreign_keys(table)
+    assert not any(fk["referred_table"] == "projects" for fk in fks), (
+        f"{table} tiene una FK hacia projects; el referente es independiente "
+        f"del grafo de proyectos (ver models.ReferenceModel)"
+    )
+
+
 def test_downgrade_removes_only_the_reference_tables(migrated_engine):
     cfg = Config(str(BACKEND / "alembic.ini"))
     cfg.set_main_option("script_location", str(BACKEND / "alembic"))
