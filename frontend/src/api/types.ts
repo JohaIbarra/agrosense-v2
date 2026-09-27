@@ -361,3 +361,16 @@ export interface SpeciesContrast {
   mortality_risk: Risk | null;
   narrative: string;
 }
+
+// ── E9: borrador de informe con IA ──────────────────────────────────────
+
+export interface AIReport {
+  project_id: number;
+  monitoring: number;
+  model_name: string;
+  prompt_version: string;
+  content: string;
+  unverified_numbers: string[];
+  created_at: string;
+  stale: boolean;
+}
