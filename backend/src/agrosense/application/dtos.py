@@ -354,3 +354,24 @@ class ProjectIndexDTO:
     readings: list[IndexReading]
     last_refreshed_at: datetime | None
 
+
+# ── E9: borrador de informe con IA ──────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class AIReportDTO:
+    """Borrador de informe de un monitoreo, generado por IA (E9, UC-IA1/2/3).
+
+    `stale=True` cuando el `input_hash` guardado ya no coincide con el del
+    snapshot actual: el analisis cambio despues de generar este borrador.
+    """
+
+    project_id: int
+    monitoring: int
+    model_name: str
+    prompt_version: str
+    content: str
+    unverified_numbers: list[str]
+    created_at: datetime
+    stale: bool
+

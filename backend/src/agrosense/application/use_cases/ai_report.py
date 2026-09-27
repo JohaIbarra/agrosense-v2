@@ -19,6 +19,36 @@ aviso.
 from __future__ import annotations
 
 import re
+from typing import Protocol
+
+from agrosense.application.dtos import AIReportDTO
+from agrosense.application.errors import AppError
+from agrosense.application.use_cases.monitoring_analysis import get_monitoring_analysis
+
+PROMPT_VERSION = "2026-09-27-e9.1"
+
+SYSTEM_PROMPT = (
+    "Eres un asistente que redacta borradores de informes de restauracion "
+    "ecologica en español, para un ingeniero forestal colombiano. Reglas "
+    "estrictas:\n"
+    "1. Usa UNICAMENTE las cifras que se te entregan. No calcules, no "
+    "estimes y no inventes ningun numero.\n"
+    "2. No hagas recomendaciones que no se desprendan directamente de las "
+    "cifras entregadas.\n"
+    "3. Escribe en tono tecnico y neutral, en 2 a 4 parrafos cortos.\n"
+    "4. Empieza el texto con la frase «Borrador generado por IA: revise "
+    "las cifras antes de usarlo.» en su propio parrafo."
+)
+
+
+class LLMClient(Protocol):
+    """Puerto hacia el modelo de lenguaje (ADR-003: solo donde hay
+    variacion real -- hoy Ollama local, manana otro proveedor, docs/04 §7)."""
+
+    model_name: str
+
+    def generate(self, prompt: str, system: str) -> str: ...
+
 
 _NUMBER_RE = re.compile(r"-?\d+(?:[.,]\d+)?%?")
 
@@ -111,3 +141,95 @@ def find_unverified_numbers(text: str, figures: dict[str, str]) -> list[str]:
         if not any(abs(valor - k) <= 0.05 for k in known) and tok not in seen:
             seen.append(tok)
     return seen
+
+
+def render_prompt(figures: dict[str, str]) -> str:
+    lineas = [f"- {label}: {valor}" for label, valor in figures.items()]
+    return (
+        "Redacta el borrador del informe con EXACTAMENTE estas cifras "
+        "(no agregues ninguna otra):\n" + "\n".join(lineas)
+    )
+
+
+def _snapshot_key(analysis_version: str, input_hash: str) -> str:
+    """Ata el borrador a la version Y a los datos exactos del snapshot."""
+    return f"{analysis_version}:{input_hash}"
+
+
+def _to_dto(project_id: int, number: int, row, stale: bool) -> AIReportDTO:
+    return AIReportDTO(
+        project_id=project_id,
+        monitoring=number,
+        model_name=row.model_name,
+        prompt_version=row.prompt_version,
+        content=row.content,
+        unverified_numbers=list(row.unverified_numbers),
+        created_at=row.created_at,
+        stale=stale,
+    )
+
+
+def get_ai_report(
+    project_id: int,
+    number: int,
+    owner_id: str,
+    project_repo,
+    analysis_repo,
+    report_repo,
+    engine,
+) -> AIReportDTO:
+    """El borrador ya generado del monitoreo `number`.
+
+    Raises:
+        AppError("PROJECT_NOT_FOUND" | "MONITORING_NOT_FOUND"): del snapshot
+            subyacente (`get_monitoring_analysis`).
+        AppError("AI_REPORT_NOT_FOUND"): el monitoreo existe pero todavia
+            no se genero ningun borrador.
+    """
+    analysis = get_monitoring_analysis(
+        project_id, number, owner_id, project_repo, analysis_repo, engine
+    )
+    monitoring = project_repo.get_monitoring(project_id, number)
+    row = report_repo.get(monitoring.id)
+    if row is None:
+        raise AppError(
+            "AI_REPORT_NOT_FOUND",
+            f"El monitoreo M{number} todavia no tiene un borrador. Generelo primero.",
+        )
+    current_key = _snapshot_key(analysis.analysis_version, analysis.input_hash)
+    return _to_dto(project_id, number, row, stale=row.input_hash != current_key)
+
+
+def generate_ai_report(
+    project_id: int,
+    number: int,
+    owner_id: str,
+    project_repo,
+    analysis_repo,
+    report_repo,
+    engine,
+    llm: LLMClient,
+) -> AIReportDTO:
+    """Genera (o regenera) el borrador del monitoreo `number`.
+
+    AgroSense calcula, el LLM redacta: el prompt SOLO lleva las cifras de
+    `build_report_figures`, nunca arboles ni observaciones. La guardia de
+    numeros corre sobre lo que devuelve el modelo antes de guardarlo.
+
+    Raises:
+        AppError("PROJECT_NOT_FOUND" | "MONITORING_NOT_FOUND"): del snapshot
+            subyacente.
+        AppError("LLM_UNAVAILABLE"): el puerto lo lanza si Ollama no responde.
+    """
+    analysis = get_monitoring_analysis(
+        project_id, number, owner_id, project_repo, analysis_repo, engine
+    )
+    monitoring = project_repo.get_monitoring(project_id, number)
+    figures = build_report_figures(analysis.payload)
+    content = llm.generate(render_prompt(figures), SYSTEM_PROMPT)
+    unverified = find_unverified_numbers(content, figures)
+    key = _snapshot_key(analysis.analysis_version, analysis.input_hash)
+    row = report_repo.save(
+        project_id, monitoring.id, llm.model_name, PROMPT_VERSION, key, content, unverified,
+    )
+    return _to_dto(project_id, number, row, stale=False)
