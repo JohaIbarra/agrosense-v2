@@ -70,6 +70,11 @@ def create_app() -> FastAPI:
 
     app.include_router(contrast_router)
 
+    # E9: borrador de informe con IA local (Ollama) de un monitoreo
+    from agrosense.adapters.api.routes.ai_reports import router as ai_reports_router
+
+    app.include_router(ai_reports_router)
+
     # Techo del cuerpo ANTES de que el parser de multipart toque disco.
     # Se anade el ultimo para que quede el mas externo de la pila.
     app.add_middleware(BodySizeLimitMiddleware, max_bytes=MAX_UPLOAD_BYTES)

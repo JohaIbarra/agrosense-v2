@@ -38,6 +38,10 @@ _CODE_HTTP: dict[str, int] = {
     "SATELLITE_UNAVAILABLE": 503,
     "SPECIES_NOT_FOUND": 404,
     "REFERENCE_NOT_LOADED": 404,
+    "AI_REPORT_NOT_FOUND": 404,
+    # El modelo de IA local es un proceso externo (Ollama): su caida no es
+    # un fallo nuestro, y 503 le dice al cliente que reintentar tiene sentido.
+    "LLM_UNAVAILABLE": 503,
     "INVALID_SORT": 400,
     "INVALID_MODEL": 400,
     "INVALID_FILE": 400,

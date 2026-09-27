@@ -586,3 +586,21 @@ class SpeciesContrastResponse(BaseModel):
     stall_risk: RiskResponse | None = None
     mortality_risk: RiskResponse | None = None
     narrative: str
+
+
+class AIReportResponse(BaseModel):
+    """Borrador de informe generado por IA de un monitoreo (E9, UC-IA1/2/3)."""
+
+    project_id: int
+    monitoring: int
+    model_name: str
+    prompt_version: str
+    content: str
+    unverified_numbers: list[str] = Field(
+        default_factory=list,
+        description="Numeros del texto generado que no aparecen entre las cifras dadas al modelo.",
+    )
+    created_at: datetime
+    stale: bool = Field(
+        description="True si el analisis del monitoreo cambio desde que se generó este borrador."
+    )
