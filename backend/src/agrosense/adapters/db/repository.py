@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from agrosense.adapters.analytics.effects_loader import normalize_level
 from agrosense.adapters.db.models import (
+    AIReportRow,
     CampaignFile,
     Engineer,
     ImageryLayerRow,
@@ -1009,3 +1010,46 @@ class ProjectSpeciesRepository:
             name = normalize_level(species)
             counts[name] = counts.get(name, 0) + int(count)
         return sorted(counts.items())
+
+
+class AIReportRepository:
+    """Persistencia del borrador de informe con IA (E9, UC-IA1/2/3).
+
+    Un borrador por monitoreo: `save` reemplaza el existente, igual que
+    `ProjectAnalysisRepository.save_snapshots` reemplaza el snapshot.
+    """
+
+    def __init__(self, session: Session):
+        self._s = session
+
+    def get(self, monitoring_id: int) -> AIReportRow | None:
+        return self._s.scalar(
+            select(AIReportRow).where(AIReportRow.monitoring_id == monitoring_id)
+        )
+
+    def save(
+        self,
+        project_id: int,
+        monitoring_id: int,
+        model_name: str,
+        prompt_version: str,
+        input_hash: str,
+        content: str,
+        unverified_numbers: list[str],
+    ) -> AIReportRow:
+        try:
+            row = self.get(monitoring_id)
+            if row is None:
+                row = AIReportRow(project_id=project_id, monitoring_id=monitoring_id)
+                self._s.add(row)
+            row.model_name = model_name
+            row.prompt_version = prompt_version
+            row.input_hash = input_hash
+            row.content = content
+            row.unverified_numbers = unverified_numbers
+            row.created_at = datetime.now(UTC)
+            self._s.commit()
+        except Exception:
+            self._s.rollback()
+            raise
+        return row
