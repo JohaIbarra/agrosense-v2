@@ -31,14 +31,14 @@ def create_app() -> FastAPI:
 
     app.include_router(router)
 
-    # Rutas del slice 5 (analitica de los modelos mixtos, solo lectura).
-    # Llevan prefijo /api/v1 mientras que las del slice 2 no: es deuda
+    # E5: Referente cientifico (efectos de los modelos mixtos, solo lectura).
+    # Lleva prefijo /api/v1 mientras que las rutas de proyecto no: es deuda
     # conocida del contrato, anotada en docs/deuda-tecnica.md. Versionar las
-    # existentes rompe al consumidor del slice 2, asi que se unifica cuando
+    # existentes rompe al consumidor de esas rutas, asi que se unifica cuando
     # haya un cambio de contrato que lo justifique, no de paso.
-    from agrosense.adapters.api.routes.analytics import router as analytics_router
+    from agrosense.adapters.api.routes.reference import router as reference_router
 
-    app.include_router(analytics_router)
+    app.include_router(reference_router)
 
     # E1: perfil del ingeniero autenticado
     from agrosense.adapters.api.routes.me import router as me_router

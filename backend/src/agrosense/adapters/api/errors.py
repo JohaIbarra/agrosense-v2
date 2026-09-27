@@ -37,7 +37,7 @@ _CODE_HTTP: dict[str, int] = {
     # nuestro, y 503 le dice al cliente que reintentar tiene sentido.
     "SATELLITE_UNAVAILABLE": 503,
     "SPECIES_NOT_FOUND": 404,
-    "ANALYTICS_NOT_LOADED": 404,
+    "REFERENCE_NOT_LOADED": 404,
     "INVALID_SORT": 400,
     "INVALID_MODEL": 400,
     "INVALID_FILE": 400,

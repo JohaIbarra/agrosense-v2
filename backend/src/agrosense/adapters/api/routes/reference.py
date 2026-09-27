@@ -1,17 +1,18 @@
-"""Endpoints de analitica del slice 5.
+"""Endpoints del Referente cientifico (E5).
 
 Regla ADR-003: las routes parsean -> llaman application/ -> mapean respuesta.
 Cero logica de negocio aqui: la interpretacion de un OR y el criterio de
 significancia viven en `application/use_cases/read_analytics.py`.
 
-Contratos (todos de solo lectura; la carga la hace `scripts/load_analytics.py`):
+Contratos (todos de solo lectura; la publicacion la hace
+`scripts/load_analytics.py`, UC-R2):
 
-    GET /api/v1/analytics/species                  -> 200 list[SpeciesAnalyticsResponse]
-    GET /api/v1/analytics/species/top-risk-stall   -> 200 list[...]
-    GET /api/v1/analytics/species/top-protective   -> 200 list[...]
-    GET /api/v1/analytics/species/{name}           -> 200 SpeciesAnalyticsResponse | 404
-    GET /api/v1/analytics/plots                    -> 200 list[PlotAnalyticsResponse]
-    GET /api/v1/analytics/variance-decomposition   -> 200 list[ModelVarianceResponse]
+    GET /api/v1/reference/species                  -> 200 list[SpeciesAnalyticsResponse]
+    GET /api/v1/reference/species/top-risk-stall   -> 200 list[...]
+    GET /api/v1/reference/species/top-protective   -> 200 list[...]
+    GET /api/v1/reference/species/{name}           -> 200 SpeciesAnalyticsResponse | 404
+    GET /api/v1/reference/plots                    -> 200 list[PlotAnalyticsResponse]
+    GET /api/v1/reference/variance-decomposition   -> 200 list[ModelVarianceResponse]
 
 Orden de declaracion: las rutas fijas `top-risk-stall` y `top-protective` van
 ANTES de `/{name}`. Al reves, FastAPI resolveria `/species/top-risk-stall`
@@ -33,7 +34,7 @@ from agrosense.adapters.api.schemas import (
     SpeciesAnalyticsResponse,
     VarianceComponentResponse,
 )
-from agrosense.adapters.db.repository import AnalyticsRepository
+from agrosense.adapters.db.repository import ReferenceRepository
 from agrosense.application.dtos import (
     ModelVarianceDTO,
     PlotAnalyticsDTO,
@@ -49,23 +50,19 @@ from agrosense.application.use_cases.read_analytics import (
     variance_decomposition,
 )
 
-# E1: el referente tambien exige sesion (ADR-006). No hay dato sensible, pero
-# toda la API es para ingenieros autenticados y la regla es una sola.
 router = APIRouter(
-    prefix="/api/v1/analytics",
-    tags=["analytics"],
+    prefix="/api/v1/reference",
+    tags=["reference"],
     dependencies=[Depends(get_current_engineer)],
 )
 
 SessionDep = Annotated[Session, Depends(get_session)]
 
-# Techo del top-N: es un atajo de lectura para el dashboard, no un listado
-# paginado. Quien quiera el ranking completo pide /species.
 MAX_TOP = 30
 
 
-def _repo(session: Session) -> AnalyticsRepository:
-    return AnalyticsRepository(session)
+def _repo(session: Session) -> ReferenceRepository:
+    return ReferenceRepository(session)
 
 
 # ── Mapeo DTO -> schema ────────────────────────────────────────────────────
@@ -204,8 +201,8 @@ def variance_decomposition_endpoint(session: SessionDep) -> list[ModelVarianceRe
         raise HTTPException(
             status_code=404,
             detail={
-                "code": "ANALYTICS_NOT_LOADED",
-                "message": "La analitica no esta cargada. Ejecute "
+                "code": "REFERENCE_NOT_LOADED",
+                "message": "El referente no esta publicado. Ejecute "
                 "scripts/load_analytics.py.",
             },
         )

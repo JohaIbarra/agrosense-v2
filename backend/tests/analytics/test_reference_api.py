@@ -1,4 +1,4 @@
-"""Contrato de `/api/v1/analytics/*` contra la analitica real cargada."""
+"""Contrato de `/api/v1/reference/*` contra la analitica real cargada."""
 from __future__ import annotations
 
 import math
@@ -8,7 +8,7 @@ import pytest
 # ── Ranking de especies ────────────────────────────────────────────────────
 
 def test_list_species_returns_all_thirty(analytics_client):
-    r = analytics_client.get("/api/v1/analytics/species")
+    r = analytics_client.get("/api/v1/reference/species")
     assert r.status_code == 200
     body = r.json()
     assert len(body) == 30
@@ -16,7 +16,7 @@ def test_list_species_returns_all_thirty(analytics_client):
 
 
 def test_list_species_default_sort_is_stall_risk_desc(analytics_client):
-    body = analytics_client.get("/api/v1/analytics/species").json()
+    body = analytics_client.get("/api/v1/reference/species").json()
     ors = [s["stall_risk"]["odds_ratio"] for s in body]
     assert ors == sorted(ors, reverse=True)
     assert body[0]["species"] == "Lafoensia speciosa"
@@ -24,7 +24,7 @@ def test_list_species_default_sort_is_stall_risk_desc(analytics_client):
 
 def test_list_species_sort_by_mortality(analytics_client):
     body = analytics_client.get(
-        "/api/v1/analytics/species", params={"sort": "mortality_risk"}
+        "/api/v1/reference/species", params={"sort": "mortality_risk"}
     ).json()
     ors = [s["mortality_risk"]["odds_ratio"] for s in body]
     assert ors == sorted(ors, reverse=True)
@@ -32,13 +32,13 @@ def test_list_species_sort_by_mortality(analytics_client):
 
 def test_invalid_sort_is_rejected_at_the_edge(analytics_client):
     """Un `sort` fuera del vocabulario no llega al caso de uso: 422."""
-    r = analytics_client.get("/api/v1/analytics/species", params={"sort": "drop table"})
+    r = analytics_client.get("/api/v1/reference/species", params={"sort": "drop table"})
     assert r.status_code == 422
 
 
 def test_filter_by_guild(analytics_client):
     body = analytics_client.get(
-        "/api/v1/analytics/species", params={"gremio": "Inicial"}
+        "/api/v1/reference/species", params={"gremio": "Inicial"}
     ).json()
     assert body
     assert {s["gremio"] for s in body} == {"Inicial"}
@@ -46,7 +46,7 @@ def test_filter_by_guild(analytics_client):
 
 
 def test_filter_by_unknown_guild_is_empty_not_error(analytics_client):
-    r = analytics_client.get("/api/v1/analytics/species", params={"gremio": "Nope"})
+    r = analytics_client.get("/api/v1/reference/species", params={"gremio": "Nope"})
     assert r.status_code == 200
     assert r.json() == []
 
@@ -54,7 +54,7 @@ def test_filter_by_unknown_guild_is_empty_not_error(analytics_client):
 # ── Detalle ────────────────────────────────────────────────────────────────
 
 def test_species_detail_matches_the_report(analytics_client):
-    r = analytics_client.get("/api/v1/analytics/species/Lafoensia speciosa")
+    r = analytics_client.get("/api/v1/reference/species/Lafoensia speciosa")
     assert r.status_code == 200
     body = r.json()
     assert body["species"] == "Lafoensia speciosa"
@@ -65,7 +65,7 @@ def test_species_detail_matches_the_report(analytics_client):
 
 
 def test_species_detail_404_has_the_contract_shape(analytics_client):
-    r = analytics_client.get("/api/v1/analytics/species/Ficus inventada")
+    r = analytics_client.get("/api/v1/reference/species/Ficus inventada")
     assert r.status_code == 404
     assert r.json()["detail"]["code"] == "SPECIES_NOT_FOUND"
 
@@ -76,7 +76,7 @@ def test_species_with_nbsp_in_the_source_is_reachable(analytics_client):
     Si `normalize_level` desaparece, esta ruta devuelve 404 justo para la
     unica especie con efecto significativo en mortalidad.
     """
-    r = analytics_client.get("/api/v1/analytics/species/Inga punctata")
+    r = analytics_client.get("/api/v1/reference/species/Inga punctata")
     assert r.status_code == 200
     body = r.json()
     assert body["mortality_risk"]["significant"] is True
@@ -91,7 +91,7 @@ def test_confidence_intervals_are_exponentiated_for_the_ui(analytics_client):
     Es el error que este contrato existe para impedir: publicar
     [0.81, 2.38] como si fuera el intervalo de un OR de 4.94.
     """
-    body = analytics_client.get("/api/v1/analytics/species").json()
+    body = analytics_client.get("/api/v1/reference/species").json()
     for s in body:
         riesgo = s["stall_risk"]
         lo_or, hi_or = riesgo["or_ci95"]
@@ -103,7 +103,7 @@ def test_confidence_intervals_are_exponentiated_for_the_ui(analytics_client):
 
 
 def test_significance_means_ci_excludes_one(analytics_client):
-    body = analytics_client.get("/api/v1/analytics/species").json()
+    body = analytics_client.get("/api/v1/reference/species").json()
     for s in body:
         lo, hi = s["stall_risk"]["or_ci95"]
         assert s["stall_risk"]["significant"] is not (lo <= 1.0 <= hi), s["species"]
@@ -115,7 +115,7 @@ def test_interpretation_never_claims_an_effect_when_ci_crosses_one(analytics_cli
     Sin esta regla, el dashboard diria "se estanca 1.9x mas" de una especie
     con 21 arboles y un IC de [0.82, 4.44] — y el vivero dejaria de plantarla.
     """
-    body = analytics_client.get("/api/v1/analytics/species").json()
+    body = analytics_client.get("/api/v1/reference/species").json()
     no_sig = [s for s in body if not s["stall_risk"]["significant"]]
     assert no_sig
     for s in no_sig:
@@ -125,7 +125,7 @@ def test_interpretation_never_claims_an_effect_when_ci_crosses_one(analytics_cli
 
 
 def test_protective_species_are_read_as_protective(analytics_client):
-    body = analytics_client.get("/api/v1/analytics/species/Verbesina arborea").json()
+    body = analytics_client.get("/api/v1/reference/species/Verbesina arborea").json()
     texto = body["stall_risk"]["interpretation"].lower()
     assert body["stall_risk"]["odds_ratio"] < 1
     assert "menos" in texto and "protector" in texto
@@ -134,7 +134,7 @@ def test_protective_species_are_read_as_protective(analytics_client):
 # ── Atajos del dashboard ───────────────────────────────────────────────────
 
 def test_top_risk_stall_returns_five_significant_species(analytics_client):
-    r = analytics_client.get("/api/v1/analytics/species/top-risk-stall")
+    r = analytics_client.get("/api/v1/reference/species/top-risk-stall")
     assert r.status_code == 200
     body = r.json()
     assert len(body) == 5
@@ -151,13 +151,13 @@ def test_top_risk_stall_returns_five_significant_species(analytics_client):
 
 def test_top_risk_route_is_not_swallowed_by_the_name_parameter(analytics_client):
     """`/species/top-risk-stall` no debe resolverse como especie "top-risk-stall"."""
-    r = analytics_client.get("/api/v1/analytics/species/top-risk-stall")
+    r = analytics_client.get("/api/v1/reference/species/top-risk-stall")
     assert r.status_code == 200
     assert isinstance(r.json(), list)
 
 
 def test_top_protective_stall(analytics_client):
-    body = analytics_client.get("/api/v1/analytics/species/top-protective").json()
+    body = analytics_client.get("/api/v1/reference/species/top-protective").json()
     assert [s["species"] for s in body] == [
         "Verbesina arborea",
         "Heliocarpus popayanensis",
@@ -168,14 +168,14 @@ def test_top_protective_stall(analytics_client):
 
 def test_top_protective_mortality_is_only_inga(analytics_client):
     body = analytics_client.get(
-        "/api/v1/analytics/species/top-protective", params={"model": "mortality"}
+        "/api/v1/reference/species/top-protective", params={"model": "mortality"}
     ).json()
     assert [s["species"] for s in body] == ["Inga punctata"]
 
 
 def test_top_protective_rejects_unknown_model(analytics_client):
     r = analytics_client.get(
-        "/api/v1/analytics/species/top-protective", params={"model": "growth"}
+        "/api/v1/reference/species/top-protective", params={"model": "growth"}
     )
     assert r.status_code == 422
 
@@ -183,7 +183,7 @@ def test_top_protective_rejects_unknown_model(analytics_client):
 # ── Parcelas ───────────────────────────────────────────────────────────────
 
 def test_list_plots(analytics_client):
-    body = analytics_client.get("/api/v1/analytics/plots").json()
+    body = analytics_client.get("/api/v1/reference/plots").json()
     assert len(body) == 45
     assert all(p["plot_code"].startswith("GEB/") for p in body)
     assert {p["localidad"] for p in body} == {
@@ -195,7 +195,7 @@ def test_list_plots(analytics_client):
 
 def test_plots_only_in_the_mortality_panel_keep_null_stall(analytics_client):
     """Las 3 parcelas que solo existen en mortalidad no se inventan un efecto."""
-    body = analytics_client.get("/api/v1/analytics/plots").json()
+    body = analytics_client.get("/api/v1/reference/plots").json()
     sin_stall = [p for p in body if p["stall_risk"]["odds_ratio"] is None]
     assert len(sin_stall) == 3
     for p in sin_stall:
@@ -205,7 +205,7 @@ def test_plots_only_in_the_mortality_panel_keep_null_stall(analytics_client):
 
 def test_filter_plots_by_locality(analytics_client):
     body = analytics_client.get(
-        "/api/v1/analytics/plots", params={"localidad": "Guayabal"}
+        "/api/v1/reference/plots", params={"localidad": "Guayabal"}
     ).json()
     assert body
     assert {p["localidad"] for p in body} == {"Guayabal"}
@@ -214,7 +214,7 @@ def test_filter_plots_by_locality(analytics_client):
 # ── Descomposicion de varianza ─────────────────────────────────────────────
 
 def test_variance_decomposition_tells_the_two_strategies_apart(analytics_client):
-    r = analytics_client.get("/api/v1/analytics/variance-decomposition")
+    r = analytics_client.get("/api/v1/reference/variance-decomposition")
     assert r.status_code == 200
     por_modelo = {m["model"]: m for m in r.json()}
     assert set(por_modelo) == {"stall", "mortality"}
@@ -236,12 +236,12 @@ def test_variance_decomposition_tells_the_two_strategies_apart(analytics_client)
 
 def test_variance_decomposition_404_when_not_loaded(empty_analytics_client):
     """Sin analitica cargada la respuesta lo dice, no devuelve una lista vacia."""
-    r = empty_analytics_client.get("/api/v1/analytics/variance-decomposition")
+    r = empty_analytics_client.get("/api/v1/reference/variance-decomposition")
     assert r.status_code == 404
-    assert r.json()["detail"]["code"] == "ANALYTICS_NOT_LOADED"
+    assert r.json()["detail"]["code"] == "REFERENCE_NOT_LOADED"
 
 
 def test_species_list_is_empty_when_not_loaded(empty_analytics_client):
-    r = empty_analytics_client.get("/api/v1/analytics/species")
+    r = empty_analytics_client.get("/api/v1/reference/species")
     assert r.status_code == 200
     assert r.json() == []
