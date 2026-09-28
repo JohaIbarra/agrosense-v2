@@ -5,7 +5,12 @@ import math
 
 import pytest
 
-from agrosense.ml.preprocessing import PreprocessorParams, fit_preprocessor, transform
+from agrosense.ml.preprocessing import (
+    PreprocessorParams,
+    fit_preprocessor,
+    transform,
+    unknown_categories,
+)
 
 ROWS = [
     {"x": 1.0, "y": None, "c": "a"},
@@ -41,6 +46,28 @@ def test_missing_category_takes_the_mode_and_one_hot_follows_sorted_categories()
 def test_unknown_category_encodes_as_all_zeros():
     params = fit_preprocessor(ROWS, ("x", "y"), ("c",))
     assert transform(params, [{"x": 1.0, "y": 1.0, "c": "nueva"}])[0][2:] == [0.0, 0.0]
+
+
+def test_unknown_categories_names_the_columns_with_an_unseen_value():
+    # Fix wave 1b: por fila, que columnas categoricas trajeron un valor que
+    # el entrenamiento nunca vio (distinto de "falta el dato", que se imputa
+    # con la moda y no cuenta como desconocido).
+    params = fit_preprocessor(ROWS, ("x", "y"), ("c",))
+    assert unknown_categories(params, [{"x": 1.0, "y": 1.0, "c": "nueva"}]) == [["c"]]
+    assert unknown_categories(params, [{"x": 1.0, "y": 1.0, "c": "a"}]) == [[]]
+    assert unknown_categories(params, [{"x": 1.0, "y": 1.0, "c": None}]) == [[]]
+
+
+def test_unknown_categories_checks_every_categorical_column_independently():
+    rows = [
+        {"c1": "a", "c2": "x"},
+        {"c1": "b", "c2": "y"},
+    ]
+    params = fit_preprocessor([{"x": 1.0, **r} for r in rows], ("x",), ("c1", "c2"))
+    result = unknown_categories(
+        params, [{"x": 1.0, "c1": "nueva", "c2": "otra-nueva"}, {"x": 1.0, "c1": "a", "c2": "y"}]
+    )
+    assert result == [["c1", "c2"], []]
 
 
 def test_constant_column_is_not_divided_by_zero():

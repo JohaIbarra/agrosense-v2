@@ -93,7 +93,7 @@ class _Scorer:
     model_version = "stall-test-1"
     artifact_sha256 = "a" * 64
     model_card = CARD
-    known_species = frozenset({"Senna viarum"})
+    KNOWN_SPECIES = frozenset({"Senna viarum"})
 
     def __init__(self):
         self.calls = 0
@@ -102,6 +102,18 @@ class _Scorer:
         self.calls += 1
         at_risk = sorted(o.tree_id for o in observations if o.campaign == t and is_at_risk(o))
         return {tid: (i + 1) / (len(at_risk) + 1) for i, tid in enumerate(at_risk)}
+
+    def unknown_categories(self, trees, observations, t):
+        at_risk = sorted(o.tree_id for o in observations if o.campaign == t and is_at_risk(o))
+        by_id = {tr.tree_id: tr for tr in trees}
+        return {
+            tid: (
+                []
+                if tid in by_id and by_id[tid].species in self.KNOWN_SPECIES
+                else ["species"]
+            )
+            for tid in at_risk
+        }
 
     def fingerprint(self, trees, observations, t):
         return f"fp-{t}-{len(observations)}"
@@ -136,7 +148,8 @@ def test_missing_monitoring_is_not_found():
 def test_payload_applies_the_business_rule():
     trees, observations = _dataset()
     probs = {"T1": 0.9, "T2": 0.4, "T3": 0.2, "T5": 0.3}
-    payload = build_stall_payload(trees, observations, 3, probs, frozenset({"Senna viarum"}))
+    unknown = {"T1": [], "T2": [], "T3": [], "T5": ["species"]}
+    payload = build_stall_payload(trees, observations, 3, probs, unknown)
     assert payload["alert_budget_pct"] == 20.0
     assert payload["persistent_min_intervals"] == 2
     assert payload["summary"] == {
@@ -146,6 +159,8 @@ def test_payload_applies_the_business_rule():
         "persistent": 1,
         "without_history": 1,
         "unknown_species": 1,
+        "unknown_category_trees": 1,
+        "mostly_without_history": False,
     }
     rows = {r["tree_id"]: r for r in payload["trees"]}
     assert "T4" not in rows  # muerto en M3: no esta en riesgo
@@ -159,12 +174,14 @@ def test_payload_applies_the_business_rule():
         "stalled_last_interval": True,
         "stall_streak": 2,
         "persistent": True,
+        "unknown_categories": [],
         "known_species": True,
     }
     assert rows["T2"]["stall_streak"] == 1 and rows["T2"]["persistent"] is False
     assert rows["T3"]["stalled_last_interval"] is False
     assert rows["T5"]["stalled_last_interval"] is None
     assert rows["T5"]["known_species"] is False
+    assert rows["T5"]["unknown_categories"] == ["species"]
     assert [r["tree_id"] for r in payload["trees"]] == ["T1", "T2", "T5", "T3"]
 
 

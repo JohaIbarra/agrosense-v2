@@ -19,6 +19,23 @@ function intervaloAnterior(t: StallTree): string {
   return t.stalled_last_interval ? "No creció" : "Creció";
 }
 
+// Nombre visible de cada feature categórica (fix wave, item 1b): la API
+// nombra los campos con su identificador interno; aquí solo se traducen.
+const NOMBRE_CAMPO: Record<string, string> = {
+  species: "especie",
+  locality: "localidad",
+  monitoring_unit: "unidad de monitoreo",
+  fito_t: "estado fitosanitario",
+};
+
+function camposDesconocidos(trees: StallTree[]): string[] {
+  const vistos = new Set<string>();
+  for (const t of trees) {
+    for (const campo of t.unknown_categories) vistos.add(NOMBRE_CAMPO[campo] ?? campo);
+  }
+  return [...vistos].sort();
+}
+
 export function StallPanel({ projectId, number }: { projectId: number; number: number }) {
   const [verTodos, setVerTodos] = useState(false);
   const estado = useAsync(
@@ -64,11 +81,33 @@ export function StallPanel({ projectId, number }: { projectId: number; number: n
               entrenar: su probabilidad se apoya solo en las demás variables.
             </p>
           )}
+          {a.summary.unknown_category_trees > 0 && (
+            <p className="warn">
+              {a.summary.unknown_category_trees} árboles tienen valores no vistos en el
+              entrenamiento en: {camposDesconocidos(a.trees).join(", ")}.
+            </p>
+          )}
+          {a.summary.mostly_without_history && (
+            <p className="warn" role="alert">
+              <strong>
+                La mayoría de los árboles de este monitoreo no tiene medición en el intervalo
+                anterior: esta predicción es una extrapolación del modelo, no una evaluación
+                equivalente a la reportada arriba.
+              </strong>
+            </p>
+          )}
           {a.summary.without_history > 0 && (
             <p className="muted">
               {a.summary.without_history} árboles no tienen medición en el monitoreo anterior.
             </p>
           )}
+          <p className="muted">
+            El modelo se entrenó con un solo proyecto: la transferencia a otros proyectos no
+            está evaluada. En este proyecto (el de referencia), las predicciones de M2 y M3 son
+            sobre datos de entrenamiento (in-sample), no una evaluación honesta. La etiqueta mide
+            crecimiento no detectable por el protocolo de campo (altura sin cambio, a precisión
+            de milímetros), no crecimiento nulo.
+          </p>
 
           <label className="checkbox">
             <input

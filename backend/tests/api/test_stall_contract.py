@@ -23,6 +23,7 @@ TREE = {
     "stall_streak": 0,
     "persistent": False,
     "known_species": True,
+    "unknown_categories": [],
 }
 CARD = {
     "model_version": "stall-logreg-2026-09-27.1",
@@ -44,6 +45,8 @@ SUMMARY = {
     "persistent": 24,
     "without_history": 0,
     "unknown_species": 0,
+    "unknown_category_trees": 0,
+    "mostly_without_history": False,
 }
 
 
@@ -77,6 +80,11 @@ def test_full_response_shape():
     )
     assert r.model.pr_auc_ci_low == 0.37
     assert r.summary.flagged == 143
+
+
+def test_unknown_categories_names_the_unseen_fields():
+    t = StallTreeResponse(**{**TREE, "unknown_categories": ["species", "locality"]})
+    assert t.unknown_categories == ["species", "locality"]
 
 
 def test_model_unavailable_is_a_503():

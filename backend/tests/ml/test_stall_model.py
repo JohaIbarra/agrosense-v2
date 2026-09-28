@@ -9,7 +9,7 @@ import pytest
 from agrosense.ml.preprocessing import fit_preprocessor
 from agrosense.ml.stall_features import CATEGORICAL_FEATURES, NUMERIC_FEATURES, build_wave
 from agrosense.ml.stall_model import StallModelError, load_stall_model, sigmoid
-from tests.ml.builders import artifact_dict, synthetic_panel
+from tests.ml.builders import artifact_dict, obs, synthetic_panel, tree
 
 CARD_KEYS = {
     "model_version",
@@ -53,7 +53,8 @@ def test_load_roundtrip(tmp_path):
     model = load_stall_model(path)
     assert model.model_version == "stall-test-1"
     assert model.artifact_sha256 == hashlib.sha256(path.read_bytes()).hexdigest()
-    assert model.known_species == frozenset({"Lenta lenta", "Rapida rapida"})
+    # Fix wave 1a: las categorias del artefacto viajan normalizadas.
+    assert model.known_species == frozenset({"lenta lenta", "rapida rapida"})
     assert set(model.model_card) == CARD_KEYS
     assert model.model_card["pr_auc_ci_low"] == 0.36
 
@@ -68,6 +69,16 @@ def test_predict_scores_every_tree_alive_and_measured_in_t(tmp_path):
     stalled = [probs[t] for t, r in rows.items() if r.features["estanco_lag"] == 1.0]
     grew = [probs[t] for t, r in rows.items() if r.features["estanco_lag"] == 0.0]
     assert min(stalled) > max(grew)  # coeficiente positivo en estanco_lag
+
+
+def test_unknown_categories_flags_a_species_never_seen_in_training(tmp_path):
+    trees, observations, data = _artifact()
+    model = load_stall_model(_write(tmp_path, data))
+    nueva = tree("Z9", species="Especie nunca vista", plot="U0", locality="Guayabal")
+    result = model.unknown_categories(trees + [nueva], observations + [obs("Z9", 3, 0.5)], 3)
+    assert result["Z9"] == ["species"]
+    conocido = next(r.tree_id for r in build_wave(trees, observations, 3, labeled=False))
+    assert result[conocido] == []
 
 
 def test_missing_artifact_is_a_model_error(tmp_path):

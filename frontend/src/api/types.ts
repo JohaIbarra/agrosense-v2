@@ -391,6 +391,8 @@ export interface StallTree {
   stall_streak: number;
   persistent: boolean;
   known_species: boolean;
+  /** Features categóricas (especie incluida) con un valor no visto en entrenamiento. */
+  unknown_categories: string[];
 }
 
 export interface StallSummary {
@@ -400,6 +402,10 @@ export interface StallSummary {
   persistent: number;
   without_history: number;
   unknown_species: number;
+  /** Árboles con al menos una categoría (no solo especie) no vista en entrenamiento. */
+  unknown_category_trees: number;
+  /** `without_history` es al menos la mitad de los árboles: predicciones en extrapolación. */
+  mostly_without_history: boolean;
 }
 
 export interface StallModelCard {

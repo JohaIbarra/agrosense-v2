@@ -38,6 +38,8 @@ const BASE: StallAssessment = {
     persistent: 24,
     without_history: 0,
     unknown_species: 0,
+    unknown_category_trees: 0,
+    mostly_without_history: false,
   },
   trees: [
     {
@@ -51,6 +53,7 @@ const BASE: StallAssessment = {
       stall_streak: 2,
       persistent: true,
       known_species: true,
+      unknown_categories: [],
     },
   ],
 };
@@ -80,6 +83,36 @@ describe("StallPanel", () => {
     render(<StallPanel projectId={7} number={4} />);
     expect(await screen.findByText(/5 árboles son de especies que el modelo no vio/))
       .toBeInTheDocument();
+  });
+
+  it("avisa de categorías no vistas nombrando los campos", async () => {
+    mocked.mockResolvedValue({
+      ...BASE,
+      summary: { ...BASE.summary, unknown_category_trees: 1 },
+      trees: [{ ...BASE.trees[0], unknown_categories: ["species", "locality"] }],
+    });
+    render(<StallPanel projectId={7} number={4} />);
+    const aviso = await screen.findByText(/valores no vistos en el entrenamiento/);
+    expect(aviso).toHaveTextContent("especie");
+    expect(aviso).toHaveTextContent("localidad");
+  });
+
+  it("siempre avisa el alcance honesto del modelo (transferencia, in-sample, protocolo)", async () => {
+    mocked.mockResolvedValue(BASE);
+    render(<StallPanel projectId={7} number={4} />);
+    await screen.findByText("FR_9_99");
+    expect(screen.getByText(/transferencia a otros proyectos/)).toBeInTheDocument();
+    expect(screen.getByText(/in-sample/)).toBeInTheDocument();
+    expect(screen.getByText(/milímetros/)).toBeInTheDocument();
+  });
+
+  it("avisa de forma destacada cuando la mayoría no tiene historia (extrapolación)", async () => {
+    mocked.mockResolvedValue({
+      ...BASE,
+      summary: { ...BASE.summary, without_history: 400, mostly_without_history: true },
+    });
+    render(<StallPanel projectId={7} number={4} />);
+    expect(await screen.findByText(/extrapolaci[oó]n/)).toBeInTheDocument();
   });
 
   it("muestra el error del backend", async () => {

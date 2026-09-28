@@ -64,12 +64,13 @@ def test_lag_features():
     assert a["estanco_lag"] == 1.0
     assert a["dcopa_lag"] == pytest.approx(0.05)
     assert a["fito_empeoro"] == 1.0
-    assert a["fito_t"] == "Regular"
+    # Fix wave 1a: las categoricas viajan normalizadas (NFC/strip/casefold).
+    assert a["fito_t"] == "regular"
     assert a["esbeltez_t"] == pytest.approx(0.40 / 0.25)
     assert (a["species"], a["locality"], a["monitoring_unit"]) == (
-        "Senna viarum",
-        "Guayabal",
-        "Parcela",
+        "senna viarum",
+        "guayabal",
+        "parcela",
     )
     b = rows["B"]
     assert b["estanco_lag"] == 0.0
@@ -100,6 +101,32 @@ def test_features_never_read_the_future():
 def test_zero_crown_gives_missing_slenderness():
     rows = build_wave([tree("A")], [obs("A", 1, 0.4, crown=0.0)], 1, labeled=False)
     assert rows[0].features["esbeltez_t"] is None
+
+
+def test_categorical_values_are_normalized_for_train_serve_parity():
+    # Fix wave 1a: distintas grafias del mismo valor (espacios, mayusculas,
+    # NFC/NFD) deben producir la MISMA categoria; si no, un valor escrito
+    # distinto en el archivo servido queda como "no visto" aunque sea el
+    # mismo valor que entreno el modelo.
+    import unicodedata
+
+    nfc = "Bogotá"
+    nfd = unicodedata.normalize("NFD", nfc)  # misma cadena, otra forma Unicode
+    t1 = tree("A", species="Senna viarum", locality=nfc, unit="Parcela")
+    t2 = tree("B", species="  Senna Viarum", locality=f"  {nfc.upper()} ", unit="PARCELA")
+    t3 = tree("C", species="Senna viarum", locality=nfd, unit="Parcela")
+    rows = {
+        r.tree_id: r.features
+        for r in build_wave(
+            [t1, t2, t3],
+            [obs("A", 1, 0.4), obs("B", 1, 0.4), obs("C", 1, 0.4)],
+            1,
+            labeled=False,
+        )
+    }
+    assert rows["A"]["species"] == rows["B"]["species"]
+    assert rows["A"]["locality"] == rows["B"]["locality"] == rows["C"]["locality"]
+    assert rows["A"]["monitoring_unit"] == rows["B"]["monitoring_unit"]
 
 
 def test_plot_is_the_grouping_key_not_a_feature():

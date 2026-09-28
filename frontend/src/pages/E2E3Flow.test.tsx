@@ -99,13 +99,14 @@ const STALL: StallAssessment = {
   },
   summary: {
     at_risk: 718, flagged: 143, stalled_last_interval: 157, persistent: 24,
-    without_history: 0, unknown_species: 0,
+    without_history: 0, unknown_species: 0, unknown_category_trees: 0,
+    mostly_without_history: false,
   },
   trees: [
     {
       tree_id: "FR_9_99", species: "Lafoensia speciosa", locality: "San Antonio",
       plot: "GEB/SA/1", probability: 0.62, flagged: true, stalled_last_interval: true,
-      stall_streak: 2, persistent: true, known_species: true,
+      stall_streak: 2, persistent: true, known_species: true, unknown_categories: [],
     },
   ],
 };

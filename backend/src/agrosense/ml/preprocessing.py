@@ -107,6 +107,25 @@ def fit_preprocessor(
     )
 
 
+def unknown_categories(params: PreprocessorParams, rows: Sequence[Row]) -> list[list[str]]:
+    """Por fila, columnas categoricas con un valor que el entrenamiento no vio.
+
+    Fix wave (item 1b): antes, un valor "no visto" solo se notaba como un
+    one-hot en ceros (silencioso). Un valor ausente (`None`) se imputa con la
+    moda y NO cuenta como desconocido: lo que se marca aqui es un valor que
+    SI llego pero no coincide con ninguna categoria de entrenamiento.
+    """
+    out: list[list[str]] = []
+    for r in rows:
+        bad: list[str] = []
+        for col in params.categorical:
+            raw = r.get(col)
+            if raw is not None and str(raw) not in params.categories[col]:
+                bad.append(col)
+        out.append(bad)
+    return out
+
+
 def transform(params: PreprocessorParams, rows: Sequence[Row]) -> list[list[float]]:
     out: list[list[float]] = []
     for r in rows:

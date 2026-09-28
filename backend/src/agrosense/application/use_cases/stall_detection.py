@@ -40,11 +40,21 @@ class StallScorer(Protocol):
     model_version: str
     artifact_sha256: str
     model_card: dict
-    known_species: frozenset[str]
 
     def predict(
         self, trees: Sequence[Tree], observations: Sequence[Observation], t: int
     ) -> dict[str, float]: ...
+
+    def unknown_categories(
+        self, trees: Sequence[Tree], observations: Sequence[Observation], t: int
+    ) -> dict[str, list[str]]:
+        """Por arbol, features categoricas (especie incluida) con un valor no
+
+        visto en entrenamiento (fix wave, item 1b). `application/` no
+        reimplementa la comparacion: la delega en el scorer, que es quien
+        conoce las categorias de entrenamiento (ml/).
+        """
+        ...
 
     def fingerprint(
         self, trees: Sequence[Tree], observations: Sequence[Observation], t: int
@@ -73,10 +83,18 @@ def build_stall_payload(
     observations: Sequence[Observation],
     number: int,
     probabilities: Mapping[str, float],
-    known_species: frozenset[str],
+    unknown_categories: Mapping[str, Sequence[str]],
     budget: float = ALERT_BUDGET,
 ) -> dict:
-    """Arma el snapshot: probabilidad del modelo + regla de negocio de dominio."""
+    """Arma el snapshot: probabilidad del modelo + regla de negocio de dominio.
+
+    `unknown_categories` (fix wave, item 1b): por arbol, los nombres de las
+    features categoricas (especie incluida) cuyo valor no vio el
+    entrenamiento; lo calcula el scorer (ml/), que es quien conoce las
+    categorias. `known_species` se conserva por compatibilidad: se deriva de
+    ahi en vez de comparar de nuevo contra un set de especies aparte, que
+    quedaria desalineado si las categorias se normalizan (item 1a).
+    """
     history: dict[str, dict[int, Observation]] = defaultdict(dict)
     for o in observations:
         if o.campaign <= number:
@@ -89,6 +107,7 @@ def build_stall_payload(
             continue
         own = history[tr.tree_id]
         streak = stall_streak(own, number)
+        unknown = list(unknown_categories.get(tr.tree_id, ()))
         rows.append(
             {
                 "tree_id": tr.tree_id,
@@ -100,18 +119,27 @@ def build_stall_payload(
                 "stalled_last_interval": stalled_previous_interval(own, number),
                 "stall_streak": streak,
                 "persistent": is_persistent_stall(streak),
-                "known_species": tr.species in known_species,
+                "unknown_categories": unknown,
+                "known_species": "species" not in unknown,
             }
         )
     rows.sort(key=lambda r: (-r["probability"], r["tree_id"]))
 
+    at_risk = len(rows)
+    without_history = sum(1 for r in rows if r["stalled_last_interval"] is None)
     summary = {
-        "at_risk": len(rows),
+        "at_risk": at_risk,
         "flagged": sum(1 for r in rows if r["flagged"]),
         "stalled_last_interval": sum(1 for r in rows if r["stalled_last_interval"] is True),
         "persistent": sum(1 for r in rows if r["persistent"]),
-        "without_history": sum(1 for r in rows if r["stalled_last_interval"] is None),
+        "without_history": without_history,
         "unknown_species": sum(1 for r in rows if not r["known_species"]),
+        "unknown_category_trees": sum(1 for r in rows if r["unknown_categories"]),
+        # Item 3 (fix wave): si la mayoria (p. ej. M1) no tiene intervalo
+        # anterior medido, la prediccion de ese monitoreo es EXTRAPOLACION
+        # pura (el modelo nunca vio ese patron sin `estanco_lag`), no una
+        # lectura equivalente a M2/M3.
+        "mostly_without_history": at_risk > 0 and without_history >= at_risk / 2,
     }
     return {
         "alert_budget_pct": round(budget * 100, 1),
@@ -155,7 +183,7 @@ def get_stall_assessment(
             observations,
             number,
             scorer.predict(trees, observations, number),
-            scorer.known_species,
+            scorer.unknown_categories(trees, observations, number),
         )
         row = assessment_repo.save(
             project_id,

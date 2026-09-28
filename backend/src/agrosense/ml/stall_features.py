@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import unicodedata
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -36,7 +37,10 @@ from agrosense.domain.stall_rules import (
 
 # Cambiar CUALQUIER definicion de abajo = nueva version; el cargador del
 # modelo rechaza un artefacto entrenado con otra (ADR-013 §5).
-FEATURES_VERSION = "2026-09-27-e7.1"
+# e7.2 (fix wave, item 1a): las categoricas se normalizan (NFC + strip +
+# casefold) para que entrenamiento y servicio nunca diverjan por una grafia
+# distinta del mismo valor (espacios, mayusculas, forma Unicode).
+FEATURES_VERSION = "2026-09-27-e7.2"
 
 NUMERIC_FEATURES: tuple[str, ...] = (
     "h_t",
@@ -78,6 +82,21 @@ def _as_float(value: bool | None) -> float | None:
     return None if value is None else float(value)
 
 
+def _normalize_category(value: str | None) -> str | None:
+    """Forma canonica de un valor categorico (fix wave, item 1a).
+
+    NFC + `strip` + `casefold`, para que "Guayabal", " GUAYABAL " y la misma
+    palabra en otra forma Unicode (NFD) sean la MISMA categoria en
+    entrenamiento y en servicio. Sin esto, un archivo servido que escribe el
+    mismo valor con otra grafia lo trata como "no visto" (one-hot en ceros)
+    en vez de reconocerlo.
+    """
+    if value is None:
+        return None
+    text = unicodedata.normalize("NFC", str(value)).strip().casefold()
+    return text or None
+
+
 def _features(tree: Tree, history: Mapping[int, Observation], t: int) -> dict[str, FeatureValue]:
     cur = history[t]
     assert cur.height_m is not None
@@ -103,10 +122,10 @@ def _features(tree: Tree, history: Mapping[int, Observation], t: int) -> dict[st
         "h_prev": h_prev,
         "esbeltez_t": h_t / copa_t if copa_t else None,
         "fito_empeoro": fito_empeoro,
-        "locality": tree.locality,
-        "species": tree.species,
-        "monitoring_unit": tree.monitoring_unit,
-        "fito_t": normalize_phytosanitary(cur.phytosanitary),
+        "locality": _normalize_category(tree.locality),
+        "species": _normalize_category(tree.species),
+        "monitoring_unit": _normalize_category(tree.monitoring_unit),
+        "fito_t": _normalize_category(normalize_phytosanitary(cur.phytosanitary)),
     }
 
 

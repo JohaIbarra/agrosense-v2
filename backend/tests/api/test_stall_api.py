@@ -38,7 +38,6 @@ class _FakeScorer:
     model_version = "stall-fake-1"
     artifact_sha256 = "f" * 64
     model_card = CARD
-    known_species = frozenset({"Senna viarum"})
 
     def __init__(self):
         self.calls = 0
@@ -47,6 +46,10 @@ class _FakeScorer:
         self.calls += 1
         ids = sorted(o.tree_id for o in observations if o.campaign == t and is_at_risk(o))
         return {tid: (i + 1) / (len(ids) + 1) for i, tid in enumerate(ids)}
+
+    def unknown_categories(self, trees, observations, t):
+        ids = sorted(o.tree_id for o in observations if o.campaign == t and is_at_risk(o))
+        return {tid: [] for tid in ids}
 
     def fingerprint(self, trees, observations, t):
         return "h" * 64
@@ -122,6 +125,8 @@ def test_returns_the_assessment(client, proyecto, scorer):
         "persistent": 0,
         "without_history": 0,
         "unknown_species": 0,
+        "unknown_category_trees": 0,
+        "mostly_without_history": False,
     }
     probs = [t["probability"] for t in body["trees"]]
     assert probs == sorted(probs, reverse=True)

@@ -21,6 +21,7 @@ from pathlib import Path
 
 from agrosense.domain.entities import Observation, Tree
 from agrosense.ml.preprocessing import PREPROCESSING_VERSION, PreprocessorParams, transform
+from agrosense.ml.preprocessing import unknown_categories as _unknown_categories
 from agrosense.ml.stall_features import (
     FEATURES_VERSION,
     FeatureValue,
@@ -81,6 +82,19 @@ class StallModel:
         rows = build_wave(trees, observations, t, labeled=False)
         scores = self.predict_rows([r.features for r in rows])
         return {r.tree_id: s for r, s in zip(rows, scores, strict=True)}
+
+    def unknown_categories(
+        self, trees: Sequence[Tree], observations: Sequence[Observation], t: int
+    ) -> dict[str, list[str]]:
+        """Por arbol, nombres de features categoricas con un valor no visto en entrenamiento.
+
+        Fix wave (item 1b): la especie va incluida (mismo mecanismo que las
+        demas categoricas); `known_species` se deriva de esto en la capa de
+        aplicacion para no duplicar la comparacion.
+        """
+        rows = build_wave(trees, observations, t, labeled=False)
+        bad = _unknown_categories(self.params, [r.features for r in rows])
+        return {r.tree_id: cols for r, cols in zip(rows, bad, strict=True)}
 
     def fingerprint(
         self, trees: Sequence[Tree], observations: Sequence[Observation], t: int

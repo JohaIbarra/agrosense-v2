@@ -635,6 +635,10 @@ class StallTreeResponse(BaseModel):
     )
     persistent: bool
     known_species: bool = Field(description="La especie estaba en los datos de entrenamiento.")
+    unknown_categories: list[str] = Field(
+        description="Nombres de las features categoricas (especie incluida) cuyo valor no "
+        "vio el entrenamiento. Vacia si todas se reconocen."
+    )
 
 
 class StallSummaryResponse(BaseModel):
@@ -644,6 +648,13 @@ class StallSummaryResponse(BaseModel):
     persistent: int = Field(ge=0)
     without_history: int = Field(ge=0)
     unknown_species: int = Field(ge=0)
+    unknown_category_trees: int = Field(
+        ge=0, description="Arboles con al menos una categoria (especie u otra) no vista en entrenamiento."
+    )
+    mostly_without_history: bool = Field(
+        description="`without_history` es al menos la mitad de los arboles puntuados: la "
+        "mayoria de las predicciones de este monitoreo son extrapolacion, no evaluacion."
+    )
 
 
 class StallModelCardResponse(BaseModel):
