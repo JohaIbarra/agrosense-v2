@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-09-28T01:55:37+00:00",
+  "created_at": "2026-09-28T03:17:27+00:00",
   "evaluation": {
     "baselines": {
       "persistence": {
@@ -9,7 +9,11 @@
         "pr_auc": 0.219
       },
       "species_rate": {
-        "pr_auc": 0.3823
+        "pr_auc": 0.3823,
+        "pr_auc_ci": [
+          0.3207,
+          0.4621
+        ]
       }
     },
     "gate": {
@@ -61,6 +65,8 @@
         0.372,
         0.5694
       ],
+      "pr_auc_ci_n_boot": 1000,
+      "pr_auc_ci_n_valid": 1000,
       "precision_at_budget_pct": 47.55,
       "prevalence_pct": 21.9,
       "recall_at_budget_pct": 43.31,
@@ -173,7 +179,7 @@
     "intercept": 0.25759736684785567,
     "type": "logistic_regression"
   },
-  "model_version": "stall-logreg-2026-09-27.1",
+  "model_version": "stall-logreg-2026-09-27.2",
   "preprocessing_version": "2026-09-27-e7.1",
   "preprocessor": {
     "categorical": [
@@ -281,7 +287,7 @@
   "provenance": {
     "dataset_file": "anexo1.xlsx",
     "dataset_sha256": "28583c3b48874626f3d7d7ae35d485634a8c8089b4c03a5997f5ba756b57a0dd",
-    "git_commit": "a6f8acc0cc0c0b829c06f80822ed35a4e5d1765d",
+    "git_commit": "1ef60692147e511049d27b9d5d7e6192feed8855",
     "git_dirty": false,
     "mapping_version": "2026-09-21-e0",
     "numpy": "1.26.4",
@@ -303,7 +309,7 @@
       "gate_max_permuted_pr_auc": 0.31,
       "gate_min_pr_auc": 0.36,
       "max_iter": 2000,
-      "model_version": "stall-logreg-2026-09-27.1",
+      "model_version": "stall-logreg-2026-09-27.2",
       "n_bootstrap": 1000,
       "n_permutations": 20,
       "seed": 42,
