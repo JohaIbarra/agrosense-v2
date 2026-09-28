@@ -1,4 +1,4 @@
-# Evaluación del modelo de estancamiento — stall-logreg-2026-09-27.2
+# Evaluación del modelo de estancamiento — stall-logreg-2026-09-27.3
 
 > Generado por `cd backend && python scripts/train_stall_model.py --data data/raw/anexo1.xlsx`. No editar a mano.
 
@@ -11,13 +11,13 @@
 | Dataset | `anexo1.xlsx` (hoja `Monitoreo_4`) |
 | SHA-256 del dataset | `28583c3b48874626f3d7d7ae35d485634a8c8089b4c03a5997f5ba756b57a0dd` |
 | Versión de la ingesta | `2026-09-21-e0` |
-| Features | `2026-09-27-e7.1` |
+| Features | `2026-09-27-e7.2` |
 | Preprocesamiento | `2026-09-27-e7.1` |
-| Commit del código | `1ef60692147e511049d27b9d5d7e6192feed8855` |
+| Commit del código | `eabfc4d4d8a0c0ac584dd4396677e2469f131b1f` |
 | Versiones | Python 3.12.1, scikit-learn 1.5.2, numpy 1.26.4 |
 | Semilla | 42 |
 | C (regularización, logística) | 0.5 — protocolo/spike (Protocolo §9), fijado antes de evaluar M3 |
-| Entrenado | 2026-09-28T03:17:27+00:00 |
+| Entrenado | 2026-09-28T03:45:46+00:00 |
 
 ## Régimen primario — validación adelantada en el tiempo
 
