@@ -531,6 +531,38 @@ class AIReportRow(Base):
     )
 
 
+class StallAssessmentRow(Base):
+    """Deteccion de estancados de UN monitoreo (E7, UC-AN4).
+
+    Snapshot, como `monitoring_analyses` (ADR-008): la lista de arboles con
+    su probabilidad, si entran en el presupuesto de alertas y la regla de
+    negocio observada. Procedencia por fila (AGENTS.md, ADR-013): que modelo
+    (`model_version` + `artifact_sha256`) y que datos (`input_hash`, solo
+    observaciones <= este monitoreo) lo produjeron. Si cambia cualquiera de
+    los tres, el caso de uso lo recalcula y REEMPLAZA.
+    """
+
+    __tablename__ = "stall_assessments"
+    __table_args__ = (
+        UniqueConstraint("monitoring_id", name="uq_stall_assessment_monitoring"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    monitoring_id: Mapped[int] = mapped_column(
+        ForeignKey("monitorings.id", ondelete="CASCADE"), nullable=False
+    )
+    model_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    artifact_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    input_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+
 def _analytics_updated() -> datetime:
     return _utcnow()
 

@@ -27,6 +27,7 @@ from agrosense.adapters.db.models import (
     ReferencePlotEffect,
     ReferenceSpeciesEffect,
     SatelliteIndexValueRow,
+    StallAssessmentRow,
     TreeRow,
     VarianceComponent,
 )
@@ -1104,4 +1105,61 @@ class AIReportRepository:
         except Exception:
             self._s.rollback()
             raise
+        return row
+
+
+class StallAssessmentRepository:
+    """Persistencia de la deteccion de estancados (E7, UC-AN4).
+
+    Un snapshot por monitoreo: `save` reemplaza el existente. Misma defensa
+    que `AIReportRepository.save` ante dos peticiones simultaneas: si la
+    segunda choca con `uq_stall_assessment_monitoring`, relee y actualiza.
+    """
+
+    def __init__(self, session: Session):
+        self._s = session
+
+    def get(self, monitoring_id: int) -> StallAssessmentRow | None:
+        return self._s.scalar(
+            select(StallAssessmentRow).where(StallAssessmentRow.monitoring_id == monitoring_id)
+        )
+
+    @staticmethod
+    def _apply(row, project_id, monitoring_id, model_version, artifact_sha256, input_hash, payload):
+        row.project_id = project_id
+        row.monitoring_id = monitoring_id
+        row.model_version = model_version
+        row.artifact_sha256 = artifact_sha256
+        row.input_hash = input_hash
+        row.payload = payload
+        row.computed_at = datetime.now(UTC)
+
+    def save(
+        self,
+        project_id: int,
+        monitoring_id: int,
+        model_version: str,
+        artifact_sha256: str,
+        input_hash: str,
+        payload: dict,
+    ) -> StallAssessmentRow:
+        values = (project_id, monitoring_id, model_version, artifact_sha256, input_hash, payload)
+        row = self.get(monitoring_id)
+        if row is None:
+            row = StallAssessmentRow(project_id=project_id, monitoring_id=monitoring_id)
+            self._s.add(row)
+        self._apply(row, *values)
+        try:
+            self._s.commit()
+        except IntegrityError:
+            self._s.rollback()
+            row = self.get(monitoring_id)
+            if row is None:
+                raise
+            self._apply(row, *values)
+            try:
+                self._s.commit()
+            except Exception:
+                self._s.rollback()
+                raise
         return row
