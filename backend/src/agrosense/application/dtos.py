@@ -375,3 +375,27 @@ class AIReportDTO:
     created_at: datetime
     stale: bool
 
+
+# ── E7: deteccion de estancados ────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class StallAssessmentDTO:
+    """Deteccion de estancados de un monitoreo (E7, UC-AN4).
+
+    `trees` y `summary` salen del snapshot tal cual; `model_card` describe el
+    modelo que los produjo (metricas honestas de su evaluacion, ADR-013).
+    """
+
+    project_id: int
+    monitoring: int
+    model_version: str
+    artifact_sha256: str
+    input_hash: str
+    computed_at: datetime
+    model_card: dict
+    alert_budget_pct: float
+    persistent_min_intervals: int
+    summary: dict
+    trees: list[dict]
+
