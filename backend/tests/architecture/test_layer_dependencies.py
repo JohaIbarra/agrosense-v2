@@ -46,6 +46,17 @@ FORBIDDEN: dict[str, tuple[str, ...]] = {
     ),
     # Regla del plan de slice 2: la API no parsea datos, delega en el ingester.
     "adapters/api": ("pandas",),
+    # Fix wave (E7, item 6): train_stall.py y evaluation.py son SOLO de
+    # entrenamiento (importan numpy/sklearn, ADR-013 §6); adapters/ sirve
+    # peticiones en produccion y solo puede ver la ruta de inferencia
+    # (stall_model.py/stall_features.py/preprocessing.py). "application" ya
+    # prohibe TODO "agrosense.ml" (ver arriba); esto cierra el mismo hueco
+    # para adapters/, que si puede importar ml/ (stall_model) pero no las
+    # partes de entrenamiento.
+    "adapters": (
+        "agrosense.ml.train_stall",
+        "agrosense.ml.evaluation",
+    ),
 }
 
 
