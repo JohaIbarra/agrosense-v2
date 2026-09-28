@@ -289,12 +289,27 @@ class TreeRow(Base):
     plot_row_id: Mapped[int | None] = mapped_column(
         ForeignKey("plots.id", ondelete="SET NULL"), index=True
     )
+    # Fix wave (E7, item 2): predio del arbol INDEPENDIENTE de la parcela.
+    # `plot_row_id` solo se fija cuando `domain.rules.plot_key` reconoce una
+    # parcela (codigo de unidad o predio/ID Parcela); un archivo que trae
+    # `LOCALIDAD` sin ninguno de los dos deja al arbol sin parcela, y antes
+    # eso tambien le borraba el predio al servir (`locality` solo miraba
+    # `plot.property`), aunque la ruta de entrenamiento (directa desde el
+    # Excel) si lo conservaba. `plot_key` no cambia: esto es solo donde se
+    # guarda el predio para exponerlo igual por las dos rutas.
+    property_id: Mapped[int | None] = mapped_column(
+        ForeignKey("properties.id", ondelete="SET NULL"), index=True
+    )
     coord_x: Mapped[float | None] = mapped_column(Float)
     coord_y: Mapped[float | None] = mapped_column(Float)
     elevation_m: Mapped[float | None] = mapped_column(Float)
 
     project: Mapped["Project"] = relationship(back_populates="trees")
     plot: Mapped["PlotRow | None"] = relationship(back_populates="trees", lazy="joined")
+    # Nombre `property_row` (no `property`): un atributo de clase llamado
+    # `property` en el cuerpo de la clase taparia el `@property` builtin
+    # para los descriptores de mas abajo.
+    property_row: Mapped["PropertyRow | None"] = relationship(lazy="joined")
     observations: Mapped[list["ObservationRow"]] = relationship(
         back_populates="tree", cascade="all, delete-orphan"
     )
@@ -311,9 +326,9 @@ class TreeRow(Base):
 
     @property
     def locality(self) -> str | None:
-        if self.plot is None or self.plot.property is None:
-            return None
-        return self.plot.property.name
+        if self.plot is not None and self.plot.property is not None:
+            return self.plot.property.name
+        return self.property_row.name if self.property_row is not None else None
 
     @property
     def sampling_unit_code(self) -> str | None:

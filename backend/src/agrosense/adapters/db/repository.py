@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import func, insert, select, update
 from sqlalchemy.exc import DataError, IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from agrosense.adapters.analytics.effects_loader import normalize_level
 from agrosense.adapters.db.models import (
@@ -334,7 +334,7 @@ class CampaignRepository:
             # monitoreo -> observacion. Todo dentro de la misma transaccion.
             property_ids = self._upsert_properties(project_id, result)
             plot_ids = self._upsert_plots(project_id, result, property_ids)
-            tree_db_id = self._upsert_trees(project_id, result, plot_ids)
+            tree_db_id = self._upsert_trees(project_id, result, plot_ids, property_ids)
             monitoring_ids = self._upsert_monitorings(project_id, result)
             self._upsert_observations(result, tree_db_id, monitoring_ids)
 
@@ -525,7 +525,11 @@ class CampaignRepository:
         return {tree_id: row_id for tree_id, row_id in rows}
 
     def _upsert_trees(
-        self, project_id: int, result: CampaignData, plot_ids: dict[str, int]
+        self,
+        project_id: int,
+        result: CampaignData,
+        plot_ids: dict[str, int],
+        property_ids: dict[str, int],
     ) -> dict[str, int]:
         """Inserta los arboles nuevos y corrige los descriptivos de los viejos.
 
@@ -567,6 +571,11 @@ class CampaignRepository:
             key = plot_key(tree)
             if key is not None:
                 fila.plot_row_id = plot_ids[key]
+            # Fix wave (item 2): el predio se guarda SIEMPRE que el archivo lo
+            # trae, tenga o no parcela reconocida (`plot_key`); si no, la
+            # ruta servida pierde la localidad que la ruta de entrenamiento
+            # (directa desde el Excel) si conserva.
+            fila.property_id = property_ids.get(tree.locality) if tree.locality else None
 
         if nuevos:
             _bulk_insert(
@@ -582,6 +591,9 @@ class CampaignRepository:
                         "guild": t.guild,
                         "plot_row_id": (
                             plot_ids[plot_key(t)] if plot_key(t) is not None else None
+                        ),
+                        "property_id": (
+                            property_ids.get(t.locality) if t.locality else None
                         ),
                         "coord_x": t.coord_x,
                         "coord_y": t.coord_y,
@@ -872,16 +884,22 @@ class ProjectAnalysisRepository:
 
     def load_dataset(self, project_id: int) -> tuple[list[Tree], list[Observation]]:
         """Todos los arboles y observaciones del proyecto, en dos consultas."""
+        # Fix wave (item 2): el predio puede venir de la parcela (caso normal,
+        # `Codigo de unidad muestreo` o `predio/ID Parcela`) o, si el arbol no
+        # tiene parcela reconocida, del predio guardado directo en el arbol
+        # (`TreeRow.property_id`). Alias porque `properties` se une dos veces.
+        TreePropertyRow = aliased(PropertyRow)
         tree_rows = self._s.execute(
-            select(TreeRow, PlotRow, PropertyRow)
+            select(TreeRow, PlotRow, PropertyRow, TreePropertyRow)
             .outerjoin(PlotRow, PlotRow.id == TreeRow.plot_row_id)
             .outerjoin(PropertyRow, PropertyRow.id == PlotRow.property_id)
+            .outerjoin(TreePropertyRow, TreePropertyRow.id == TreeRow.property_id)
             .where(TreeRow.project_id == project_id)
             .order_by(TreeRow.id)
         ).all()
         trees: list[Tree] = []
         tree_ids: dict[int, str] = {}
-        for t, plot, prop in tree_rows:
+        for t, plot, prop, tree_prop in tree_rows:
             tree_ids[t.id] = t.tree_id
             trees.append(
                 Tree(
@@ -891,7 +909,7 @@ class ProjectAnalysisRepository:
                     common_name=t.common_name,
                     guild=t.guild,
                     plot_id=plot.plot_label if plot else None,
-                    locality=prop.name if prop else None,
+                    locality=(prop.name if prop else None) or (tree_prop.name if tree_prop else None),
                     coord_x=t.coord_x,
                     coord_y=t.coord_y,
                     elevation_m=t.elevation_m,
