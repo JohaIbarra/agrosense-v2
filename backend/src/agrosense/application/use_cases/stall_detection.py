@@ -21,7 +21,7 @@ forma: application/ no importa ml/ (la flecha va hacia adentro).
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Protocol
 
 from agrosense.application.dtos import StallAssessmentDTO
@@ -159,17 +159,26 @@ def get_stall_assessment(
     project_repo,
     analysis_repo,
     assessment_repo,
-    scorer: StallScorer,
+    scorer_factory: Callable[[], StallScorer],
     *,
     only_flagged: bool = False,
 ) -> StallAssessmentDTO:
     """UC-AN4. Reutiliza el snapshot si modelo, artefacto, datos y reglas no cambiaron.
 
+    `scorer_factory` (fix wave, item 5) se resuelve DESPUES de las
+    comprobaciones de dueño y monitoreo: si el modelo esta caido, un
+    visitante que no es dueño del proyecto (o pide un monitoreo que no
+    existe) debe seguir viendo 404, no un 503 que delata que el modelo esta
+    caido antes de saber si tiene permiso para verlo.
+
     Raises:
         AppError("PROJECT_NOT_FOUND" | "MONITORING_NOT_FOUND")
+        cualquier error que levante `scorer_factory` (p. ej. modelo caido),
+        pero solo DESPUES de las dos comprobaciones anteriores.
     """
     _owned_project(project_repo, project_id, owner_id)
     monitoring = _monitoring(project_repo, project_id, number)
+    scorer = scorer_factory()
     trees, observations = analysis_repo.load_dataset(project_id)
     input_hash = scorer.fingerprint(trees, observations, number)
 

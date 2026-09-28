@@ -103,7 +103,8 @@ def get_stall_assessment_endpoint(
             ProjectRepository(session),
             ProjectAnalysisRepository(session),
             StallAssessmentRepository(session),
-            _scorer(),
+            _scorer,  # se pasa la funcion, no se invoca aqui (item 5, fix wave):
+            # el caso de uso la resuelve DESPUES de comprobar dueño y monitoreo.
             only_flagged=only_flagged,
         )
     except ValueError as exc:

@@ -129,8 +129,12 @@ class _Scorer:
         return f"fp-{t}-{len(observations)}"
 
 
-def _call(dataset=None, assessments=None, scorer=None, owner="eng-1", number=3, **kw):
+def _call(
+    dataset=None, assessments=None, scorer=None, scorer_factory=None, owner="eng-1",
+    number=3, **kw,
+):
     trees, observations = dataset or _dataset()
+    factory = scorer_factory or (lambda: scorer or _Scorer())
     return get_stall_assessment(
         7,
         number,
@@ -138,7 +142,7 @@ def _call(dataset=None, assessments=None, scorer=None, owner="eng-1", number=3, 
         _Projects(),
         _Dataset(trees, observations),
         assessments if assessments is not None else _Assessments(),
-        scorer or _Scorer(),
+        factory,
         **kw,
     )
 
@@ -153,6 +157,31 @@ def test_missing_monitoring_is_not_found():
     with pytest.raises(AppError) as err:
         _call(number=9)
     assert err.value.code == "MONITORING_NOT_FOUND"
+
+
+def _broken_scorer_factory():
+    raise AppError("STALL_MODEL_UNAVAILABLE", "El modelo no está disponible.")
+
+
+def test_a_non_owner_gets_not_found_even_if_the_model_is_down():
+    # Fix wave (item 5): la fabrica del scorer se resuelve DESPUES de saber
+    # si el proyecto es del dueño; si no, un modelo caido delataria con un
+    # 503 lo que deberia ser un 404 comun.
+    with pytest.raises(AppError) as err:
+        _call(owner="otro", scorer_factory=_broken_scorer_factory)
+    assert err.value.code == "PROJECT_NOT_FOUND"
+
+
+def test_a_missing_monitoring_is_not_found_even_if_the_model_is_down():
+    with pytest.raises(AppError) as err:
+        _call(number=9, scorer_factory=_broken_scorer_factory)
+    assert err.value.code == "MONITORING_NOT_FOUND"
+
+
+def test_the_model_being_down_is_still_reported_for_an_owned_project():
+    with pytest.raises(AppError) as err:
+        _call(scorer_factory=_broken_scorer_factory)
+    assert err.value.code == "STALL_MODEL_UNAVAILABLE"
 
 
 def test_payload_applies_the_business_rule():

@@ -155,6 +155,29 @@ def test_model_unavailable_is_a_clean_503(client, proyecto, monkeypatch):
     assert r.json()["detail"]["code"] == "STALL_MODEL_UNAVAILABLE"
 
 
+def test_a_non_owner_gets_404_even_if_the_model_is_down(client, proyecto, monkeypatch):
+    # Fix wave (item 5): el scorer se resuelve DESPUES de comprobar dueño y
+    # monitoreo, asi que un modelo caido no delata (con un 503) que el
+    # proyecto existe cuando quien pregunta no es su dueño.
+    def _roto():
+        raise AppError("STALL_MODEL_UNAVAILABLE", "El modelo no está disponible.")
+
+    monkeypatch.setattr(rutas, "_scorer", _roto)
+    r = client.get(_url(proyecto), headers=bearer(ENGINEER_B))
+    assert r.status_code == 404
+    assert r.json()["detail"]["code"] == "PROJECT_NOT_FOUND"
+
+
+def test_an_unknown_monitoring_is_404_even_if_the_model_is_down(client, proyecto, monkeypatch):
+    def _roto():
+        raise AppError("STALL_MODEL_UNAVAILABLE", "El modelo no está disponible.")
+
+    monkeypatch.setattr(rutas, "_scorer", _roto)
+    r = client.get(_url(proyecto, 9))
+    assert r.status_code == 404
+    assert r.json()["detail"]["code"] == "MONITORING_NOT_FOUND"
+
+
 def test_serves_the_committed_model(client, proyecto):
     # Sin sustituir el scorer: el artefacto versionado de la Task 8.
     r = client.get(_url(proyecto))
