@@ -7,8 +7,10 @@ Uso (desde backend/, con `pip install -e ".[dev,ml]"`):
 Sin `--check`: evalua (temporal + GroupKFold por parcela + bootstrap +
 control permutado + lineas base), aplica el ML eval gate y, SOLO si lo pasa,
 escribe el artefacto versionado y el informe de metricas.
-Con `--check`: reentrena y compara contra el artefacto versionado; no
-escribe nada. Es la prueba de reproducibilidad de AGENTS.md.
+Con `--check`: reentrena y compara contra el artefacto versionado Y contra el
+informe documentado (`docs/ml/evaluacion-estancamiento.md`, ignorando
+timestamp/commit); no escribe nada. Es la prueba de reproducibilidad de
+AGENTS.md, y evita que el informe en git quede desactualizado en silencio.
 
 Este script es el composition root: lee el Excel con el adapter de ingesta
 (el mismo que usa la carga de la API) y le pasa entidades de dominio a ml/,
@@ -38,6 +40,7 @@ from agrosense.ml.train_stall import (  # noqa: E402
     StallTrainConfig,
     diff_artifacts,
     render_report,
+    report_diff,
     train_and_evaluate,
 )
 
@@ -118,6 +121,20 @@ def main(argv: list[str] | None = None) -> int:
         if diffs:
             print(
                 "El reentrenamiento NO reproduce el artefacto:\n  " + "\n  ".join(diffs),
+                file=sys.stderr,
+            )
+            return 1
+        # Fix round 1 (M3): el informe documentado tambien debe seguir
+        # correspondiendo al procedimiento actual, no solo el artefacto JSON.
+        if not args.report.exists():
+            print(f"No hay informe documentado en {args.report}", file=sys.stderr)
+            return 1
+        committed_report = args.report.read_text(encoding="utf-8")
+        report_diffs = report_diff(committed_report, report)
+        if report_diffs:
+            print(
+                "El informe documentado NO coincide con el generado:\n  "
+                + "\n  ".join(report_diffs),
                 file=sys.stderr,
             )
             return 1

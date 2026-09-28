@@ -70,20 +70,36 @@
      tasa por especie), aplica el gate y solo entonces escribe el artefacto
      y `docs/ml/evaluacion-estancamiento.md`. `--check` reentrena y compara
      contra el artefacto versionado.
-     Gate: PR-AUC temporal ≥ 0.36 (límite inferior del IC del protocolo);
-     supera a prevalencia y persistencia; el control con la etiqueta
-     permutada en todo el conjunto ≤ 0.31 (vigila fugas: sin señal, el
-     pipeline debe caer a la prevalencia); y supera al control permutado
-     dentro de cada parcela.
-     **Desvío del protocolo:** el protocolo usa como control la permutación
-     dentro de parcela y reporta 0.238. Al reproducirlo con esta
-     featurización da ≈ 0.33 (20 corridas, rango 0.24–0.40), porque conserva
-     la tasa de cada parcela y la especie y el predio permiten aprenderla:
-     no es fuga, es señal de sitio. Por eso ese control pasa a medir cuánto
-     aporta el modelo por encima de la tasa de la parcela, y el control de
-     fugas es la permutación global (≈ 0.227, rango 0.16–0.33).
+     Gate: el PR-AUC temporal **puntual** (no el límite inferior de su
+     propio IC) ≥ 0.36; supera a prevalencia y persistencia; el control con
+     la etiqueta permutada en todo el conjunto ≤ 0.31 (vigila fugas: sin
+     señal, el pipeline debe caer a la prevalencia); y supera al control
+     permutado dentro de cada parcela. El 0.36 proviene históricamente del
+     límite inferior del IC 95 % que reportó el protocolo (Protocolo §5):
+     es el origen del número, no una descripción de qué compara el gate hoy
+     (fix round 1, M1 — antes se prestaba a leerse como "compara el límite
+     del IC").
+     **Desvío del protocolo, redefinido DESPUÉS de ver el resultado (fix
+     round 1, I1):** el protocolo usa como control de fugas la permutación
+     dentro de parcela, con techo 0.31 (reporta 0.238, rango 0.18–0.31). Al
+     reproducirlo con esta featurización da ≈ 0.33 (20 corridas, rango
+     0.24–0.40): **con ese criterio original, este modelo NO habría pasado
+     el gate.** La causa no es fuga sino señal de sitio: conservar la tasa
+     de cada parcela permite aprender la especie y el predio, que sí varían
+     entre parcelas. Por eso ese control pasó a medir cuánto aporta el
+     modelo por encima de la tasa de la parcela (debe superarlo, no
+     acercarse a él), y el control de fugas real pasó a ser la permutación
+     global (≈ 0.227, rango 0.16–0.33), con el mismo techo 0.31. Esta
+     reinterpretación queda **pre-registrada desde el artefacto
+     `stall-logreg-2026-09-27.2` en adelante**: no explica retroactivamente
+     `.1` (mismos coeficientes; solo cambian metadatos y métricas
+     reportadas), pero cualquier reentrenamiento futuro se juzga con esta
+     definición, no con una reinterpretada sobre la marcha otra vez.
      El artefacto servido se reentrena con el mismo procedimiento sobre las
-     olas M2 y M3; las métricas evalúan el procedimiento.
+     olas M2 y M3; las métricas evalúan el procedimiento. El `C=0.5` de la
+     logística viene del protocolo/spike (`Protocolo Estancamiento.md` §9),
+     fijado antes de evaluar M3 (fix round 1, M5): no se reajustó al ver
+     este resultado.
   5. **Artefacto** `backend/src/agrosense/ml/artifacts/stall_logreg.json`,
      en git: formato, `model_version`, `features_version`,
      `preprocessing_version`, parámetros del preprocesador, coeficientes,

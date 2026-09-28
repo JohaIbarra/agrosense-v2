@@ -40,7 +40,7 @@ def recall_precision_at_budget(
     return recall, precision
 
 
-def grouped_bootstrap_ci(
+def grouped_bootstrap_summary(
     y: Sequence[int],
     scores: Sequence[float],
     plot_codes: Sequence[str],
@@ -48,11 +48,17 @@ def grouped_bootstrap_ci(
     n_boot: int,
     seed: int,
     level: float = 0.95,
-) -> tuple[float, float]:
+) -> dict:
     """IC del PR-AUC remuestreando PARCELAS con reemplazo, no filas.
 
     Las filas de una parcela no son independientes (suelo, pendiente,
     cuadrilla): remuestrear filas daria un IC falsamente estrecho.
+
+    Fix round 1 (M2): tambien informa cuantos de los `n_boot` remuestreos
+    fueron VALIDOS. Un remuestreo de una sola clase (todas las parcelas
+    elegidas positivas, o todas negativas) no tiene PR-AUC definido y se
+    descarta; si `n_valid` << `n_boot` el IC se calculo con pocos puntos y
+    reportarlo evita leerlo como mas solido de lo que es.
     """
     y_arr = np.asarray(y, dtype=int)
     s_arr = np.asarray(scores, dtype=float)
@@ -71,7 +77,26 @@ def grouped_bootstrap_ci(
         raise ValueError("ningun remuestreo tuvo ambas clases: no hay IC")
     alpha = (1.0 - level) / 2.0
     lo, hi = np.quantile(values, [alpha, 1.0 - alpha])
-    return float(lo), float(hi)
+    return {
+        "ci": (float(lo), float(hi)),
+        "n_boot": n_boot,
+        "n_valid": len(values),
+    }
+
+
+def grouped_bootstrap_ci(
+    y: Sequence[int],
+    scores: Sequence[float],
+    plot_codes: Sequence[str],
+    *,
+    n_boot: int,
+    seed: int,
+    level: float = 0.95,
+) -> tuple[float, float]:
+    """Solo el IC; ver `grouped_bootstrap_summary` para el conteo de validos."""
+    return grouped_bootstrap_summary(
+        y, scores, plot_codes, n_boot=n_boot, seed=seed, level=level
+    )["ci"]
 
 
 def species_rate_scores(

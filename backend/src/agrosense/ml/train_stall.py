@@ -33,7 +33,7 @@ from sklearn.model_selection import GroupKFold
 from agrosense.domain.entities import Observation, Tree
 from agrosense.domain.stall_rules import ALERT_BUDGET
 from agrosense.ml.evaluation import (
-    grouped_bootstrap_ci,
+    grouped_bootstrap_summary,
     pr_auc,
     recall_precision_at_budget,
     roc_auc,
@@ -66,10 +66,18 @@ _VOLATILE: frozenset[tuple[str, ...]] = frozenset(
 class StallTrainConfig:
     """Configuracion completa del entrenamiento; viaja en el artefacto."""
 
-    model_version: str = "stall-logreg-2026-09-27.1"
+    # Fix round 1 (I1): version .2 en adelante pre-registra la
+    # reinterpretacion del control dentro de parcela (ver render_report,
+    # seccion "Lectura honesta"). Los coeficientes de .1 y .2 son
+    # identicos; solo cambian metadatos y metricas reportadas.
+    model_version: str = "stall-logreg-2026-09-27.2"
     train_wave: int = 2
     test_wave: int = 3
     final_waves: tuple[int, ...] = (2, 3)
+    # Fix round 1 (M5): C=0.5 viene del protocolo/spike
+    # (docs/obsidian-agrosense/04-ML/Protocolo Estancamiento.md §9,
+    # "Implementacion"), fijado ANTES de evaluar M3. No se reajusto aqui
+    # para mejorar la metrica de este reporte.
     C: float = 0.5
     class_weight: str = "balanced"
     max_iter: int = 2000
@@ -79,8 +87,12 @@ class StallTrainConfig:
     n_permutations: int = 20
     cv_folds: int = 5
     alert_budget: float = ALERT_BUDGET
-    # Gate: limite inferior del IC 95 % del protocolo (0.36) y limite superior
-    # del IC del control permutado (0.31). Protocolo §5.
+    # Gate (fix round 1, M1): se compara el PR-AUC PUNTUAL del regimen
+    # temporal (NO el limite inferior de su propio IC) contra 0.36. Ese
+    # 0.36 proviene historicamente del limite inferior del IC 95 % que
+    # reporto el protocolo (Protocolo §5); es el origen del numero, no una
+    # descripcion de que se compara aqui. El limite superior del control
+    # permutado global (fuga) es 0.31.
     gate_min_pr_auc: float = 0.36
     gate_max_permuted_pr_auc: float = 0.31
     expected_dataset_sha256: str = (
@@ -167,7 +179,10 @@ def _temporal(train, test, model, config) -> dict:
     recall, precision = recall_precision_at_budget(
         [r.tree_id for r in test], y, scores, config.alert_budget
     )
-    lo, hi = grouped_bootstrap_ci(y, scores, plots, n_boot=config.n_bootstrap, seed=config.seed)
+    summary = grouped_bootstrap_summary(
+        y, scores, plots, n_boot=config.n_bootstrap, seed=config.seed
+    )
+    lo, hi = summary["ci"]
     prevalence = sum(y) / len(y)
     return {
         "train_wave": config.train_wave,
@@ -180,6 +195,10 @@ def _temporal(train, test, model, config) -> dict:
         "prevalence_pct": _round(100 * prevalence, 2),
         "pr_auc": _round(pr_auc(y, scores)),
         "pr_auc_ci": [_round(lo), _round(hi)],
+        # Fix round 1 (M2): cuantos de los `n_boot` remuestreos aportaron al
+        # IC (los de una sola clase se descartan; ver grouped_bootstrap_summary).
+        "pr_auc_ci_n_boot": summary["n_boot"],
+        "pr_auc_ci_n_valid": summary["n_valid"],
         "roc_auc": _round(roc_auc(y, scores)),
         "alert_budget_pct": _round(100 * config.alert_budget, 1),
         "recall_at_budget_pct": _round(100 * recall, 2),
@@ -187,18 +206,28 @@ def _temporal(train, test, model, config) -> dict:
     }
 
 
-def _baselines(train, test) -> dict:
+def _baselines(train, test, config) -> dict:
     y = _labels(test)
+    plots = _plots(test)
     persistence = [float(r.features["estanco_lag"] or 0.0) for r in test]
     species = species_rate_scores(
         [r.features["species"] for r in train],  # type: ignore[misc]
         _labels(train),
         [r.features["species"] for r in test],  # type: ignore[misc]
     )
+    # Fix round 1 (I3): mismo procedimiento y semilla que el IC del modelo,
+    # para que la comparacion de intervalos en el informe sea de manzanas
+    # con manzanas.
+    species_ci = grouped_bootstrap_summary(
+        y, species, plots, n_boot=config.n_bootstrap, seed=config.seed
+    )["ci"]
     return {
         "prevalence": {"pr_auc": _round(sum(y) / len(y))},
         "persistence": {"pr_auc": _round(pr_auc(y, persistence))},
-        "species_rate": {"pr_auc": _round(pr_auc(y, species))},
+        "species_rate": {
+            "pr_auc": _round(pr_auc(y, species)),
+            "pr_auc_ci": [_round(species_ci[0]), _round(species_ci[1])],
+        },
     }
 
 
@@ -267,7 +296,7 @@ def evaluate(
     model = fit_stall_model(train, config)
     return {
         "temporal": _temporal(train, test, model, config),
-        "baselines": _baselines(train, test),
+        "baselines": _baselines(train, test, config),
         "permutation_control": _permutation_control(train, test, config),
         "group_kfold": _group_kfold(list(train) + list(test), config),
     }
@@ -362,6 +391,26 @@ def diff_artifacts(a, b, *, tol: float = 1e-9, _path: tuple[str, ...] = ()) -> l
     return [] if a == b else [here]
 
 
+# Fix round 1 (M3): lineas del informe en prosa que cambian entre corridas
+# identicas sin que el modelo cambie (timestamp y commit/dirty del codigo).
+_REPORT_VOLATILE_PREFIXES: tuple[str, ...] = ("| Entrenado |", "| Commit del código |")
+
+
+def report_diff(a: str, b: str) -> list[str]:
+    """Lineas donde dos informes difieren, ignorando timestamp y commit.
+
+    Analogo a `diff_artifacts` pero para el informe en prosa: `--check`
+    (Task 8, fix M3) lo usa para detectar que el informe versionado en
+    `docs/ml/evaluacion-estancamiento.md` quedo desactualizado respecto del
+    procedimiento actual, no solo el artefacto JSON.
+    """
+    la = [line for line in a.splitlines() if not line.startswith(_REPORT_VOLATILE_PREFIXES)]
+    lb = [line for line in b.splitlines() if not line.startswith(_REPORT_VOLATILE_PREFIXES)]
+    if len(la) != len(lb):
+        return [f"<{len(la)} vs {len(lb)} lineas (ignorando timestamp/commit)>"]
+    return [x for x, y in zip(la, lb, strict=True) if x != y]
+
+
 def render_report(artifact: Mapping) -> str:
     """Informe de metricas (docs/ml/evaluacion-estancamiento.md), generado."""
     ev = artifact["evaluation"]
@@ -378,6 +427,21 @@ def render_report(artifact: Mapping) -> str:
     olas = ", ".join(f"M{w}" for w in tr["waves"])
     folds = ", ".join(f"{v:.3f}" for v in g["pr_auc_by_fold"])
     dirty = " (con cambios sin confirmar)" if p.get("git_dirty") else ""
+    species_ci = b["species_rate"]["pr_auc_ci"]
+    # Fix round 1 (I3): el enunciado de solape se calcula de los numeros
+    # reales, no se da por sentado.
+    overlap = t["pr_auc_ci"][0] <= species_ci[1] and species_ci[0] <= t["pr_auc_ci"][1]
+    if overlap:
+        solape_txt = (
+            f"los intervalos de la logística ({t['pr_auc_ci'][0]:.2f}–{t['pr_auc_ci'][1]:.2f}) "
+            f"y de la tasa por especie ({species_ci[0]:.2f}–{species_ci[1]:.2f}) se solapan"
+        )
+    else:
+        solape_txt = (
+            f"el intervalo de la logística ({t['pr_auc_ci'][0]:.2f}–{t['pr_auc_ci'][1]:.2f}) NO "
+            f"se solapa con el de la tasa por especie ({species_ci[0]:.2f}–{species_ci[1]:.2f}): "
+            "la logística lo supera con margen"
+        )
     lines = [
         f"# Evaluación del modelo de estancamiento — {artifact['model_version']}",
         "",
@@ -398,6 +462,9 @@ def render_report(artifact: Mapping) -> str:
         f"| Commit del código | `{p['git_commit']}`{dirty} |",
         f"| Versiones | Python {p['python']}, scikit-learn {p['sklearn']}, numpy {p['numpy']} |",
         f"| Semilla | {tr['config']['seed']} |",
+        # Fix round 1 (M5): de donde sale C=0.5.
+        f"| C (regularización, logística) | {tr['config']['C']} — protocolo/spike "
+        "(Protocolo §9), fijado antes de evaluar M3 |",
         f"| Entrenado | {artifact['created_at']} |",
         "",
         "## Régimen primario — validación adelantada en el tiempo",
@@ -412,9 +479,11 @@ def render_report(artifact: Mapping) -> str:
         "|---|---|",
         f"| Prevalencia (sin modelo) | {b['prevalence']['pr_auc']:.3f} |",
         f"| Persistencia (estancó antes) | {b['persistence']['pr_auc']:.3f} |",
-        f"| Tasa media por especie | {b['species_rate']['pr_auc']:.3f} |",
+        f"| Tasa media por especie | {b['species_rate']['pr_auc']:.3f} (IC 95 % por parcelas "
+        f"{species_ci[0]:.2f}–{species_ci[1]:.2f}) |",
         f"| **Regresión logística** | **{t['pr_auc']:.3f}** (IC 95 % por parcelas "
-        f"{t['pr_auc_ci'][0]:.2f}–{t['pr_auc_ci'][1]:.2f}) |",
+        f"{t['pr_auc_ci'][0]:.2f}–{t['pr_auc_ci'][1]:.2f}; {t['pr_auc_ci_n_valid']}/"
+        f"{t['pr_auc_ci_n_boot']} remuestreos válidos) |",
         f"| Control negativo: etiqueta permutada en todo el conjunto ({c['n_permutations']} "
         f"corridas) | {cg['pr_auc_mean']:.3f} (rango {cg['pr_auc_min']:.3f}–"
         f"{cg['pr_auc_max']:.3f}) |",
@@ -428,13 +497,21 @@ def render_report(artifact: Mapping) -> str:
         "## Régimen secundario — GroupKFold por parcela (diagnóstico)",
         "",
         f"{g['folds']} folds agrupados por {g['grouping']}: PR-AUC agregado "
-        f"{g['pr_auc_pooled']:.3f}; por fold {folds}.",
+        f"{g['pr_auc_pooled']:.3f}; por fold {folds}. "
+        # Fix round 1 (M4): el pool mezcla las dos olas etiquetadas.
+        f"Los folds agrupan M{t['train_wave']} y M{t['test_wave']} en un solo conjunto: "
+        "es un diagnóstico de estabilidad espacial (parcelas nuevas), no una métrica "
+        "temporal-segura, porque mezcla ambas olas.",
         "",
         "## Gate",
         "",
         "| Criterio | Resultado |",
         "|---|---|",
         *[f"| `{k}` | {'cumple' if v else 'no cumple'} |" for k, v in decision["checks"].items()],
+        "",
+        # Fix round 1 (M1): que quede explicito que compara.
+        "`pr_auc_at_least_min` compara el PR-AUC **puntual** del régimen temporal (no el "
+        f"límite inferior de su propio IC) contra {decision['min_pr_auc']}.",
         "",
         "## Artefacto servido",
         "",
@@ -444,10 +521,34 @@ def render_report(artifact: Mapping) -> str:
         "",
         "## Lectura honesta",
         "",
-        "La evidencia de que el modelo supera a una regla de una línea es sugestiva, no "
-        "concluyente (Protocolo §5): los intervalos de la logística y de la tasa por especie "
-        "se solapan. La etiqueta mide «crecimiento no detectable por el protocolo», no "
-        "«crecimiento nulo». La probabilidad es condicional a que el árbol siga vivo.",
+        # Fix round 1 (I1): el criterio de fuga se redefinio DESPUES de ver el
+        # resultado; decirlo en pasado no basta, hay que decir que habria
+        # fallado con el criterio original y desde cuando queda fijo el nuevo.
+        "**El criterio de fuga se redefinió después de ver el resultado.** El protocolo "
+        "original usa la permutación DENTRO de cada parcela como control de fugas, con "
+        f"techo {decision['max_permuted_pr_auc']} (rango reportado 0.18–0.31). Al "
+        f"reproducirlo con esta featurización da {cw['pr_auc_mean']:.3f} (rango "
+        f"{cw['pr_auc_min']:.3f}–{cw['pr_auc_max']:.3f}): **con ese criterio original, este "
+        "modelo NO habría pasado el gate**. La causa no es fuga sino señal de sitio: "
+        "conservar la tasa de cada parcela deja aprender la especie y el predio, que sí "
+        "varían entre parcelas. Por eso el control dentro de parcela pasó a medir cuánto "
+        "aporta el modelo por encima de la tasa de la parcela (debe superarlo, no acercarse "
+        "a él), y el control de fugas real pasó a ser la permutación GLOBAL, con el mismo "
+        f"techo {decision['max_permuted_pr_auc']}. Esta regla queda **PRE-REGISTRADA** desde "
+        "el artefacto `stall-logreg-2026-09-27.2` en adelante: un reentrenamiento futuro se "
+        "juzga con esta definición, no con la reinterpretada aquí sobre la marcha.",
+        "",
+        # Fix round 1 (I2): alcance del entrenamiento y que M2/M3 servidos son in-sample.
+        "El modelo se entrenó con un solo proyecto (3 predios, ~30 especies): la "
+        "transferencia espacial a otros proyectos NO está evaluada. Las predicciones que "
+        "sirve la API para M2 y M3 de este proyecto son sobre datos de ENTRENAMIENTO "
+        "(in-sample, no evaluación); la única evaluación honesta es M3→M4, la que se "
+        "reporta arriba.",
+        "",
+        f"La evidencia de que el modelo supera a una regla de una línea es sugestiva, no "
+        f"concluyente (Protocolo §5): {solape_txt}. La etiqueta mide «crecimiento no "
+        "detectable por el protocolo», no «crecimiento nulo». La probabilidad es "
+        "condicional a que el árbol siga vivo.",
         "",
     ]
     return "\n".join(lines)

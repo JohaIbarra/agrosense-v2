@@ -28,6 +28,7 @@ from agrosense.ml.train_stall import (  # noqa: E402
     permuted_globally,
     permuted_within_plot,
     render_report,
+    report_diff,
     train_and_evaluate,
 )
 from tests.ml.builders import synthetic_panel  # noqa: E402
@@ -89,8 +90,21 @@ def test_evaluate_reports_every_regime():
     assert t["n_test"] == len(build_wave(trees, observations, 3, labeled=True))
     assert 0.0 <= t["pr_auc"] <= 1.0
     assert t["pr_auc_ci"][0] <= t["pr_auc_ci"][1]
+    # Fix round 1 (M2): el IC informa cuantos remuestreos fueron validos.
+    assert t["pr_auc_ci_n_boot"] == FAST.n_bootstrap
+    assert 0 < t["pr_auc_ci_n_valid"] <= t["pr_auc_ci_n_boot"]
     assert set(ev["baselines"]) == {"prevalence", "persistence", "species_rate"}
     assert ev["group_kfold"]["folds"] == 5
+
+
+def test_species_rate_baseline_reports_a_plot_bootstrap_ci():
+    # Fix round 1 (I3): la linea base tambien lleva IC, con el mismo
+    # procedimiento (parcela, seed) que el modelo.
+    trees, observations = synthetic_panel()
+    ev = evaluate(trees, observations, FAST)
+    species = ev["baselines"]["species_rate"]
+    lo, hi = species["pr_auc_ci"]
+    assert lo <= species["pr_auc"] <= hi
 
 
 def _ev(pr, perm_global, perm_within=0.33, persistence=0.35, prevalence=0.22):
@@ -172,6 +186,45 @@ def test_diff_artifacts_ignores_only_volatile_fields():
     assert diff_artifacts(base, other) == ["m/c/0"]
     other["provenance"]["d"] = "2"
     assert "provenance/d" in diff_artifacts(base, other)
+
+
+def test_report_states_the_reinterpreted_leakage_criterion_and_scope_caveats():
+    """Fix round 1 (I1, I2, M4, M5): el informe no puede sonar mas limpio que
+    el proceso real."""
+    trees, observations = synthetic_panel()
+    artifact = train_and_evaluate(trees, observations, FAST, PROVENANCE)
+    report = render_report(artifact)
+    # I1: el criterio de fuga se redefinio despues de ver el resultado, con
+    # el numero concreto del control dentro de parcela, y queda
+    # pre-registrado desde .2 en adelante.
+    assert "NO habría pasado el gate" in report
+    assert "PRE-REGISTRADA" in report
+    assert "stall-logreg-2026-09-27.2" in report
+    # I2: alcance del entrenamiento y que M2/M3 servidos son in-sample.
+    assert "in-sample" in report
+    assert "transferencia espacial" in report
+    # M4: el GroupKFold agrupado mezcla olas; es diagnostico.
+    assert "mezcla" in report.lower() or "mezclan" in report.lower()
+    # M5: procedencia de C=0.5.
+    assert "C=0.5" in report or "C (regularización" in report
+
+
+def test_report_diff_ignores_only_timestamp_and_git_lines():
+    trees, observations = synthetic_panel()
+    a = render_report(train_and_evaluate(trees, observations, FAST, PROVENANCE))
+    # Misma config y datos: dos corridas solo difieren en 'Entrenado' (timestamp).
+    b = render_report(train_and_evaluate(trees, observations, FAST, PROVENANCE))
+    assert report_diff(a, b) == []
+    other_provenance = dict(PROVENANCE, git_commit="otro-commit", git_dirty=True)
+    c = render_report(train_and_evaluate(trees, observations, FAST, other_provenance))
+    assert report_diff(a, c) == []
+
+
+def test_report_diff_catches_a_real_metric_change():
+    trees, observations = synthetic_panel()
+    base = render_report(train_and_evaluate(trees, observations, FAST, PROVENANCE))
+    stale = base.replace("PR-AUC agregado", "PR-AUC AGREGADO DISTINTO")
+    assert report_diff(base, stale) != []
 
 
 @pytest.mark.skipif(
