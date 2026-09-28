@@ -30,9 +30,19 @@ FORBIDDEN: dict[str, tuple[str, ...]] = {
     ),
     "application": (
         "agrosense.adapters",
+        # ADR-003/ADR-013: ml/ es capa exterior; el caso de uso recibe el
+        # modelo inyectado, no lo importa.
+        "agrosense.ml",
         "fastapi",
         "sqlalchemy",
         "pandas",
+    ),
+    # ADR-003: "Modulo ml/ no puede importar adapters/ — solo domain/".
+    "ml": (
+        "agrosense.application",
+        "agrosense.adapters",
+        "fastapi",
+        "sqlalchemy",
     ),
     # Regla del plan de slice 2: la API no parsea datos, delega en el ingester.
     "adapters/api": ("pandas",),
@@ -81,3 +91,27 @@ def test_domain_is_self_contained() -> None:
             if module.startswith("agrosense.") and not module.startswith("agrosense.domain"):
                 bad.append(f"{py.relative_to(SRC.parent)}:{lineno} -> {module}")
     assert not bad, "domain/ debe ser autocontenido:\n" + "\n".join(bad)
+
+
+# ADR-013: la ruta de INFERENCIA corre en cada peticion de la API y debe ser
+# Python puro. numpy/sklearn solo existen en el extra `ml` (entrenamiento).
+ML_SERVING_MODULES = (
+    "ml/__init__.py",
+    "ml/stall_features.py",
+    "ml/preprocessing.py",
+    "ml/stall_model.py",
+)
+ML_SERVING_FORBIDDEN = ("numpy", "sklearn", "pandas", "scipy", "joblib", "pickle")
+
+
+def test_ml_serving_path_is_pure_python() -> None:
+    presentes = [SRC / m for m in ML_SERVING_MODULES if (SRC / m).exists()]
+    if not presentes:
+        pytest.skip("la ruta de inferencia de ml/ aun no existe (E7)")
+    malos = []
+    for py in presentes:
+        for module, lineno in _imports_of(py):
+            raiz = module.split(".")[0]
+            if raiz in ML_SERVING_FORBIDDEN:
+                malos.append(f"{py.relative_to(SRC.parent)}:{lineno} importa {module!r}")
+    assert not malos, "La inferencia debe ser Python puro (ADR-013):\n" + "\n".join(malos)

@@ -46,6 +46,14 @@ dev = [
     # ejecutable: pip-audit -r requirements.lock.txt (el CIERRE, no las raices).
     "pip-audit==2.10.1",
 ]
+# E7 (ADR-013): SOLO para entrenar y evaluar offline el modelo de
+# estancamiento (`python scripts/train_stall_model.py`). La API sirve el
+# artefacto JSON en Python puro y NO necesita ninguna de las dos.
+# scikit-learn >= 1.5.0 corrige CVE-2024-5206.
+ml = [
+    "scikit-learn==1.5.2",
+    "numpy==1.26.4",
+]
 
 [build-system]
 requires = ["setuptools>=69"]
@@ -53,6 +61,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+# El artefacto del modelo viaja con el paquete: la API lo lee de ahi.
+agrosense = ["ml/artifacts/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
