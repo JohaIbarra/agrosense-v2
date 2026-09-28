@@ -75,6 +75,11 @@ def create_app() -> FastAPI:
 
     app.include_router(ai_reports_router)
 
+    # E7: deteccion de estancados (UC-AN4)
+    from agrosense.adapters.api.routes.stall import router as stall_router
+
+    app.include_router(stall_router)
+
     # Techo del cuerpo ANTES de que el parser de multipart toque disco.
     # Se anade el ultimo para que quede el mas externo de la pila.
     app.add_middleware(BodySizeLimitMiddleware, max_bytes=MAX_UPLOAD_BYTES)
