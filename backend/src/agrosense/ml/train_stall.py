@@ -70,7 +70,11 @@ class StallTrainConfig:
     # reinterpretacion del control dentro de parcela (ver render_report,
     # seccion "Lectura honesta"). Los coeficientes de .1 y .2 son
     # identicos; solo cambian metadatos y metricas reportadas.
-    model_version: str = "stall-logreg-2026-09-27.2"
+    # Fix wave (item 1c): version .3 reentrena con FEATURES_VERSION e7.2
+    # (categoricas normalizadas, item 1a). El dataset de referencia es
+    # consistente (sin duplicados por grafia), asi que se espera el MISMO
+    # resultado salvo metadatos.
+    model_version: str = "stall-logreg-2026-09-27.3"
     train_wave: int = 2
     test_wave: int = 3
     final_waves: tuple[int, ...] = (2, 3)
