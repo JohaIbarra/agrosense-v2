@@ -69,3 +69,37 @@ def synthetic_panel(n_plots: int = 10, per_plot: int = 12) -> tuple[list[Tree], 
                 stalls = slow and (c + p) % 4 != 0
                 h += 0.0 if stalls else 0.05 * (1 + (i + p + c) % 3)
     return trees, observations
+
+
+def artifact_dict(params, coefficients, intercept, *, model_version: str = "stall-test-1") -> dict:
+    """Artefacto minimo valido con el formato de ADR-013 (sin entrenar)."""
+    from agrosense.ml.preprocessing import PREPROCESSING_VERSION
+    from agrosense.ml.stall_features import FEATURES_VERSION
+    from agrosense.ml.stall_model import ARTIFACT_FORMAT
+
+    return {
+        "format": ARTIFACT_FORMAT,
+        "model_version": model_version,
+        "features_version": FEATURES_VERSION,
+        "preprocessing_version": PREPROCESSING_VERSION,
+        "created_at": "2026-09-27T00:00:00+00:00",
+        "preprocessor": params.to_json(),
+        "model": {
+            "type": "logistic_regression",
+            "feature_names": params.feature_names,
+            "coefficients": list(coefficients),
+            "intercept": intercept,
+        },
+        "training": {},
+        "evaluation": {
+            "temporal": {
+                "pr_auc": 0.47,
+                "pr_auc_ci": [0.36, 0.58],
+                "roc_auc": 0.73,
+                "prevalence_pct": 21.9,
+                "recall_at_budget_pct": 45.0,
+                "precision_at_budget_pct": 50.0,
+            }
+        },
+        "provenance": {"dataset_file": "anexo1.xlsx", "dataset_sha256": "0" * 64},
+    }
