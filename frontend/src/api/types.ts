@@ -374,3 +374,56 @@ export interface AIReport {
   created_at: string;
   stale: boolean;
 }
+
+// ── E7: detección de estancados (UC-AN4) ──────────────────────────────────
+
+/** E7 · Detección de estancados (UC-AN4). Espejo de `StallAssessmentResponse`. */
+export interface StallTree {
+  tree_id: string;
+  species: string;
+  locality: string | null;
+  plot: string | null;
+  /** Probabilidad 0–1 de que la altura no cambie hasta el próximo monitoreo. */
+  probability: number;
+  flagged: boolean;
+  /** null = el árbol no tiene medición en el monitoreo anterior. */
+  stalled_last_interval: boolean | null;
+  stall_streak: number;
+  persistent: boolean;
+  known_species: boolean;
+}
+
+export interface StallSummary {
+  at_risk: number;
+  flagged: number;
+  stalled_last_interval: number;
+  persistent: number;
+  without_history: number;
+  unknown_species: number;
+}
+
+export interface StallModelCard {
+  model_version: string;
+  artifact_sha256: string;
+  dataset_sha256: string;
+  trained_on: string;
+  pr_auc: number;
+  pr_auc_ci_low: number;
+  pr_auc_ci_high: number;
+  roc_auc: number;
+  prevalence_pct: number;
+  recall_at_budget_pct: number;
+  precision_at_budget_pct: number;
+}
+
+export interface StallAssessment {
+  project_id: number;
+  monitoring: number;
+  input_hash: string;
+  computed_at: string;
+  alert_budget_pct: number;
+  persistent_min_intervals: number;
+  model: StallModelCard;
+  summary: StallSummary;
+  trees: StallTree[];
+}
