@@ -606,3 +606,75 @@ class AIReportResponse(BaseModel):
     stale: bool = Field(
         description="True si el analisis del monitoreo cambio desde que se generó este borrador."
     )
+
+
+# ── E7: deteccion de estancados (UC-AN4) ─────────────────────────────────────
+
+
+class StallTreeResponse(BaseModel):
+    """Un arbol vivo y medido en el monitoreo, con su riesgo de estancarse."""
+
+    tree_id: str
+    species: str
+    locality: str | None
+    plot: str | None
+    probability: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="P(la altura no cambie hasta el proximo monitoreo | sigue vivo).",
+    )
+    flagged: bool = Field(
+        description="Entra en el presupuesto de alertas para revision en campo."
+    )
+    stalled_last_interval: bool | None = Field(
+        description="No crecio desde el monitoreo anterior (estancó_intervalo_previo). "
+        "null = sin historia medida."
+    )
+    stall_streak: int = Field(
+        ge=0, description="Intervalos seguidos sin crecer hasta este monitoreo."
+    )
+    persistent: bool
+    known_species: bool = Field(description="La especie estaba en los datos de entrenamiento.")
+
+
+class StallSummaryResponse(BaseModel):
+    at_risk: int = Field(ge=0)
+    flagged: int = Field(ge=0)
+    stalled_last_interval: int = Field(ge=0)
+    persistent: int = Field(ge=0)
+    without_history: int = Field(ge=0)
+    unknown_species: int = Field(ge=0)
+
+
+class StallModelCardResponse(BaseModel):
+    """Que modelo produjo el resultado y cuanto vale, segun su evaluacion honesta."""
+
+    model_config = {"protected_namespaces": ()}
+
+    model_version: str
+    artifact_sha256: str
+    dataset_sha256: str
+    trained_on: str
+    pr_auc: float
+    pr_auc_ci_low: float
+    pr_auc_ci_high: float
+    roc_auc: float
+    prevalence_pct: float
+    recall_at_budget_pct: float
+    precision_at_budget_pct: float
+
+
+class StallAssessmentResponse(BaseModel):
+    """Deteccion de estancados de un monitoreo (E7, UC-AN4)."""
+
+    model_config = {"protected_namespaces": ()}
+
+    project_id: int
+    monitoring: int
+    input_hash: str
+    computed_at: datetime
+    alert_budget_pct: float = Field(description="Porcentaje de arboles marcados (escala 0-100).")
+    persistent_min_intervals: int
+    model: StallModelCardResponse
+    summary: StallSummaryResponse
+    trees: list[StallTreeResponse]

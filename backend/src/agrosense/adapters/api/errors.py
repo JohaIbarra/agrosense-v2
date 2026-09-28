@@ -42,6 +42,9 @@ _CODE_HTTP: dict[str, int] = {
     # El modelo de IA local es un proceso externo (Ollama): su caida no es
     # un fallo nuestro, y 503 le dice al cliente que reintentar tiene sentido.
     "LLM_UNAVAILABLE": 503,
+    # El artefacto del modelo de estancamiento falta o es de otra version
+    # (ADR-013): no es un fallo del cliente; reintentar tras el despliegue sirve.
+    "STALL_MODEL_UNAVAILABLE": 503,
     "INVALID_SORT": 400,
     "INVALID_MODEL": 400,
     "INVALID_FILE": 400,
