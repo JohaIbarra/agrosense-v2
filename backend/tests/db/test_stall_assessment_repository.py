@@ -43,12 +43,12 @@ def test_save_creates_the_row(session, monitoring):
     row = repo.save(project_id, monitoring_id, "stall-v1", "a" * 64, "h" * 64, "rules-v1", PAYLOAD)
     assert row.id is not None
     stored = repo.get(monitoring_id)
-    assert (stored.model_version, stored.artifact_sha256, stored.input_hash, stored.rules_version) == (
-        "stall-v1",
-        "a" * 64,
-        "h" * 64,
-        "rules-v1",
-    )
+    assert (
+        stored.model_version,
+        stored.artifact_sha256,
+        stored.input_hash,
+        stored.rules_version,
+    ) == ("stall-v1", "a" * 64, "h" * 64, "rules-v1")
     assert stored.payload == PAYLOAD
     assert stored.computed_at is not None
 

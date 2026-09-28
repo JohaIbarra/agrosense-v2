@@ -649,7 +649,8 @@ class StallSummaryResponse(BaseModel):
     without_history: int = Field(ge=0)
     unknown_species: int = Field(ge=0)
     unknown_category_trees: int = Field(
-        ge=0, description="Arboles con al menos una categoria (especie u otra) no vista en entrenamiento."
+        ge=0,
+        description="Arboles con al menos una categoria (especie u otra) no vista al entrenar.",
     )
     mostly_without_history: bool = Field(
         description="`without_history` es al menos la mitad de los arboles puntuados: la "

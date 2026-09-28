@@ -909,7 +909,9 @@ class ProjectAnalysisRepository:
                     common_name=t.common_name,
                     guild=t.guild,
                     plot_id=plot.plot_label if plot else None,
-                    locality=(prop.name if prop else None) or (tree_prop.name if tree_prop else None),
+                    locality=(
+                        (prop.name if prop else None) or (tree_prop.name if tree_prop else None)
+                    ),
                     coord_x=t.coord_x,
                     coord_y=t.coord_y,
                     elevation_m=t.elevation_m,

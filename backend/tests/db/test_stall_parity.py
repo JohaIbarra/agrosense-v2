@@ -78,12 +78,10 @@ def test_served_dataset_matches_the_direct_excel_source_for_every_wave(session):
     assert {t.tree_id for t in served_trees} == {t.tree_id for t in direct.trees}
 
     for t in (1, 2):
-        direct_rows = {
-            r.tree_id: r.features for r in build_wave(direct.trees, direct.observations, t, labeled=False)
-        }
-        served_rows = {
-            r.tree_id: r.features for r in build_wave(served_trees, served_obs, t, labeled=False)
-        }
+        direct_wave = build_wave(direct.trees, direct.observations, t, labeled=False)
+        served_wave = build_wave(served_trees, served_obs, t, labeled=False)
+        direct_rows = {r.tree_id: r.features for r in direct_wave}
+        served_rows = {r.tree_id: r.features for r in served_wave}
         assert served_rows == direct_rows, f"ola {t}: features distintas entre servido y directo"
         assert fingerprint(served_trees, served_obs, t) == fingerprint(
             direct.trees, direct.observations, t
