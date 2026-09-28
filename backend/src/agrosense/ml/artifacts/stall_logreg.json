@@ -1,0 +1,321 @@
+{
+  "created_at": "2026-09-28T01:55:37+00:00",
+  "evaluation": {
+    "baselines": {
+      "persistence": {
+        "pr_auc": 0.3306
+      },
+      "prevalence": {
+        "pr_auc": 0.219
+      },
+      "species_rate": {
+        "pr_auc": 0.3823
+      }
+    },
+    "gate": {
+      "checks": {
+        "beats_persistence": true,
+        "beats_prevalence": true,
+        "beats_within_plot_permutation": true,
+        "permutation_control_near_prevalence": true,
+        "pr_auc_at_least_min": true
+      },
+      "max_permuted_pr_auc": 0.31,
+      "min_pr_auc": 0.36,
+      "passed": true
+    },
+    "group_kfold": {
+      "folds": 5,
+      "grouping": "Codigo de unidad muestreo (parcela)",
+      "pr_auc_by_fold": [
+        0.5844,
+        0.4052,
+        0.6286,
+        0.6508,
+        0.4297
+      ],
+      "pr_auc_pooled": 0.5149
+    },
+    "permutation_control": {
+      "global": {
+        "pr_auc_max": 0.3274,
+        "pr_auc_mean": 0.2271,
+        "pr_auc_min": 0.1585
+      },
+      "n_permutations": 20,
+      "within_plot": {
+        "pr_auc_max": 0.3964,
+        "pr_auc_mean": 0.3289,
+        "pr_auc_min": 0.2443
+      }
+    },
+    "temporal": {
+      "alert_budget_pct": 20.0,
+      "n_test": 717,
+      "n_test_plots": 39,
+      "n_train": 618,
+      "positives_test": 157,
+      "positives_train": 153,
+      "pr_auc": 0.4781,
+      "pr_auc_ci": [
+        0.372,
+        0.5694
+      ],
+      "precision_at_budget_pct": 47.55,
+      "prevalence_pct": 21.9,
+      "recall_at_budget_pct": 43.31,
+      "roc_auc": 0.738,
+      "test_wave": 3,
+      "train_wave": 2
+    }
+  },
+  "features_version": "2026-09-27-e7.1",
+  "format": 1,
+  "model": {
+    "coefficients": [
+      0.5475333565836895,
+      -0.7826010666539768,
+      -0.1399713758721659,
+      0.1743983224343692,
+      0.41397153547142135,
+      0.14458290597737217,
+      0.5610419912048684,
+      -0.023592781227094566,
+      -0.2605839566270881,
+      0.16401328909173873,
+      0.17584156539107154,
+      -0.5109613248786016,
+      -0.25033221439117376,
+      -0.5189791325949277,
+      1.4289534749815973,
+      0.09918701539035125,
+      0.6347248848206024,
+      0.8591552634621863,
+      0.21467461786850092,
+      -0.5059627355628541,
+      1.218734926513727,
+      -0.6683565501849649,
+      -1.0468896886425323,
+      0.5810139265886091,
+      0.49235905626432924,
+      0.7479748297891329,
+      -0.6092495931787982,
+      0.4270655525632705,
+      -0.5181527376236016,
+      -0.07120960123563873,
+      0.020357048606396703,
+      1.2549879404953548,
+      -0.2014534048407494,
+      0.30360416953925173,
+      -0.05723985568944919,
+      -0.04348473067735464,
+      -0.6287668859137733,
+      -0.23683909040404028,
+      -1.4347910223433642,
+      -0.3164615020208169,
+      -0.5843917388449406,
+      -0.21336049044532326,
+      -0.7044425117352026,
+      0.9970739000362454,
+      -0.338826215798452,
+      -0.10094735590374115,
+      0.5190444695579146
+    ],
+    "feature_names": [
+      "h_t",
+      "copa_t",
+      "dh_lag",
+      "dcopa_lag",
+      "estanco_lag",
+      "h_prev",
+      "esbeltez_t",
+      "fito_empeoro",
+      "locality=Guayabal",
+      "locality=San Antonio",
+      "locality=Tres Jotas",
+      "species=Brunellia subsessilis",
+      "species=Calophyllum brasiliense",
+      "species=Cavendishia bracteata",
+      "species=Cedrela montana",
+      "species=Citharexylum subflavescens",
+      "species=Clusia cuneifolia",
+      "species=Delostoma integrifolium",
+      "species=Delostoma roseum",
+      "species=Dodonaea viscosa",
+      "species=Erythrina edulis",
+      "species=Hedyosmum racemosum",
+      "species=Heliocarpus popayanensis",
+      "species=Ilex gabinetensis",
+      "species=Inga punctata",
+      "species=Lafoensia speciosa",
+      "species=Miconia theaezans",
+      "species=Mollinedia tomentosa",
+      "species=Montanoa quadrangularis",
+      "species=Morella pubescens",
+      "species=Myrcia popayanensis",
+      "species=Persea caerulea",
+      "species=Pittosporum undulatum",
+      "species=Quercus humboldtii",
+      "species=Retrophyllum rospigliosii",
+      "species=Senna viarum",
+      "species=Solanum sycophanta",
+      "species=Tecoma stans",
+      "species=Verbesina arborea",
+      "species=Viburnum tinoides",
+      "species=Vismia baccifera",
+      "monitoring_unit=Parcela",
+      "monitoring_unit=Unidad de muestreo tipo X",
+      "monitoring_unit=árboles aislados",
+      "fito_t=Bueno",
+      "fito_t=Malo",
+      "fito_t=Regular"
+    ],
+    "intercept": 0.25759736684785567,
+    "type": "logistic_regression"
+  },
+  "model_version": "stall-logreg-2026-09-27.1",
+  "preprocessing_version": "2026-09-27-e7.1",
+  "preprocessor": {
+    "categorical": [
+      "locality",
+      "species",
+      "monitoring_unit",
+      "fito_t"
+    ],
+    "categories": {
+      "fito_t": [
+        "Bueno",
+        "Malo",
+        "Regular"
+      ],
+      "locality": [
+        "Guayabal",
+        "San Antonio",
+        "Tres Jotas"
+      ],
+      "monitoring_unit": [
+        "Parcela",
+        "Unidad de muestreo tipo X",
+        "árboles aislados"
+      ],
+      "species": [
+        "Brunellia subsessilis",
+        "Calophyllum brasiliense",
+        "Cavendishia bracteata",
+        "Cedrela montana",
+        "Citharexylum subflavescens",
+        "Clusia cuneifolia",
+        "Delostoma integrifolium",
+        "Delostoma roseum",
+        "Dodonaea viscosa",
+        "Erythrina edulis",
+        "Hedyosmum racemosum",
+        "Heliocarpus popayanensis",
+        "Ilex gabinetensis",
+        "Inga punctata",
+        "Lafoensia speciosa",
+        "Miconia theaezans",
+        "Mollinedia tomentosa",
+        "Montanoa quadrangularis",
+        "Morella pubescens",
+        "Myrcia popayanensis",
+        "Persea caerulea",
+        "Pittosporum undulatum",
+        "Quercus humboldtii",
+        "Retrophyllum rospigliosii",
+        "Senna viarum",
+        "Solanum sycophanta",
+        "Tecoma stans",
+        "Verbesina arborea",
+        "Viburnum tinoides",
+        "Vismia baccifera"
+      ]
+    },
+    "means": {
+      "copa_t": 0.32442696629213486,
+      "dcopa_lag": 0.12623970037453183,
+      "dh_lag": 0.16356554307116103,
+      "esbeltez_t": 1.8161093220102502,
+      "estanco_lag": 0.17827715355805243,
+      "fito_empeoro": 0.07041198501872659,
+      "h_prev": 0.31721348314606745,
+      "h_t": 0.49937827715355804
+    },
+    "medians": {
+      "copa_t": 0.25,
+      "dcopa_lag": 0.07999999999999999,
+      "dh_lag": 0.09999999999999998,
+      "esbeltez_t": 1.6020833333333335,
+      "estanco_lag": 0.0,
+      "fito_empeoro": 0.0,
+      "h_prev": 0.26,
+      "h_t": 0.41
+    },
+    "modes": {
+      "fito_t": "Bueno",
+      "locality": "Tres Jotas",
+      "monitoring_unit": "Parcela",
+      "species": "Montanoa quadrangularis"
+    },
+    "numeric": [
+      "h_t",
+      "copa_t",
+      "dh_lag",
+      "dcopa_lag",
+      "estanco_lag",
+      "h_prev",
+      "esbeltez_t",
+      "fito_empeoro"
+    ],
+    "scales": {
+      "copa_t": 0.24268525358275675,
+      "dcopa_lag": 0.20112664558048254,
+      "dh_lag": 0.218074014193926,
+      "esbeltez_t": 1.3922581041703694,
+      "estanco_lag": 0.38274588185543035,
+      "fito_empeoro": 0.25584006211781846,
+      "h_prev": 0.14574369313238805,
+      "h_t": 0.3129358192087449
+    }
+  },
+  "provenance": {
+    "dataset_file": "anexo1.xlsx",
+    "dataset_sha256": "28583c3b48874626f3d7d7ae35d485634a8c8089b4c03a5997f5ba756b57a0dd",
+    "git_commit": "a6f8acc0cc0c0b829c06f80822ed35a4e5d1765d",
+    "git_dirty": false,
+    "mapping_version": "2026-09-21-e0",
+    "numpy": "1.26.4",
+    "python": "3.12.1",
+    "sheet": "Monitoreo_4",
+    "sklearn": "1.5.2"
+  },
+  "training": {
+    "config": {
+      "C": 0.5,
+      "alert_budget": 0.2,
+      "class_weight": "balanced",
+      "cv_folds": 5,
+      "expected_dataset_sha256": "28583c3b48874626f3d7d7ae35d485634a8c8089b4c03a5997f5ba756b57a0dd",
+      "final_waves": [
+        2,
+        3
+      ],
+      "gate_max_permuted_pr_auc": 0.31,
+      "gate_min_pr_auc": 0.36,
+      "max_iter": 2000,
+      "model_version": "stall-logreg-2026-09-27.1",
+      "n_bootstrap": 1000,
+      "n_permutations": 20,
+      "seed": 42,
+      "solver": "lbfgs",
+      "test_wave": 3,
+      "train_wave": 2
+    },
+    "n_rows": 1335,
+    "positives": 310,
+    "waves": [
+      2,
+      3
+    ]
+  }
+}
