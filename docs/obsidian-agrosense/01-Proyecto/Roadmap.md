@@ -83,17 +83,35 @@ Contract → Implement → Verify → Review → Siguiente Slice
 > 3. **Riesgo de gate.** Construir mortalidad primero obliga a improvisar esa
 >    feature y a pasarle el ML eval gate dos veces.
 
-### Slice 4: Detección de Estancados ⬜ ← siguiente
+### Slice 4 / E7: Detección de Estancados ✅ (2026-09-27)
 
 > [[Slice 4 - Detección de Estancados]]
+> Plan: `docs/superpowers/plans/2026-09-27-e7-estancados.md`. Decisión:
+> `docs/adr/013-modelo-estancamiento-offline.md`. Métricas:
+> `docs/ml/evaluacion-estancamiento.md`. Verificación: `docs/verificacion-e7.md`.
 
-| Aspecto | Plan |
+| Aspecto | Resultado |
 |---|---|
 | Target | Altura no crece en el intervalo (t, t+1] |
-| Modelo | Regresión logística + regla de negocio |
-| Evidencia | 153 eventos positivos, PR-AUC 0.469 (IC 95% 0.36–0.58) |
-| Split | Temporal M2→M3 / M3→M4 + GroupKFold por **parcela** |
-| Produce | `estancó_intervalo_previo` — feature de entrada del Slice 3 |
+| Modelo | Regresión logística `stall-logreg-2026-09-27.3` + regla de negocio |
+| Evidencia | 153 positivos train (M2→M3), 157 test (M3→M4); PR-AUC temporal 0.478 (IC 95 % por parcelas 0.37–0.57) |
+| Split | Temporal M2→M3 / M3→M4 + GroupKFold por **parcela** (diagnóstico) |
+| Produce | `estancó_intervalo_previo` — feature de entrada del Slice 3 (E8) |
+| Tests | 785 backend + 121 frontend |
+| Fase 6 — Verify | ✅ |
+| Fase 7 — Review | ✅ |
+
+> [!warning] Correcciones al implementar (ver ADR-013 y `docs/verificacion-e7.md`)
+> El control de fugas real es la permutación **global** de la etiqueta; la
+> permutación dentro de parcela pasó a medir cuánto aporta el modelo sobre la
+> tasa de la parcela (reinterpretación post-hoc, pre-registrada desde `.2`).
+> Con el criterio original del protocolo (permutación dentro de parcela como
+> control de fugas) este modelo no habría pasado el gate — la causa es señal
+> de sitio, no fuga.
+
+> [!info] Pendiente
+> Migración en Supabase (`e7c1a3b5d7f9`, `f4a1c9e7b3d2`, `a1b2c3d4e5f6`)
+> requiere autorización del ingeniero.
 
 ### Slice 3: Riesgo de Mortalidad ⬜ ← después de Estancados
 
@@ -170,7 +188,7 @@ Contract → Implement → Verify → Review → Siguiente Slice
 > síncrona de hasta 180 s. La guardia no distingue unidades (93,5 y 93,5 % cuentan igual) ni
 > separadores de miles. Requiere Ollama corriendo en local.
 
-Siguiente según `docs/04-vision-producto.md` §11: **E7 · Estancados** (primer modelo de ML).
+Siguiente según `docs/04-vision-producto.md` §11: **E8 · Mortalidad** (consume `stalled_previous_interval`).
 
 ---
 

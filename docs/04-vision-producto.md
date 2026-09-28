@@ -489,10 +489,14 @@ Aquí está el alcance, no la descomposición.
 - Pendiente para cuando haya dato que poner: capas adicionales
   (`geo_layers`) y color por otras variables (crecimiento, riesgo).
 
-### E7 · Detección de estancados — *el actual Slice 4*
-- Regresión logística del protocolo; necesita `sampling_unit_code` (E0) para
-  su ML eval gate.
-- Produce `estancó_intervalo_previo`.
+### E7 · Detección de estancados — ✅ hecho (2026-09-27)
+- Modelo offline + artefacto JSON versionado + inferencia en Python puro
+  (ADR-013); snapshot `stall_assessments`.
+- Regresión logística `stall-logreg-2026-09-27.3`; PR-AUC temporal 0.478
+  (M3→M4, IC 95 % por parcelas 0.37–0.57), agrupada por `sampling_unit_code`
+  (E0) en su ML eval gate.
+- Produce `estancó_intervalo_previo` (derivada, no persistida). Verificación:
+  `docs/verificacion-e7.md`.
 
 ### E8 · Riesgo de mortalidad — *el actual Slice 3*
 - Consume la feature de E7. Mantiene el límite declarado: EPV 4–11.
@@ -571,7 +575,7 @@ Tres dependencias que no son obvias:
 | 8 | **E10a · NDVI Sentinel-2 por predio** ✅ | Cierra el orden aprobado por el ingeniero |
 | — | **E5 · Referente + contraste** | Barato: el referente ya existe, falta conectarlo |
 | 9 | **E9 · IA** | Solo necesita E3 y E4; se puede adelantar en paralelo con E6 |
-| 10 | **E7 · Estancados** | Primer modelo de ML |
+| 10 | **E7 · Estancados** ✅ | Primer modelo de ML |
 | 11 | **E8 · Mortalidad** | Consume E7 |
 | 12 | **E10 · Satélite (resto de índices)** | Tras verificar el tamaño de las parcelas |
 | 13 | **E11 · Ortofotos + DL** | Tras conseguir la fuente de imágenes |
@@ -611,6 +615,7 @@ Se numeran en el orden en que se escriben.
 | ADR-010 | Datos geoespaciales en PostGIS | E6 |
 | ADR-011 | Escala espacial explícita y restricción por resolución | E10 |
 | ADR-012 | LLM local: AgroSense calcula, el modelo redacta | E9 |
+| ADR-013 | Modelo de estancamiento offline, artefacto JSON e inferencia en Python puro | E7 |
 
 ---
 

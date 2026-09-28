@@ -268,6 +268,11 @@ Con el 20% de árboles marcados para revisión en campo, la regresión logístic
 | `Unidad de monitoreo` | cat | Parcela |
 | `fito_t` | cat | Estado fitosanitario actual |
 
+> [!warning] Correcciones al implementar (E7, ADR-013)
+> - `Unidad de monitoreo` es el **tipo** de unidad (3 niveles), no la parcela. La parcela (`Codigo de unidad muestreo`) no es feature: es la unidad de agrupamiento.
+> - La igualdad de alturas se compara en milímetros (0,24 → 0,245 m cuenta como crecimiento).
+> - El control negativo que vigila fugas es la permutación **global** de la etiqueta; la permutación dentro de parcela conserva la tasa de cada parcela y puntúa ≈ 0.33 (ADR-013).
+
 ### Pipeline
 
 ```python

@@ -1,15 +1,15 @@
 ---
 aliases: [Slice 4, Estancados, Detección]
-tags: [slice, pendiente]
-status: pendiente
+tags: [slice, hecho]
+status: hecho
 protocolo: "[[Protocolo Estancamiento]]"
 ---
 
 # Slice 4 — Detección de Estancados/Anómalos
 
 > [!abstract] Regresión logística + regla de negocio (no IsolationForest)
-> **Estado**: ⬜ Pendiente | **Protocolo**: [[Protocolo Estancamiento]]
-> **Modelo**: Logística (PR-AUC 0.469, interpretable)
+> **Estado**: ✅ Hecho (2026-09-27) | **Protocolo**: [[Protocolo Estancamiento]]
+> **Modelo**: Logística `stall-logreg-2026-09-27.3` (PR-AUC 0.478 en M3→M4, interpretable)
 > **Orden**: va ANTES de [[Slice 3 - Riesgo de Mortalidad]] (invertido el 2026-09-21)
 
 > [!important] Este es el primer slice de modelo — y alimenta al de mortalidad
@@ -150,15 +150,15 @@ Con presupuesto del 20% de árboles para revisión en campo:
 
 | Task | Estado | Descripción |
 |---|---|---|
-| Task 1 | ⬜ | Implementar `build_wave()` + featurización |
-| Task 2 | ⬜ | Pipeline logística con ColumnTransformer |
-| Task 3 | ⬜ | Validación temporal M3→M4 |
-| Task 4 | ⬜ | Bootstrap IC 95% agrupado por parcela |
-| Task 5 | ⬜ | Control negativo (permutación) |
-| Task 6 | ⬜ | Feature importance + calibration plot |
-| Task 7 | ⬜ | Test anti-leakage |
-| Task 8 | ⬜ | API + integración con [[Slice 2 - Persistencia y API]] |
-| Task 9 | ⬜ | Exponer `estancó_intervalo_previo` como feature persistida para [[Slice 3 - Riesgo de Mortalidad]] |
+| Task 1 | ✅ | Implementar `build_wave()` + featurización |
+| Task 2 | ✅ | Pipeline logística con ColumnTransformer (reimplementado en Python puro, `ml/preprocessing.py`, con test de paridad) |
+| Task 3 | ✅ | Validación temporal M3→M4 |
+| Task 4 | ✅ | Bootstrap IC 95% agrupado por parcela |
+| Task 5 | ✅ | Control negativo (permutación) |
+| Task 6 | ✅ | Coeficientes versionados en el artefacto (feature importance). Calibration plot y UI de importancia quedan fuera de alcance — mejora futura (Protocolo §10) |
+| Task 7 | ✅ | Test anti-leakage |
+| Task 8 | ✅ | API + integración con [[Slice 2 - Persistencia y API]] |
+| Task 9 | ✅ | `estancó_intervalo_previo` = `domain.stall_rules.stalled_previous_interval` (derivada, no persistida — ADR-013) |
 
 ---
 
@@ -166,11 +166,22 @@ Con presupuesto del 20% de árboles para revisión en campo:
 
 | Archivo | Contenido |
 |---|---|
-| `ml/stall_protocol.py` | Protocolo completo (futuro) |
-| `ml/preprocessing.py` | Pipeline compartido train/serve (futuro) |
-| `ml/model.py` | Inferencia (futuro) |
+| `backend/src/agrosense/domain/stall_rules.py` | Etiqueta, regla de negocio (`stalled_previous_interval`), `RULES_VERSION` |
+| `backend/src/agrosense/ml/stall_features.py` | Featurización relativa a la ola, compartida train/serve |
+| `backend/src/agrosense/ml/preprocessing.py` | Preprocesamiento en Python puro (paridad con `SimpleImputer`+`StandardScaler`+`OneHotEncoder`) |
+| `backend/src/agrosense/ml/stall_model.py` | Carga y validación del artefacto, inferencia servible |
+| `backend/src/agrosense/ml/train_stall.py` | Entrenamiento, evaluación honesta, ML eval gate |
+| `backend/scripts/train_stall_model.py` | Comando único de entrenamiento/verificación (`--check`) |
 
 ---
+
+> [!warning] Correcciones al implementar (E7, ADR-013)
+> - Los **153** estancados son de la ola de **entrenamiento** (M2→M3); la de prueba (M3→M4) tiene **157**.
+> - `Unidad de monitoreo` es el **tipo** de unidad (3 niveles), no la parcela. La parcela (`Codigo de unidad muestreo`) no es feature: es la unidad de agrupamiento.
+> - La igualdad de alturas se compara en milímetros (0,24 → 0,245 m cuenta como crecimiento).
+> - El umbral «≤ 5 cm» es la definición descriptiva de E4, no la etiqueta del modelo.
+> - El control negativo que vigila fugas es la permutación **global** de la etiqueta; la permutación dentro de parcela conserva la tasa de cada parcela y puntúa ≈ 0.33 (ADR-013).
+> - Fix wave de revisión final: normalización de categóricas + aviso `unknown_categories`, test de paridad Excel→DB, `RULES_VERSION` invalida el snapshot, el scorer se resuelve después de validar dueño/monitoreo, `adapters/` no puede importar `ml/train_stall` ni `ml/evaluation`. Artefacto final: `stall-logreg-2026-09-27.3`.
 
 ## Links
 
