@@ -126,6 +126,32 @@
      misma función en la evaluación y en la API. «Persistente» = 2 o más
      intervalos seguidos sin crecer (convención del proyecto, confirmada con
      el ingeniero el 2026-09-27).
+  10. **La etiqueta depende del protocolo de campo, no solo del árbol**
+      (fix wave 2026-09-27, item 7). `stall_label` compara alturas en
+      milímetros entre DOS monitoreos consecutivos del MISMO protocolo de
+      campo: su significado —y por lo tanto la prevalencia que reporta el
+      gate— está atado a dos parámetros de ese protocolo, no es una
+      propiedad universal del árbol:
+      - **Espaciado entre monitoreos.** El dataset de referencia mide cada
+        ~1 año (M1-M4). Un proyecto que monitoree cada 6 meses vería más
+        estancamiento «real» capturado en cada intervalo (el árbol tuvo
+        menos tiempo para crecer lo suficiente como para que el instrumento
+        lo note); uno que monitoree cada 2 años vería menos. La
+        prevalencia (153/717 en M2→M3/M3→M4) es de ESTE espaciado.
+      - **Precisión del redondeo de altura.** Aquí son milímetros
+        (`height_unchanged`, éste ADR §Decisión 1); el dataset real trae
+        medio centímetro de resolución de campo. Un protocolo que registre
+        con menos precisión (p. ej. a los 5 cm, como `STAGNATION_THRESHOLD_M`
+        en `rules.py`, que es la comparación descriptiva de E4 y NO esta
+        etiqueta) fusionaría como «estancados» árboles que sí crecieron
+        unos centímetros; uno con más precisión (mm reales de un
+        dendrómetro) separaría estancamientos que aquí se ven iguales.
+      - **Consecuencia:** un modelo entrenado con un proyecto NO se
+        transfiere a otro con espaciado o precisión de monitoreo distintos
+        sin revalidar — ni siquiera si comparte especies y sitio. Esto es
+        ADEMÁS de la limitación ya declarada de transferencia espacial
+        (§Consecuencias): aquí la limitación es sobre el PROTOCOLO de
+        medición, no sobre el predio.
 
 - **Consecuencias:**
   - Train y serve no pueden divergir: comparten `build_wave`, `transform` y
@@ -134,6 +160,10 @@
     especie que no vio pesa cero en su one-hot: cada árbol lleva
     `known_species` y la UI lo avisa. La transferencia espacial no está
     evaluada (Protocolo §3: 3 localidades, no es viable).
+  - La transferencia tampoco está evaluada entre protocolos de monitoreo
+    distintos: la prevalencia y el significado de la etiqueta dependen del
+    espaciado entre monitoreos y de la precisión del redondeo de altura de
+    ESTE proyecto (Decisión 10).
   - En el proyecto de referencia, las predicciones de M2 y M3 son sobre
     datos de entrenamiento: no son una evaluación. La evaluación honesta es
     la del informe.
