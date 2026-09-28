@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../App";
 import { AuthProvider, type AuthClient } from "../auth/AuthProvider";
-import type { MonitoringAnalysis } from "../api/types";
+import type { MonitoringAnalysis, StallAssessment } from "../api/types";
 
 const auth: AuthClient = {
   getSession: async () => ({ accessToken: "tok", email: "ing@example.com" }),
@@ -86,6 +86,30 @@ const ANALISIS: MonitoringAnalysis = {
   ],
 };
 
+// E7: especie, predio y porcentajes elegidos para no chocar con los textos
+// que los tests de E3 buscan con getByText.
+const STALL: StallAssessment = {
+  project_id: 7, monitoring: 4, input_hash: "fedcba9876543210".repeat(4),
+  computed_at: "2026-09-27T10:00:00Z", alert_budget_pct: 20, persistent_min_intervals: 2,
+  model: {
+    model_version: "stall-logreg-2026-09-27.1", artifact_sha256: "a".repeat(64),
+    dataset_sha256: "0".repeat(64), trained_on: "anexo1.xlsx", pr_auc: 0.478,
+    pr_auc_ci_low: 0.37, pr_auc_ci_high: 0.58, roc_auc: 0.738, prevalence_pct: 21.9,
+    recall_at_budget_pct: 43.3, precision_at_budget_pct: 47.6,
+  },
+  summary: {
+    at_risk: 718, flagged: 143, stalled_last_interval: 157, persistent: 24,
+    without_history: 0, unknown_species: 0,
+  },
+  trees: [
+    {
+      tree_id: "FR_9_99", species: "Lafoensia speciosa", locality: "San Antonio",
+      plot: "GEB/SA/1", probability: 0.62, flagged: true, stalled_last_interval: true,
+      stall_streak: 2, persistent: true, known_species: true,
+    },
+  ],
+};
+
 function mockApi() {
   const calls: { url: string; method: string; body: unknown }[] = [];
   const spy = vi.fn().mockImplementation((url: string, init: RequestInit = {}) => {
@@ -119,6 +143,7 @@ function mockApi() {
         blob: async () => new Blob(["xlsx"]),
       });
     }
+    if (url.startsWith("/projects/7/monitorings/4/stall-assessment")) return json(200, STALL);
     return json(404, { detail: { code: "NOT_FOUND", message: "no" } });
   });
   vi.stubGlobal("fetch", spy);
@@ -214,5 +239,21 @@ describe("E2/E3 en la interfaz", () => {
     await userEvent.upload(screen.getByLabelText("Archivo Excel (.xlsx)"), new File(["x"], "a.xlsx"));
     await userEvent.click(screen.getByRole("button", { name: "Cargar y analizar" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("esta en el futuro");
+  });
+
+  it("E7: el análisis muestra los árboles en riesgo de estancarse y permite ver todos", async () => {
+    const calls = mockApi();
+    renderAt("/proyectos/7/monitoreos/4");
+
+    expect(await screen.findByRole("heading", { name: "Árboles en riesgo de estancarse" }))
+      .toBeInTheDocument();
+    expect(await screen.findByText("FR_9_99")).toBeInTheDocument();
+    expect(screen.getByText(/143 de 718 árboles vivos/)).toBeInTheDocument();
+    expect(calls.some((c) => c.url.endsWith("/stall-assessment?only_flagged=true"))).toBe(true);
+
+    await userEvent.click(screen.getByLabelText("Ver todos los árboles vivos"));
+    await waitFor(() =>
+      expect(calls.some((c) => c.url === "/projects/7/monitorings/4/stall-assessment")).toBe(true),
+    );
   });
 });

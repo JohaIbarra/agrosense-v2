@@ -14,6 +14,7 @@ import { formatDate, formatSummary } from "../analysis/format";
 import { AIReportPanel } from "../components/AIReportPanel";
 import { AnalysisBarChart } from "../components/AnalysisBarChart";
 import { DataTable } from "../components/DataTable";
+import { StallPanel } from "../components/StallPanel";
 import { useAsync } from "../hooks/useAsync";
 
 const ALL = "__todos__";
@@ -195,6 +196,9 @@ export function MonitoringAnalysisPage() {
           nunca reiniciado) seguia mostrandose al cambiar de monitoreo con
           los botones M1..Mn, que NO desmontan esta pagina. */}
       <AIReportPanel key={`${projectId}-${number}`} projectId={projectId} number={number} />
+
+      {/* key: un panel nuevo por monitoreo, como el del borrador de IA. */}
+      <StallPanel key={`stall-${projectId}-${number}`} projectId={projectId} number={number} />
 
       <p className="muted provenance">
         Cálculo {a.analysis_version} · datos {a.input_hash.slice(0, 12)} · calculado{" "}
