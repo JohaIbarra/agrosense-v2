@@ -10,8 +10,10 @@ medido en t recibe:
     (t-1, t]; es `estancó_intervalo_previo`), `stall_streak` y `persistent`.
 
 El resultado se guarda como snapshot por monitoreo (`stall_assessments`,
-criterio de ADR-008) con la version del modelo, la huella del artefacto y la
-huella de los datos; se recalcula solo si cambia alguna de las tres.
+criterio de ADR-008) con la version del modelo, la huella del artefacto, la
+huella de los datos y `RULES_VERSION` (fix wave, item 4: ALERT_BUDGET,
+PERSISTENT_STALL_INTERVALS y la definicion de la etiqueta); se recalcula
+solo si cambia alguna de las cuatro.
 
 El scorer se inyecta por parametro (ADR-003). `StallScorer` solo describe su
 forma: application/ no importa ml/ (la flecha va hacia adentro).
@@ -29,6 +31,7 @@ from agrosense.domain.rules import plot_key
 from agrosense.domain.stall_rules import (
     ALERT_BUDGET,
     PERSISTENT_STALL_INTERVALS,
+    RULES_VERSION,
     is_persistent_stall,
     select_alerts,
     stall_streak,
@@ -160,7 +163,7 @@ def get_stall_assessment(
     *,
     only_flagged: bool = False,
 ) -> StallAssessmentDTO:
-    """UC-AN4. Reutiliza el snapshot si modelo, artefacto y datos no cambiaron.
+    """UC-AN4. Reutiliza el snapshot si modelo, artefacto, datos y reglas no cambiaron.
 
     Raises:
         AppError("PROJECT_NOT_FOUND" | "MONITORING_NOT_FOUND")
@@ -176,6 +179,10 @@ def get_stall_assessment(
         and row.model_version == scorer.model_version
         and row.artifact_sha256 == scorer.artifact_sha256
         and row.input_hash == input_hash
+        # Fix wave (item 4): ALERT_BUDGET/PERSISTENT_STALL_INTERVALS/la
+        # etiqueta pueden cambiar sin reentrenar el modelo; sin esto, un
+        # snapshot viejo se serviria con la regla de negocio DESACTUALIZADA.
+        and row.rules_version == RULES_VERSION
     )
     if not fresh:
         payload = build_stall_payload(
@@ -191,6 +198,7 @@ def get_stall_assessment(
             scorer.model_version,
             scorer.artifact_sha256,
             input_hash,
+            RULES_VERSION,
             payload,
         )
 

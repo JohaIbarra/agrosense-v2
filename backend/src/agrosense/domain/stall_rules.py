@@ -37,6 +37,16 @@ ALERT_BUDGET = 0.20
 # minimo que merece "persistente".
 PERSISTENT_STALL_INTERVALS = 2
 
+# Fix wave (item 4): version de las reglas de NEGOCIO observadas que arma
+# UC-AN4 (`ALERT_BUDGET`, `PERSISTENT_STALL_INTERVALS`, la definicion de
+# `stall_label`/`height_unchanged`). Es DISTINTA de `FEATURES_VERSION` y
+# `PREPROCESSING_VERSION` (ml/): esas versionan el MODELO; esta versiona la
+# regla observada que se calcula ademas de la probabilidad y que el
+# snapshot de `stall_assessments` tambien tiene que invalidar si cambia,
+# aunque el modelo servido siga siendo el mismo. Cambiar cualquiera de las
+# tres = nueva version.
+RULES_VERSION = "2026-09-27-e7.1"
+
 
 def _mm(height_m: float) -> int:
     return round(height_m * 1000)

@@ -74,7 +74,16 @@ class _Assessments:
     def get(self, monitoring_id):
         return self.rows.get(monitoring_id)
 
-    def save(self, project_id, monitoring_id, model_version, artifact_sha256, input_hash, payload):
+    def save(
+        self,
+        project_id,
+        monitoring_id,
+        model_version,
+        artifact_sha256,
+        input_hash,
+        rules_version,
+        payload,
+    ):
         self.saves += 1
         row = SimpleNamespace(
             project_id=project_id,
@@ -82,6 +91,7 @@ class _Assessments:
             model_version=model_version,
             artifact_sha256=artifact_sha256,
             input_hash=input_hash,
+            rules_version=rules_version,
             payload=payload,
             computed_at=datetime(2026, 9, 27, tzinfo=UTC),
         )
@@ -210,6 +220,19 @@ def test_a_new_model_recomputes():
     _call(assessments=assessments, scorer=nuevo)
     assert assessments.saves == 2
     assert assessments.rows[103].model_version == "stall-test-2"
+
+
+def test_a_new_rules_version_recomputes(monkeypatch):
+    # Fix wave (item 4): ALERT_BUDGET/PERSISTENT_STALL_INTERVALS/la etiqueta
+    # pueden cambiar sin tocar el modelo; el snapshot debe invalidarse igual.
+    import agrosense.application.use_cases.stall_detection as ucd
+
+    assessments = _Assessments()
+    _call(assessments=assessments)
+    monkeypatch.setattr(ucd, "RULES_VERSION", "otra-version-de-reglas")
+    _call(assessments=assessments)
+    assert assessments.saves == 2
+    assert assessments.rows[103].rules_version == "otra-version-de-reglas"
 
 
 def test_changed_data_recomputes():

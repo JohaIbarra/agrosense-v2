@@ -6,6 +6,7 @@ import pytest
 from agrosense.domain.stall_rules import (
     ALERT_BUDGET,
     PERSISTENT_STALL_INTERVALS,
+    RULES_VERSION,
     alert_count,
     height_unchanged,
     is_at_risk,
@@ -121,3 +122,9 @@ def test_alert_budget_must_be_a_fraction():
 def test_select_alerts_takes_the_highest_scores_and_breaks_ties_by_tree_id():
     scores = {"C": 0.9, "A": 0.5, "B": 0.5, "D": 0.1, "E": 0.2}
     assert select_alerts(scores, budget=0.4) == frozenset({"C", "A"})
+
+
+def test_rules_version_is_declared():
+    # Fix wave (item 4): version de ALERT_BUDGET/PERSISTENT_STALL_INTERVALS
+    # y la regla de la etiqueta, distinta de las versiones de ml/.
+    assert RULES_VERSION

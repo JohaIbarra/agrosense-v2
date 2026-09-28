@@ -1143,12 +1143,22 @@ class StallAssessmentRepository:
         )
 
     @staticmethod
-    def _apply(row, project_id, monitoring_id, model_version, artifact_sha256, input_hash, payload):
+    def _apply(
+        row,
+        project_id,
+        monitoring_id,
+        model_version,
+        artifact_sha256,
+        input_hash,
+        rules_version,
+        payload,
+    ):
         row.project_id = project_id
         row.monitoring_id = monitoring_id
         row.model_version = model_version
         row.artifact_sha256 = artifact_sha256
         row.input_hash = input_hash
+        row.rules_version = rules_version
         row.payload = payload
         row.computed_at = datetime.now(UTC)
 
@@ -1159,9 +1169,18 @@ class StallAssessmentRepository:
         model_version: str,
         artifact_sha256: str,
         input_hash: str,
+        rules_version: str,
         payload: dict,
     ) -> StallAssessmentRow:
-        values = (project_id, monitoring_id, model_version, artifact_sha256, input_hash, payload)
+        values = (
+            project_id,
+            monitoring_id,
+            model_version,
+            artifact_sha256,
+            input_hash,
+            rules_version,
+            payload,
+        )
         row = self.get(monitoring_id)
         if row is None:
             row = StallAssessmentRow(project_id=project_id, monitoring_id=monitoring_id)

@@ -40,13 +40,14 @@ PAYLOAD = {"alert_budget_pct": 20.0, "persistent_min_intervals": 2, "summary": {
 def test_save_creates_the_row(session, monitoring):
     project_id, monitoring_id = monitoring
     repo = StallAssessmentRepository(session)
-    row = repo.save(project_id, monitoring_id, "stall-v1", "a" * 64, "h" * 64, PAYLOAD)
+    row = repo.save(project_id, monitoring_id, "stall-v1", "a" * 64, "h" * 64, "rules-v1", PAYLOAD)
     assert row.id is not None
     stored = repo.get(monitoring_id)
-    assert (stored.model_version, stored.artifact_sha256, stored.input_hash) == (
+    assert (stored.model_version, stored.artifact_sha256, stored.input_hash, stored.rules_version) == (
         "stall-v1",
         "a" * 64,
         "h" * 64,
+        "rules-v1",
     )
     assert stored.payload == PAYLOAD
     assert stored.computed_at is not None
@@ -55,11 +56,12 @@ def test_save_creates_the_row(session, monitoring):
 def test_save_again_replaces_it(session, monitoring):
     project_id, monitoring_id = monitoring
     repo = StallAssessmentRepository(session)
-    repo.save(project_id, monitoring_id, "stall-v1", "a" * 64, "h1" * 32, PAYLOAD)
-    repo.save(project_id, monitoring_id, "stall-v2", "b" * 64, "h2" * 32, PAYLOAD)
+    repo.save(project_id, monitoring_id, "stall-v1", "a" * 64, "h1" * 32, "rules-v1", PAYLOAD)
+    repo.save(project_id, monitoring_id, "stall-v2", "b" * 64, "h2" * 32, "rules-v2", PAYLOAD)
     total = session.scalar(select(func.count()).select_from(StallAssessmentRow))
     assert total == 1
-    assert repo.get(monitoring_id).model_version == "stall-v2"
+    stored = repo.get(monitoring_id)
+    assert (stored.model_version, stored.rules_version) == ("stall-v2", "rules-v2")
 
 
 def test_get_without_assessment_is_none(session, monitoring):

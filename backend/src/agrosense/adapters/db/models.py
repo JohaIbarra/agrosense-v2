@@ -552,9 +552,11 @@ class StallAssessmentRow(Base):
     Snapshot, como `monitoring_analyses` (ADR-008): la lista de arboles con
     su probabilidad, si entran en el presupuesto de alertas y la regla de
     negocio observada. Procedencia por fila (AGENTS.md, ADR-013): que modelo
-    (`model_version` + `artifact_sha256`) y que datos (`input_hash`, solo
-    observaciones <= este monitoreo) lo produjeron. Si cambia cualquiera de
-    los tres, el caso de uso lo recalcula y REEMPLAZA.
+    (`model_version` + `artifact_sha256`), que datos (`input_hash`, solo
+    observaciones <= este monitoreo) y que REGLAS de negocio
+    (`rules_version`, fix wave item 4: ALERT_BUDGET, PERSISTENT_STALL_INTERVALS
+    y la definicion de la etiqueta) lo produjeron. Si cambia cualquiera de
+    los cuatro, el caso de uso lo recalcula y REEMPLAZA.
     """
 
     __tablename__ = "stall_assessments"
@@ -572,6 +574,7 @@ class StallAssessmentRow(Base):
     model_version: Mapped[str] = mapped_column(String(50), nullable=False)
     artifact_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     input_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    rules_version: Mapped[str] = mapped_column(String(50), nullable=False)
     computed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
