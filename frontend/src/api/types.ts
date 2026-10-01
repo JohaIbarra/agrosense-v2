@@ -478,7 +478,7 @@ export interface MortalityTree {
   species: string;
   locality: string | null;
   plot: string | null;
-  height_m: number;
+  height_m: number | null;
   score: number;
   /** 0–100 dentro de la ola (100 = más riesgo). */
   risk_percentile: number;

@@ -96,7 +96,12 @@ class _ProjectModel:
         # En el primer intervalo nadie tiene historia (estanco_lag, dh_lag): esas
         # columnas no existen para este ajuste en vez de imputarse de la nada.
         numeric = tuple(c for c in PROJECT_NUMERIC if any(f.get(c) is not None for f in feats))
-        self.params = fit_preprocessor(feats, numeric, PROJECT_CATEGORICAL)
+        # Igual con las categoricas: LOCALIDAD y el estado fitosanitario son
+        # opcionales en el archivo (regresion de la revision de E8).
+        categorical = tuple(
+            c for c in PROJECT_CATEGORICAL if any(f.get(c) is not None for f in feats)
+        )
+        self.params = fit_preprocessor(feats, numeric, categorical)
         self.fit = fit_logistic_l2(transform(self.params, feats),
                                    [int(bool(r.label)) for r in train], C=PROJECT_C)
 

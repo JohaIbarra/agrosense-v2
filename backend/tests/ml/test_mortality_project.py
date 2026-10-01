@@ -74,3 +74,13 @@ def test_average_precision_matches_sklearn_with_ties():
     y = [int(rng.random() < 0.2) for _ in range(300)]
     s = [round(rng.random(), 1) for _ in y]  # muchos empates
     assert average_precision(y, s) == pytest.approx(metrics.average_precision_score(y, s))
+
+
+def test_project_without_locality_or_phytosanitary_does_not_crash():
+    """Regresion (revision E8): LOCALIDAD y estado fitosanitario son opcionales."""
+    trees, o = _species_driven()
+    trees = [t.model_copy(update={"locality": None}) for t in trees]
+    o = [x.model_copy(update={"phytosanitary": None}) for x in o]
+    res = SCORER.assess(trees, o, 3)
+    assert res.kind in {"project", "general"}
+    assert res.decision["reason"] in {"propio_mejor", "general_mejor"}

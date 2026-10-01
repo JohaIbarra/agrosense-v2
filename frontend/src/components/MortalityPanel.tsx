@@ -112,7 +112,7 @@ export function MortalityPanel({ projectId, number }: { projectId: number; numbe
                         <td>{t.species}</td>
                         <td>{t.locality ?? "—"}</td>
                         <td>{t.plot ?? "—"}</td>
-                        <td>{nf(t.height_m, 2)}</td>
+                        <td>{t.height_m === null ? "—" : nf(t.height_m, 2)}</td>
                         <td>{riesgo(r, t.score, t.risk_percentile)}</td>
                         <td>{t.flagged ? "Sí" : "—"}</td>
                       </tr>
