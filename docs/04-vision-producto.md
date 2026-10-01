@@ -498,8 +498,14 @@ Aquí está el alcance, no la descomposición.
 - Produce `estancó_intervalo_previo` (derivada, no persistida). Verificación:
   `docs/verificacion-e7.md`.
 
-### E8 · Riesgo de mortalidad — *el actual Slice 3*
-- Consume la feature de E7. Mantiene el límite declarado: EPV 4–11.
+### E8 · Riesgo de mortalidad — ✅ hecho (2026-09-30)
+- **Híbrido (ADR-014):** modelo general de una variable (percentil de altura en la ola),
+  entrenado con Anexo 1 + Werden 2018 + Werden 2020 y validado dejando un proyecto fuera
+  (lift sobre el azar 1.29–1.62); modelo propio del proyecto, reentrenado en Python puro con
+  cada monitoreo y servido solo si supera al general en el último intervalo cerrado.
+- Snapshot `mortality_assessments`; endpoint `GET .../mortality-risk`; panel «Árboles en
+  riesgo de morir» con el modelo usado y por qué. Cierra la deuda D (Excel crudo).
+- Verificación: `docs/verificacion-e8.md`; métricas: `docs/ml/evaluacion-mortalidad.md`.
 
 ### E9 · IA con Ollama
 - Resumen del monitoreo, informe comparativo, hallazgos y alertas.

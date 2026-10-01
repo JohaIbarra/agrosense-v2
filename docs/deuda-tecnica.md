@@ -17,9 +17,11 @@ La regla es la de AGENTS.md — una deuda sin dueño ni gate es un bug latente.
 
 ---
 
-## D — El archivo crudo de la campaña no se guarda
+## D — El archivo crudo de la campaña no se guarda — ✅ CERRADO (2026-09-30, E8)
 
-**Estado:** deuda aceptada. **Dueño:** épica de storage / ADR-005 si aplica.
+**Cierre:** `campaign_files.content` guarda el Excel crudo (migración `b3d5f7a9c1e2`, ADR-014); las cargas anteriores quedan con `NULL`.
+
+**Estado original:** deuda aceptada. **Dueño:** épica de storage / ADR-005 si aplica.
 
 ADR-004 §5 exige "cada archivo crudo se guarda versionado + hash", y
 `AGENTS.md` (Data provenance) pide poder trazar cada análisis a su dataset
@@ -329,3 +331,10 @@ y una caída a mitad guarda lo conseguido.
 (ADR-010), junto con la ingesta. Hoy no se paga esa infraestructura por una
 consulta que el ingeniero hace de vez en cuando.
 
+
+## J — Imágenes base de Docker sin digest (2026-09-30)
+
+**Estado:** deuda aceptada. **Dueño:** fase 9 (deploy).
+`Dockerfile` usa `node:22-slim` y `python:3.12-slim` por etiqueta y `pip install -r
+requirements.lock.txt` sin `--require-hashes`: la imagen no es reproducible bit a bit.
+**Gate:** fijar por `@sha256:` y añadir hashes al lock antes del primer despliegue a producción.
