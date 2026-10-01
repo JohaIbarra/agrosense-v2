@@ -45,6 +45,8 @@ _CODE_HTTP: dict[str, int] = {
     # El artefacto del modelo de estancamiento falta o es de otra version
     # (ADR-013): no es un fallo del cliente; reintentar tras el despliegue sirve.
     "STALL_MODEL_UNAVAILABLE": 503,
+    # Idem para el artefacto del modelo general de mortalidad (ADR-014).
+    "MORTALITY_MODEL_UNAVAILABLE": 503,
     "INVALID_SORT": 400,
     "INVALID_MODEL": 400,
     "INVALID_FILE": 400,

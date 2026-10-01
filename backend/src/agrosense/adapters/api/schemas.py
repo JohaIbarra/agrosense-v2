@@ -690,3 +690,87 @@ class StallAssessmentResponse(BaseModel):
     model: StallModelCardResponse
     summary: StallSummaryResponse
     trees: list[StallTreeResponse]
+
+
+class MortalityTreeResponse(BaseModel):
+    """Un arbol vivo y medido en el monitoreo, con su riesgo de morir en el siguiente."""
+
+    tree_id: str
+    species: str
+    locality: str | None
+    plot: str | None
+    height_m: float | None
+    score: float = Field(
+        description="Riesgo relativo (modelo general) o probabilidad (modelo propio); ver "
+        "`score_kind`."
+    )
+    risk_percentile: float = Field(
+        ge=0.0,
+        le=100.0,
+        description="Rango del puntaje dentro de la ola (100 = mas riesgo).",
+    )
+    flagged: bool = Field(
+        description="Entra en el presupuesto de alertas para revision en campo."
+    )
+    stalled_last_interval: bool | None = Field(
+        description="No crecio desde el monitoreo anterior. null = sin historia medida."
+    )
+
+
+class MortalitySummaryResponse(BaseModel):
+    at_risk: int = Field(ge=0)
+    flagged: int = Field(ge=0)
+    stalled_last_interval: int = Field(ge=0)
+    without_history: int = Field(ge=0)
+
+
+class MortalityDecisionResponse(BaseModel):
+    """Por que se sirvio el modelo general o el propio (gate de ADR-014).
+
+    Salvo `reason`, los campos dependen de la razon y pueden faltar.
+    """
+
+    reason: Literal["sin_intervalos_cerrados", "pocos_eventos", "general_mejor", "propio_mejor"]
+    closed_intervals: int | None = None
+    train_events: int | None = None
+    holdout_events: int | None = None
+    holdout_interval: str | None = None
+    holdout_prevalence: float | None = None
+    holdout_lift_project: float | None = None
+    holdout_lift_general: float | None = None
+
+
+class MortalityLopoResponse(BaseModel):
+    held_out: str
+    median_lift: float
+
+
+class MortalityModelCardResponse(BaseModel):
+    """Modelo general que respalda el resultado y su evaluacion fuera de muestra."""
+
+    model_config = {"protected_namespaces": ()}
+
+    model_version: str
+    trained_on: list[str]
+    lopo: list[MortalityLopoResponse]
+    gate_passed: bool
+
+
+class MortalityRiskResponse(BaseModel):
+    """Riesgo de mortalidad de un monitoreo (E8, ADR-014)."""
+
+    model_config = {"protected_namespaces": ()}
+
+    project_id: int
+    monitoring: int
+    model_kind: Literal["general", "project"]
+    score_kind: Literal["relative_risk", "probability"]
+    model_version: str
+    artifact_sha256: str
+    input_hash: str
+    computed_at: datetime
+    decision: MortalityDecisionResponse
+    model: MortalityModelCardResponse
+    alert_budget_pct: float = Field(description="Porcentaje de arboles marcados (escala 0-100).")
+    summary: MortalitySummaryResponse
+    trees: list[MortalityTreeResponse]
