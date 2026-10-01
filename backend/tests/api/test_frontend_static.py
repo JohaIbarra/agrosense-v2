@@ -13,7 +13,7 @@ def client(tmp_path, monkeypatch):
     (tmp_path / "index.html").write_text("<html>agrosense spa</html>", encoding="utf-8")
     (tmp_path / "assets" / "app.js").write_text("console.log(1)", encoding="utf-8")
     monkeypatch.setenv("FRONTEND_DIST", str(tmp_path))
-    return TestClient(create_app())
+    return TestClient(create_app(), raise_server_exceptions=False)
 
 
 def test_browser_navigation_to_a_spa_route_gets_index_html(client):
@@ -33,7 +33,10 @@ def test_static_assets_are_served(client):
 
 def test_api_routes_still_win(client):
     r = client.get("/projects", headers={"Accept": "text/html"})
-    assert r.status_code == 401  # la API, no el SPA
+    # Responde la API (401 sin sesion, o 500 controlado si el entorno no tiene
+    # SUPABASE_URL, como en CI), nunca el index.html del SPA.
+    assert "agrosense spa" not in r.text
+    assert r.headers["content-type"].startswith("application/json")
 
 
 def test_unknown_non_html_request_is_a_json_404_not_the_spa(client):
