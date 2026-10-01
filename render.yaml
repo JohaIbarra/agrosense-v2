@@ -1,0 +1,30 @@
+# Blueprint de Render (ADR-015): un servicio web Docker con la API y el SPA.
+# Se crea desde el panel de Render: New > Blueprint > este repositorio.
+#
+# - Region virginia: la mas cercana a Supabase sa-east-1 (Render no tiene region
+#   en Sudamerica).
+# - autoDeployTrigger checksPass: solo despliega commits de master con el CI en verde.
+# - sync: false = Render pide el valor al crear el Blueprint; nunca vive en el repo.
+#   Render pasa las variables tambien como build args, asi que las VITE_* llegan
+#   al build del frontend (son publicas por diseno).
+# - El contenedor aplica `alembic upgrade head` al arrancar (Dockerfile).
+services:
+  - name: agrosense
+    type: web
+    runtime: docker
+    plan: free
+    region: virginia
+    branch: master
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /docs
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_PUBLISHABLE_KEY
+        sync: false
