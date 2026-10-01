@@ -40,9 +40,15 @@ from agrosense.domain.stall_rules import (
 
 
 class StallScorer(Protocol):
-    model_version: str
-    artifact_sha256: str
-    model_card: dict
+    # Solo lectura: el modelo concreto es un dataclass congelado
+    @property
+    def model_version(self) -> str: ...
+
+    @property
+    def artifact_sha256(self) -> str: ...
+
+    @property
+    def model_card(self) -> dict: ...
 
     def predict(
         self, trees: Sequence[Tree], observations: Sequence[Observation], t: int

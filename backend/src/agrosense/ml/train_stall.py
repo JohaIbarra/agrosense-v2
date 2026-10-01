@@ -215,9 +215,9 @@ def _baselines(train, test, config) -> dict:
     plots = _plots(test)
     persistence = [float(r.features["estanco_lag"] or 0.0) for r in test]
     species = species_rate_scores(
-        [r.features["species"] for r in train],  # type: ignore[misc]
+        [r.features["species"] for r in train],
         _labels(train),
-        [r.features["species"] for r in test],  # type: ignore[misc]
+        [r.features["species"] for r in test],
     )
     # Fix round 1 (I3): mismo procedimiento y semilla que el IC del modelo,
     # para que la comparacion de intervalos en el informe sea de manzanas

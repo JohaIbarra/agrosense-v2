@@ -9,6 +9,8 @@ propios (ADR-003): el mapeo a la respuesta HTTP es trabajo del adapter.
 """
 from __future__ import annotations
 
+from typing import Any, cast
+
 from agrosense.application.dtos import ProjectSummary
 from agrosense.application.errors import AppError
 from agrosense.domain.project import ProjectSpec
@@ -30,11 +32,15 @@ def to_summary(proj, campaigns_count: int) -> ProjectSummary:
         description=proj.description,
         created_at=proj.created_at,
         campaigns_count=campaigns_count,
-        **{
-            f: getattr(proj, f, None)
-            for f in ("project_code", *EDITABLE_FIELDS)
-            if f not in ("name", "locality", "description") and getattr(proj, f, None) is not None
-        },
+        **cast(
+            "dict[str, Any]",
+            {
+                f: getattr(proj, f, None)
+                for f in ("project_code", *EDITABLE_FIELDS)
+                if f not in ("name", "locality", "description")
+                and getattr(proj, f, None) is not None
+            },
+        ),
     )
 
 

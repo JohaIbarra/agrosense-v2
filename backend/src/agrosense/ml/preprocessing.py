@@ -19,6 +19,7 @@ import statistics
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import cast
 
 PREPROCESSING_VERSION = "2026-09-27-e7.1"
 
@@ -75,11 +76,11 @@ def fit_preprocessor(
     means: dict[str, float] = {}
     scales: dict[str, float] = {}
     for col in numeric:
-        present = [float(r[col]) for r in rows if r.get(col) is not None]
+        present = [float(cast("float", r[col])) for r in rows if r.get(col) is not None]
         if not present:
             raise ValueError(f"la columna numerica {col!r} no tiene ningun valor en entrenamiento")
         median = float(statistics.median(present))
-        imputed = [float(r[col]) if r.get(col) is not None else median for r in rows]
+        imputed = [float(cast("float", r[col])) if r.get(col) is not None else median for r in rows]
         std = statistics.pstdev(imputed)
         medians[col] = median
         means[col] = statistics.fmean(imputed)

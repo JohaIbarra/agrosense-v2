@@ -45,6 +45,8 @@ dev = [
     # Gate 5 de AGENTS.md ("dependencies checked for known vulnerabilities")
     # ejecutable: pip-audit -r requirements.lock.txt (el CIERRE, no las raices).
     "pip-audit==2.10.1",
+    # Gate 3 de AGENTS.md (type checking): python -m mypy
+    "mypy==2.3.1",
 ]
 # E7 (ADR-013): SOLO para entrenar y evaluar offline el modelo de
 # estancamiento (`python scripts/train_stall_model.py`). La API sirve el
@@ -75,6 +77,12 @@ addopts = ["-m", "not supabase", "--strict-markers"]
 markers = [
     "supabase: toca la instancia real de Supabase (requiere DATABASE_URL y red). Excluido por defecto.",
 ]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src"]
+ignore_missing_imports = true
+warn_unused_ignores = true
 
 [tool.ruff]
 line-length = 100

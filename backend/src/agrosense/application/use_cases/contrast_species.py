@@ -9,6 +9,7 @@ duplicarla.
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Protocol
 
 from agrosense.application.dtos import RiskDTO, SpeciesContrastDTO
@@ -56,7 +57,8 @@ class ReferenceEffectRow(Protocol):
 class ReferenceSpeciesReader(Protocol):
     def active_model(self) -> object | None: ...
 
-    def list_species(self) -> list[ReferenceEffectRow]: ...
+    # Sequence (covariante): el adaptador devuelve list[<fila ORM>] y list es invariante
+    def list_species(self) -> Sequence[ReferenceEffectRow]: ...
 
 
 def _narrative(species: str, n_trees: int, stall: RiskDTO, mortality: RiskDTO) -> str:

@@ -24,6 +24,7 @@ import unicodedata
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import cast
 
 from agrosense.domain.analysis_rules import normalize_phytosanitary
 from agrosense.domain.entities import Observation, Tree
@@ -182,7 +183,7 @@ def fingerprint(trees: Sequence[Tree], observations: Sequence[Observation], t: i
                 [tr.tree_id, tr.species, tr.locality, tr.monitoring_unit, plot_key(tr)]
                 for tr in trees
             ),
-            key=lambda row: row[0],
+            key=lambda row: cast("str", row[0]),
         ),
         "observations": sorted(
             (

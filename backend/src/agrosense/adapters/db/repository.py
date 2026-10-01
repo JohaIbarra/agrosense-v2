@@ -6,6 +6,7 @@ la operacion completa.
 """
 import uuid
 from datetime import UTC, datetime
+from typing import cast
 
 from sqlalchemy import func, insert, select, update
 from sqlalchemy.exc import DataError, IntegrityError
@@ -104,7 +105,8 @@ class EngineerRepository:
             except IntegrityError:
                 # Dos peticiones simultaneas del mismo ingeniero nuevo
                 self._s.rollback()
-                eng = self._s.get(Engineer, engineer_id)
+                # La fila que gano la carrera existe: el INSERT ajeno la creo
+                eng = cast(Engineer, self._s.get(Engineer, engineer_id))
         elif email and eng.email != email:
             eng.email = email
             self._s.commit()
@@ -353,7 +355,8 @@ class CampaignRepository:
                 source_recorder=_fit(meta.recorder, 300),
             )
             campaign.monitorings = [
-                self._s.get(MonitoringRow, monitoring_ids[n]) for n in result.monitorings
+                cast(MonitoringRow, self._s.get(MonitoringRow, monitoring_ids[n]))
+                for n in result.monitorings
             ]
             self._s.add(campaign)
             self._s.commit()
@@ -469,7 +472,7 @@ class CampaignRepository:
             ).all()
         }
 
-        primer_arbol: dict[str, object] = {}
+        primer_arbol: dict[str, Tree] = {}
         for tree in result.trees:
             key = plot_key(tree)
             if key is not None and key not in primer_arbol:
@@ -590,7 +593,7 @@ class CampaignRepository:
                         "common_name": t.common_name,
                         "guild": t.guild,
                         "plot_row_id": (
-                            plot_ids[plot_key(t)] if plot_key(t) is not None else None
+                            plot_ids[k] if (k := plot_key(t)) is not None else None
                         ),
                         "property_id": (
                             property_ids.get(t.locality) if t.locality else None
@@ -756,12 +759,12 @@ class ReferenceRepository:
             self._s.add(model)
             self._s.flush()  # asigna model.id antes de estampar las filas
 
-            for row in species:
-                row.reference_model_id = model.id
-            for row in plots:
-                row.reference_model_id = model.id
-            for row in variance:
-                row.reference_model_id = model.id
+            for sp_row in species:
+                sp_row.reference_model_id = model.id
+            for plot_row in plots:
+                plot_row.reference_model_id = model.id
+            for var_row in variance:
+                var_row.reference_model_id = model.id
 
             self._s.add_all(species)
             self._s.add_all(plots)
@@ -1098,8 +1101,7 @@ class AIReportRepository:
         hubieran llegado en secuencia (gana el ultimo commit).
         """
         row = self.get(monitoring_id)
-        nueva = row is None
-        if nueva:
+        if row is None:
             row = AIReportRow(project_id=project_id, monitoring_id=monitoring_id)
             self._s.add(row)
         self._apply(
@@ -1110,9 +1112,10 @@ class AIReportRepository:
             self._s.commit()
         except IntegrityError:
             self._s.rollback()
-            row = self.get(monitoring_id)
-            if row is None:
+            ganadora = self.get(monitoring_id)
+            if ganadora is None:
                 raise
+            row = ganadora
             self._apply(
                 row, project_id, monitoring_id, model_name, prompt_version, input_hash, content,
                 unverified_numbers,

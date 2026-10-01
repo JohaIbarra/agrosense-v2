@@ -23,6 +23,7 @@ import json
 import math
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import date
+from typing import Any
 
 import pandas as pd
 
@@ -141,7 +142,7 @@ def _clean(value):
 
 
 def _col(key: str, label: str, kind: str, decimals: int | None = None, group: str | None = None):
-    col = {"key": key, "label": label, "kind": kind}
+    col: dict[str, object] = {"key": key, "label": label, "kind": kind}
     if decimals is not None:
         col["decimals"] = decimals
     if group is not None:
@@ -481,7 +482,7 @@ def _measure_section(
                     else None
                 )
             rows.append(row)
-        footer = {
+        footer: dict[str, Any] = {
             "species": "Total del predio",
             "n": int(vk_var[var].size),
             "cur": _mean(vk_var[var]),
@@ -550,14 +551,14 @@ def _measure_section(
                 ):
                     rows.append(row)
             footer_rows = []
-            media = {"species": "Media general"}
+            media: dict[str, Any] = {"species": "Media general"}
             for i, v in enumerate(valores):
                 media[f"c{i}_cur"] = _mean(vk_var.loc[vk_var[dim] == v, var])
                 if prev is not None:
                     media[f"c{i}_prev"] = _mean(vp_var.loc[vp_var[dim] == v, var])
             footer_rows.append(media)
             if prev is not None:
-                crec_row = {"species": f"Crecimiento promedio por {dim_lower}"}
+                crec_row: dict[str, Any] = {"species": f"Crecimiento promedio por {dim_lower}"}
                 for i in range(len(valores)):
                     g = growth_by_col[i]
                     crec_row[f"c{i}_cur"] = sum(g) / len(g) if g else None
@@ -706,10 +707,10 @@ def _survival(ctx: _Ctx) -> dict:
                 _pct("pct_property", "% del predio"),
             ]
             rows = []
-            for v in ctx.dim_values(dim, prop):
-                gv, gm = _status_counts(ak[ak[dim] == v])
+            for valor in ctx.dim_values(dim, prop):
+                gv, gm = _status_counts(ak[ak[dim] == valor])
                 row = {
-                    "value": v,
+                    "value": valor,
                     "total": gv + gm,
                     "alive": gv,
                     "dead": gm,
@@ -718,7 +719,7 @@ def _survival(ctx: _Ctx) -> dict:
                     **_low_flag(gv + gm),
                 }
                 if prev is not None:
-                    pv, pm = _status_counts(ap[ap[dim] == v])
+                    pv, pm = _status_counts(ap[ap[dim] == valor])
                     row["alive_prev"] = pv
                     row["pct_prev"] = _pct_of(pv, pv + pm)
                 rows.append(row)
@@ -805,7 +806,9 @@ _PHYTO_KEYS = {"Bueno": "good", "Regular": "fair", "Malo": "poor"}
 
 def _phyto_counts(df: pd.DataFrame) -> dict:
     vivos = df[df["alive"] == True]  # noqa: E712
-    out = {_PHYTO_KEYS[s]: int((vivos["phyto"] == s).sum()) for s in PHYTOSANITARY_STATES}
+    out: dict[str, Any] = {
+        _PHYTO_KEYS[s]: int((vivos["phyto"] == s).sum()) for s in PHYTOSANITARY_STATES
+    }
     out["total"] = sum(out.values())
     out["missing"] = int(vivos["phyto"].isna().sum())
     for s in PHYTOSANITARY_STATES:
@@ -992,7 +995,7 @@ def _development(ctx: _Ctx) -> dict:
             rows = []
             for v in ctx.dim_values(dim, prop):
                 gk, gp = ck[ck[dim] == v], cp[cp[dim] == v]
-                row = {"value": v, "total": int(gk["dev"].notna().sum())}
+                row: dict[str, Any] = {"value": v, "total": int(gk["dev"].notna().sum())}
                 for j, c in enumerate(clases):
                     row[f"k{j}_cur"] = int((gk["dev"] == c).sum())
                     if prev is not None:
@@ -1036,7 +1039,7 @@ def _development(ctx: _Ctx) -> dict:
     # Individuos por categoria y monitoreo, todo el proyecto (M1..Mk)
     cols = [_text("category", "Categoría")] + [_int(f"m{n}", f"M{n}") for n in ctx.monitorings]
     rows = []
-    muertos = {"category": "Muertos"}
+    muertos: dict[str, Any] = {"category": "Muertos"}
     for n in ctx.monitorings:
         muertos[f"m{n}"] = _status_counts(ctx.at(n))[1]
     rows.append(muertos)
@@ -1046,7 +1049,7 @@ def _development(ctx: _Ctx) -> dict:
         for n in ctx.monitorings:
             row[f"m{n}"] = int((por_monitoreo[n]["dev"] == c).sum())
         rows.append(row)
-    sin = {"category": "Vivos sin altura"}
+    sin: dict[str, Any] = {"category": "Vivos sin altura"}
     for n in ctx.monitorings:
         sin[f"m{n}"] = int(por_monitoreo[n]["dev"].isna().sum())
     rows.append(sin)
@@ -1124,7 +1127,7 @@ def _interval_stats(par: pd.DataFrame, years: float | None) -> dict:
     muertos = int((par["alive_cur"] != True).sum())  # noqa: E712
     medidos = par.dropna(subset=["growth"])
     crecimiento = _mean(medidos["growth"])
-    fila = {
+    fila: dict[str, Any] = {
         "alive_prev": vivos_antes,
         "deaths": muertos,
         "mortality": _pct_of(muertos, vivos_antes),

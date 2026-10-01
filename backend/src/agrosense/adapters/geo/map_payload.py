@@ -15,6 +15,7 @@ datos actuales; guardarlo solo anadiria una copia que invalidar.
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from typing import cast
 
 from agrosense.adapters.geo.projection import to_wgs84
 from agrosense.domain.analysis_rules import MIN_SAMPLE_FOR_PERCENT, is_low_sample, tree_state
@@ -76,7 +77,9 @@ def build_map(
     ubicados = [t for t in trees if t.coord_x is not None and t.coord_y is not None]
     sin_coordenada = len(trees) - len(ubicados)
 
-    coords = to_wgs84([(t.coord_x, t.coord_y) for t in ubicados], srid)
+    coords = to_wgs84(
+        [(cast("float", t.coord_x), cast("float", t.coord_y)) for t in ubicados], srid
+    )
     por_arbol: dict[str, list[Observation]] = {}
     for o in observations:
         por_arbol.setdefault(o.tree_id, []).append(o)
@@ -192,7 +195,9 @@ def property_outlines(
     ubicados = [t for t in trees if t.coord_x is not None and t.coord_y is not None]
     if not ubicados:
         return {}
-    coords = to_wgs84([(t.coord_x, t.coord_y) for t in ubicados], srid)
+    coords = to_wgs84(
+        [(cast("float", t.coord_x), cast("float", t.coord_y)) for t in ubicados], srid
+    )
     por_predio: dict[str, list[tuple[float, float]]] = {}
     for t, punto in zip(ubicados, coords, strict=True):
         por_predio.setdefault(t.locality or "Sin predio", []).append(punto)

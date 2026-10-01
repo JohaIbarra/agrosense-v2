@@ -29,6 +29,7 @@ import math
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 
@@ -127,7 +128,7 @@ def _f(value: object) -> float | None:
     if value is None:
         return None
     try:
-        out = float(value)
+        out = float(cast("float", value))
     except (TypeError, ValueError):
         return None
     return None if math.isnan(out) else out

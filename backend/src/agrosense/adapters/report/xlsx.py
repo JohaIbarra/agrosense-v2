@@ -230,10 +230,10 @@ def _write_section(wb: Workbook, section: dict) -> None:
     chart_col = get_column_letter(max_width + _CHART_COL_GAP)
     chart_row = 4
     for chart in section.get("charts", []):
-        loc = locations.get(chart["table"])
-        if loc is None:
+        chart_loc = locations.get(chart["table"])
+        if chart_loc is None:
             continue
-        _add_chart(ws, chart, loc, f"{chart_col}{chart_row}")
+        _add_chart(ws, chart, chart_loc, f"{chart_col}{chart_row}")
         chart_row += 17
     ws.sheet_view.showGridLines = False
 
@@ -361,19 +361,19 @@ def _write_raw(wb: Workbook, trees: Sequence[Tree], observations: Sequence[Obser
         values: list = [getattr(t, attr) for _, attr in _FIXED_HEADERS]
         formats: list = [None] * len(values)
         for _, n, what, fmt in per_monitoring:
-            o = obs.get(n)
-            if o is None:
+            obs_n = obs.get(n)
+            if obs_n is None:
                 values.append(None)
             elif what == "height":
-                values.append(o.height_m)
+                values.append(obs_n.height_m)
             elif what == "crown":
-                values.append(o.crown_diameter_m)
+                values.append(obs_n.crown_diameter_m)
             elif what == "dap":
-                values.append(_dap_value(o))
+                values.append(_dap_value(obs_n))
             elif what == "alive":
-                values.append(_alive_text(o.alive))
+                values.append(_alive_text(obs_n.alive))
             else:
-                values.append(o.phytosanitary)
+                values.append(obs_n.phytosanitary)
             formats.append(fmt)
         notes = next(
             (o.field_notes for n, o in sorted(obs.items(), reverse=True) if o.field_notes), None
