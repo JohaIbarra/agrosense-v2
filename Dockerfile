@@ -28,7 +28,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
 WORKDIR /app/backend
 COPY backend/requirements.docker.txt ./
 # Mismas versiones que el lock auditado, verificadas por hash (deuda J)
-RUN pip install --no-cache-dir --require-hashes -r requirements.docker.txt
+# --no-deps: el lock ya es el cierre verificado; resolver de nuevo exigiria fijar
+# tambien dependencias de herramientas de desarrollo que la imagen no usa.
+RUN pip install --no-cache-dir --require-hashes --no-deps -r requirements.docker.txt
 COPY backend/ ./
 RUN pip install --no-cache-dir --no-deps . && useradd --create-home agrosense
 COPY --from=frontend /app/frontend/dist /app/frontend/dist

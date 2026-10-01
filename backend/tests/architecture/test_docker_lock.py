@@ -27,4 +27,4 @@ def test_dockerfile_pins_base_images_by_digest_and_requires_hashes():
     dockerfile = (BACKEND.parent / "Dockerfile").read_text(encoding="utf-8")
     froms = re.findall(r"^FROM\s+(\S+)", dockerfile, re.MULTILINE)
     assert froms and all("@sha256:" in f for f in froms), froms
-    assert "--require-hashes -r requirements.docker.txt" in dockerfile
+    assert "--require-hashes --no-deps -r requirements.docker.txt" in dockerfile
