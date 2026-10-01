@@ -433,3 +433,72 @@ export interface StallAssessment {
   summary: StallSummary;
   trees: StallTree[];
 }
+
+// ── E8: riesgo de mortalidad (S9/S10). Espejo de `MortalityRiskResponse` ───
+
+export type MortalityDecisionReason =
+  | "sin_intervalos_cerrados"
+  | "pocos_eventos"
+  | "general_mejor"
+  | "propio_mejor";
+
+export interface MortalityDecision {
+  reason: MortalityDecisionReason;
+  closed_intervals?: number;
+  train_events?: number;
+  holdout_events?: number;
+  /** Ej. "M2→M3". */
+  holdout_interval?: string;
+  holdout_prevalence?: number;
+  holdout_lift_project?: number;
+  holdout_lift_general?: number;
+}
+
+export interface MortalityLopo {
+  held_out: string;
+  median_lift: number;
+}
+
+export interface MortalityModelCard {
+  model_version: string;
+  trained_on: string[];
+  lopo: MortalityLopo[];
+  gate_passed: boolean;
+}
+
+export interface MortalitySummary {
+  at_risk: number;
+  flagged: number;
+  stalled_last_interval: number;
+  without_history: number;
+}
+
+export interface MortalityTree {
+  tree_id: string;
+  species: string;
+  locality: string | null;
+  plot: string | null;
+  height_m: number;
+  score: number;
+  /** 0–100 dentro de la ola (100 = más riesgo). */
+  risk_percentile: number;
+  flagged: boolean;
+  stalled_last_interval: boolean | null;
+}
+
+export interface MortalityRisk {
+  project_id: number;
+  monitoring: number;
+  model_kind: "general" | "project";
+  /** "probability" solo si model_kind = "project". */
+  score_kind: "relative_risk" | "probability";
+  model_version: string;
+  artifact_sha256: string;
+  input_hash: string;
+  computed_at: string;
+  decision: MortalityDecision;
+  model: MortalityModelCard;
+  alert_budget_pct: number;
+  summary: MortalitySummary;
+  trees: MortalityTree[];
+}

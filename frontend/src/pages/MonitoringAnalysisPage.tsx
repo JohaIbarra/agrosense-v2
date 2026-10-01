@@ -14,6 +14,7 @@ import { formatDate, formatSummary } from "../analysis/format";
 import { AIReportPanel } from "../components/AIReportPanel";
 import { AnalysisBarChart } from "../components/AnalysisBarChart";
 import { DataTable } from "../components/DataTable";
+import { MortalityPanel } from "../components/MortalityPanel";
 import { StallPanel } from "../components/StallPanel";
 import { useAsync } from "../hooks/useAsync";
 
@@ -199,6 +200,12 @@ export function MonitoringAnalysisPage() {
 
       {/* key: un panel nuevo por monitoreo, como el del borrador de IA. */}
       <StallPanel key={`stall-${projectId}-${number}`} projectId={projectId} number={number} />
+
+      <MortalityPanel
+        key={`mortality-${projectId}-${number}`}
+        projectId={projectId}
+        number={number}
+      />
 
       <p className="muted provenance">
         Cálculo {a.analysis_version} · datos {a.input_hash.slice(0, 12)} · calculado{" "}
