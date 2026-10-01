@@ -112,6 +112,7 @@ def upload_campaign(
         result=data,
         filename=filename,
         sha256=sha256,
+        content=content,
     )
 
     # 6. Fecha y analisis. Si el analisis fallara, la carga ya esta hecha y el

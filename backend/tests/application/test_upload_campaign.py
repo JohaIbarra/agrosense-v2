@@ -93,7 +93,10 @@ class FakeCampaignRepository:
         self._next_id = 1
         self._project_repo = project_repo
 
-    def save_ingest(self, project_id: int, result: Any, filename: str, sha256: str) -> dict:
+    def save_ingest(
+        self, project_id: int, result: Any, filename: str, sha256: str, content: bytes | None = None
+    ) -> dict:
+        self.last_content = content
         # Verificar duplicado SHA en mismo proyecto
         for c in self._campaigns:
             if c.project_id == project_id and c.sha256 == sha256:
@@ -523,3 +526,26 @@ class TestCampaignSourcePort:
         assert [w.type for w in result.warnings] == ["contraction", "revival", "census_gap"]
         assert all(isinstance(w, WarningDTO) for w in result.warnings)
         assert result.warnings[0].tree_id == "T1"
+
+
+def test_upload_keeps_the_raw_file_for_reproducibility():
+    """Deuda D (E8, ADR-014): el caso de uso entrega los bytes crudos al repositorio."""
+    from agrosense.application.use_cases.upload_campaign import upload_campaign
+    from tests.db.test_repository import sample_campaign
+
+    class StubSource:
+        def read(self, content, filename):
+            return sample_campaign()
+
+    proj_repo, camp_repo = make_repos()
+    proj = proj_repo.create("Crudo", None, None)
+    upload_campaign(
+        owner_id="ing-1",
+        project_id=proj.id,
+        filename="m.xlsx",
+        content=b"bytes del excel",
+        project_repo=proj_repo,
+        campaign_repo=camp_repo,
+        source=StubSource(),
+    )
+    assert camp_repo.last_content == b"bytes del excel"

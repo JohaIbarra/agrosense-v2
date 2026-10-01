@@ -29,6 +29,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Table,
     Text,
@@ -251,6 +252,8 @@ class CampaignFile(Base):
     )
     filename: Mapped[str] = mapped_column(String(500), nullable=False)
     sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Excel crudo (deuda D, ADR-014): NULL en cargas anteriores a E8.
+    content: Mapped[bytes | None] = mapped_column(LargeBinary, deferred=True)
     mapping_version: Mapped[str] = mapped_column(String(50), nullable=False)
     ingested_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False

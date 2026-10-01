@@ -295,6 +295,7 @@ class CampaignRepository:
         result: CampaignData,
         filename: str,
         sha256: str,
+        content: bytes | None = None,
     ) -> dict:
         """Persiste la CampaignData completa en UNA transaccion.
 
@@ -345,6 +346,7 @@ class CampaignRepository:
                 project_id=project_id,
                 filename=filename,
                 sha256=sha256,
+                content=content,
                 mapping_version=result.mapping_version,
                 trees=len(result.trees),
                 observations=len(result.observations),

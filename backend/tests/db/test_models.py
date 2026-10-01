@@ -49,6 +49,8 @@ def test_campaign_file_table():
         "ingested_at", "trees", "observations", "deaths",
         # E0: lo que el archivo dice de si mismo
         "source_project_label", "source_event", "source_field_crew", "source_recorder",
+        # E8 (deuda D): el Excel crudo
+        "content",
     }
     # provenance: mismo archivo no se ingesta 2 veces al mismo proyecto
     assert ("project_id", "sha256") in unique_groups(t)

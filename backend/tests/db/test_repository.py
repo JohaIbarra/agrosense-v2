@@ -245,3 +245,30 @@ class TestCampaignRepositoryWrites:
         assert session.query(TreeRow).filter_by(project_id=proj.id).count() == 0
         assert session.query(ObservationRow).count() == 0
         assert session.query(CampaignFile).count() == 0
+
+
+class TestRawFileIsKept:
+    """Deuda D (cerrada en E8, ADR-014): el Excel crudo se guarda con su hash."""
+
+    def test_save_ingest_stores_the_raw_bytes(self, session):
+        from agrosense.adapters.db.models import CampaignFile
+
+        proj = ProjectRepository(session).create(owner_id=OWNER, name="crudo")
+        CampaignRepository(session).save_ingest(
+            project_id=proj.id,
+            result=sample_campaign(),
+            filename="m1.xlsx",
+            sha256="e" * 64,
+            content=b"PK\x03\x04 excel crudo",
+        )
+        row = session.query(CampaignFile).filter_by(project_id=proj.id).one()
+        assert row.content == b"PK\x03\x04 excel crudo"
+
+    def test_content_is_optional_for_legacy_callers(self, session):
+        from agrosense.adapters.db.models import CampaignFile
+
+        proj = ProjectRepository(session).create(owner_id=OWNER, name="sin crudo")
+        CampaignRepository(session).save_ingest(
+            project_id=proj.id, result=sample_campaign(), filename="m1.xlsx", sha256="f" * 64
+        )
+        assert session.query(CampaignFile).filter_by(project_id=proj.id).one().content is None
