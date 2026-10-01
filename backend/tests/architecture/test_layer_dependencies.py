@@ -111,6 +111,11 @@ ML_SERVING_MODULES = (
     "ml/stall_features.py",
     "ml/preprocessing.py",
     "ml/stall_model.py",
+    # E8 (ADR-014): el modelo propio se ENTRENA en la peticion, tambien en Python puro
+    "ml/logistic.py",
+    "ml/mortality_features.py",
+    "ml/mortality_model.py",
+    "ml/mortality_project.py",
 )
 ML_SERVING_FORBIDDEN = ("numpy", "sklearn", "pandas", "scipy", "joblib", "pickle")
 
