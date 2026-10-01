@@ -136,8 +136,15 @@ jobs:
           -t agrosense:ci .
       - name: Arranca y sirve el SPA (sin base de datos)
         run: |
-          docker run -d --name app -p 8000:8000 agrosense:ci             uvicorn agrosense.adapters.api.app:create_app --factory --host 0.0.0.0 --port 8000
+          # Config ficticia (sin secretos): SQLite temporal y un SUPABASE_URL que
+          # nunca se consulta, porque la peticion de prueba no lleva token.
+          docker run -d --name app -p 8000:8000 \
+            -e DATABASE_URL=sqlite:////tmp/ci.db -e SUPABASE_URL=https://example.supabase.co \
+            agrosense:ci \
+            uvicorn agrosense.adapters.api.app:create_app --factory --host 0.0.0.0 --port 8000
           for i in $(seq 1 30); do curl -sf http://127.0.0.1:8000/docs >/dev/null && break; sleep 1; done
           curl -sf -H 'Accept: text/html' http://127.0.0.1:8000/proyectos | grep -q 'id="root"'
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/projects)" = "401"
-          docker rm -f app
+      - name: Logs del contenedor
+        if: always()
+        run: docker logs app 2>&1 | tail -50 || true
