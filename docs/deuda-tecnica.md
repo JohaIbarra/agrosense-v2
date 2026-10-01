@@ -332,9 +332,11 @@ y una caída a mitad guarda lo conseguido.
 consulta que el ingeniero hace de vez en cuando.
 
 
-## J — Imágenes base de Docker sin digest (2026-09-30)
+## J — Imágenes base de Docker sin digest (2026-09-30) — ✅ CERRADO (2026-09-30)
 
-**Estado:** deuda aceptada. **Dueño:** fase 9 (deploy).
+**Cierre:** `FROM ...@sha256:` en ambas etapas y `pip install --require-hashes -r requirements.docker.txt`, generado del lock auditado por `scripts/hash_lock.py` (hashes de PyPI de todas las plataformas). `tests/architecture/test_docker_lock.py` exige mismas versiones que el lock, hash en cada línea y digests en cada `FROM`. El lock sin hashes se conserva porque `pip-audit` con hashes necesita instalarlo.
+
+**Estado original:** deuda aceptada. **Dueño:** fase 9 (deploy).
 `Dockerfile` usa `node:22-slim` y `python:3.12-slim` por etiqueta y `pip install -r
 requirements.lock.txt` sin `--require-hashes`: la imagen no es reproducible bit a bit.
 **Gate:** fijar por `@sha256:` y añadir hashes al lock antes del primer despliegue a producción.
