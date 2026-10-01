@@ -410,11 +410,13 @@ class SatelliteIndexValueRow(Base):
             name="uq_index_value_scene",
         ),
         CheckConstraint("valid_pixels >= 0", name="ck_index_value_pixels"),
+        # La lectura de la serie filtra por proyecto e indice y ordena por fecha.
+        Index("ix_satellite_index_values_project", "project_id", "index_name", "acquired_at"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     project_id: Mapped[int] = mapped_column(
-        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
     )
     property_name: Mapped[str] = mapped_column(String(200), nullable=False)
     index_name: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -641,6 +643,12 @@ class ReferenceSpeciesEffect(Base):
     """
 
     __tablename__ = "reference_species_effects"
+    # Indices de orden/filtro de /api/v1/reference/species (migracion c7e9f2a4b6d8).
+    __table_args__ = (
+        Index("ix_reference_species_effects_or_stall", "or_stall"),
+        Index("ix_reference_species_effects_or_mort", "or_mort"),
+        Index("ix_reference_species_effects_gremio", "gremio"),
+    )
 
     reference_model_id: Mapped[int] = mapped_column(
         ForeignKey("reference_models.id", ondelete="CASCADE"), primary_key=True
@@ -676,6 +684,7 @@ class ReferencePlotEffect(Base):
     """Efecto aleatorio por parcela (`Codigo de unidad muestreo`) de UNA version."""
 
     __tablename__ = "reference_plot_effects"
+    __table_args__ = (Index("ix_reference_plot_effects_localidad", "localidad"),)
 
     reference_model_id: Mapped[int] = mapped_column(
         ForeignKey("reference_models.id", ondelete="CASCADE"), primary_key=True
