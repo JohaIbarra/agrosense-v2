@@ -57,6 +57,13 @@ test("ingeniero: registro → proyecto → carga → análisis → comparación 
     await expect(page.getByRole("alert")).toHaveCount(0);
   }
 
+  // E8: el panel de riesgo de mortalidad responde (modelo y razón visibles, sin error)
+  const mortality = page.locator("section, div").filter({
+    has: page.getByRole("heading", { name: "Árboles en riesgo de morir" }),
+  }).last();
+  await expect(mortality).toBeVisible({ timeout: 30_000 });
+  await expect(mortality.getByText(/modelo (general|entrenado)/i).first()).toBeVisible();
+
   // La sesión persiste al recargar y se cierra al salir
   await page.reload();
   await expect(page.getByRole("heading", { name: "Análisis del monitoreo M3" })).toBeVisible();

@@ -85,6 +85,11 @@ def create_app() -> FastAPI:
 
     app.include_router(mortality_router)
 
+    # ADR-015: el SPA, solo si FRONTEND_DIST existe y SIEMPRE despues de la API
+    from agrosense.adapters.api.frontend import mount_frontend
+
+    mount_frontend(app)
+
     # Techo del cuerpo ANTES de que el parser de multipart toque disco.
     # Se anade el ultimo para que quede el mas externo de la pila.
     app.add_middleware(BodySizeLimitMiddleware, max_bytes=MAX_UPLOAD_BYTES)

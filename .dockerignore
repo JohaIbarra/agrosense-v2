@@ -1,0 +1,16 @@
+# No entra al contexto de la imagen
+**/node_modules
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+backend/.env
+frontend/.env*
+backend/data
+frontend/dist
+frontend/e2e/.tmp
+frontend/test-results
+frontend/playwright-report
+.git
+docs
