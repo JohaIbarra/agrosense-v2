@@ -55,3 +55,8 @@ backend/build/
 frontend/dist/
 frontend/node_modules/.tmp/
 *.tsbuildinfo
+
+# E2E (Playwright): base SQLite y fixture generados, reportes
+frontend/e2e/.tmp/
+frontend/test-results/
+frontend/playwright-report/
