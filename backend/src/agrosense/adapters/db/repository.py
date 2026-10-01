@@ -20,6 +20,7 @@ from agrosense.adapters.db.models import (
     ImageryLayerRow,
     MonitoringAnalysisRow,
     MonitoringRow,
+    MortalityAssessmentRow,
     ObservationRow,
     PlotRow,
     Project,
@@ -1191,6 +1192,88 @@ class StallAssessmentRepository:
         row = self.get(monitoring_id)
         if row is None:
             row = StallAssessmentRow(project_id=project_id, monitoring_id=monitoring_id)
+            self._s.add(row)
+        self._apply(row, *values)
+        try:
+            self._s.commit()
+        except IntegrityError:
+            self._s.rollback()
+            row = self.get(monitoring_id)
+            if row is None:
+                raise
+            self._apply(row, *values)
+            try:
+                self._s.commit()
+            except Exception:
+                self._s.rollback()
+                raise
+        return row
+
+
+class MortalityAssessmentRepository:
+    """Persistencia del riesgo de mortalidad (E8, ADR-014).
+
+    Un snapshot por monitoreo: `save` reemplaza el existente. Misma defensa
+    que `AIReportRepository.save` ante dos peticiones simultaneas: si la
+    segunda choca con `uq_mortality_assessment_monitoring`, relee y actualiza.
+    """
+
+    def __init__(self, session: Session):
+        self._s = session
+
+    def get(self, monitoring_id: int) -> MortalityAssessmentRow | None:
+        return self._s.scalar(
+            select(MortalityAssessmentRow).where(
+                MortalityAssessmentRow.monitoring_id == monitoring_id
+            )
+        )
+
+    @staticmethod
+    def _apply(
+        row,
+        project_id,
+        monitoring_id,
+        model_kind,
+        model_version,
+        artifact_sha256,
+        input_hash,
+        rules_version,
+        payload,
+    ):
+        row.project_id = project_id
+        row.monitoring_id = monitoring_id
+        row.model_kind = model_kind
+        row.model_version = model_version
+        row.artifact_sha256 = artifact_sha256
+        row.input_hash = input_hash
+        row.rules_version = rules_version
+        row.payload = payload
+        row.computed_at = datetime.now(UTC)
+
+    def save(
+        self,
+        project_id: int,
+        monitoring_id: int,
+        model_kind: str,
+        model_version: str,
+        artifact_sha256: str,
+        input_hash: str,
+        rules_version: str,
+        payload: dict,
+    ) -> MortalityAssessmentRow:
+        values = (
+            project_id,
+            monitoring_id,
+            model_kind,
+            model_version,
+            artifact_sha256,
+            input_hash,
+            rules_version,
+            payload,
+        )
+        row = self.get(monitoring_id)
+        if row is None:
+            row = MortalityAssessmentRow(project_id=project_id, monitoring_id=monitoring_id)
             self._s.add(row)
         self._apply(row, *values)
         try:

@@ -586,6 +586,41 @@ class StallAssessmentRow(Base):
     payload: Mapped[dict] = mapped_column(JSON, nullable=False)
 
 
+class MortalityAssessmentRow(Base):
+    """Riesgo de mortalidad de UN monitoreo (E8, ADR-014).
+
+    Snapshot como `stall_assessments`: la lista de arboles con su puntaje,
+    percentil en la ola y marca de alerta. Procedencia por fila: que modelo
+    sirvio (`model_kind`: general o propio del proyecto), su version y la
+    huella del artefacto general, los datos (`input_hash`, solo observaciones
+    <= este monitoreo; el modelo propio se entrena con ellas, asi que tambien
+    lo versionan) y las REGLAS (`rules_version`). Si cambia alguno, el caso de
+    uso lo recalcula y REEMPLAZA.
+    """
+
+    __tablename__ = "mortality_assessments"
+    __table_args__ = (
+        UniqueConstraint("monitoring_id", name="uq_mortality_assessment_monitoring"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    monitoring_id: Mapped[int] = mapped_column(
+        ForeignKey("monitorings.id", ondelete="CASCADE"), nullable=False
+    )
+    model_kind: Mapped[str] = mapped_column(String(10), nullable=False)
+    model_version: Mapped[str] = mapped_column(String(120), nullable=False)
+    artifact_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    input_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    rules_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+
 def _analytics_updated() -> datetime:
     return _utcnow()
 

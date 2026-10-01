@@ -399,3 +399,25 @@ class StallAssessmentDTO:
     summary: dict
     trees: list[dict]
 
+
+@dataclass(frozen=True)
+class MortalityAssessmentDTO:
+    """Riesgo de mortalidad de un monitoreo (E8, ADR-014).
+
+    `trees` y `summary` salen del snapshot tal cual; `model_card` describe el
+    modelo general y `decision` por que se sirvio el general o el propio.
+    """
+
+    project_id: int
+    monitoring: int
+    model_kind: str
+    score_kind: str
+    model_version: str
+    artifact_sha256: str
+    input_hash: str
+    computed_at: datetime
+    decision: dict
+    model_card: dict
+    alert_budget_pct: float
+    summary: dict
+    trees: list[dict]
