@@ -28,3 +28,13 @@ def test_dockerfile_pins_base_images_by_digest_and_requires_hashes():
     froms = re.findall(r"^FROM\s+(\S+)", dockerfile, re.MULTILINE)
     assert froms and all("@sha256:" in f for f in froms), froms
     assert "--require-hashes --no-deps -r requirements.docker.txt" in dockerfile
+
+
+def test_extras_needed_at_runtime_are_in_the_lock():
+    """Regresion (primer deploy en Render): la imagen instala el lock con --no-deps,
+    asi que los extras de pyproject NO se resuelven solos. Sin psycopg-binary no
+    hay driver de Postgres (ImportError: no pq wrapper available)."""
+    pins = _pins("requirements.lock.txt")
+    assert "psycopg-binary" in pins
+    assert pins["psycopg-binary"] == pins["psycopg"]
+    assert "cryptography" in pins  # PyJWT[crypto]: firmas ES256 de Supabase

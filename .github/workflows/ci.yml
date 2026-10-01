@@ -124,6 +124,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [backend, frontend]
+    # Postgres real: el primer deploy fallo porque la imagen no traia el driver
+    # (psycopg-binary) y aqui solo se probaba con SQLite.
+    services:
+      postgres:
+        image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+        env:
+          POSTGRES_PASSWORD: ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -134,15 +145,16 @@ jobs:
           --build-arg VITE_SUPABASE_URL=https://example.supabase.co
           --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=ci-placeholder
           -t agrosense:ci .
-      - name: Arranca y sirve el SPA (sin base de datos)
+      - name: Arranca como en produccion (migraciones en Postgres + API + SPA)
         run: |
-          # Config ficticia (sin secretos): SQLite temporal y un SUPABASE_URL que
-          # nunca se consulta, porque la peticion de prueba no lleva token.
-          docker run -d --name app -p 8000:8000 \
-            -e DATABASE_URL=sqlite:////tmp/ci.db -e SUPABASE_URL=https://example.supabase.co \
-            agrosense:ci \
-            uvicorn agrosense.adapters.api.app:create_app --factory --host 0.0.0.0 --port 8000
-          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8000/docs >/dev/null && break; sleep 1; done
+          # CMD por defecto de la imagen: alembic upgrade head && uvicorn. Config
+          # solo de CI: el Postgres de servicio y un SUPABASE_URL que nunca se
+          # consulta (la peticion de prueba no lleva token).
+          docker run -d --name app --network host -e PORT=8000 \
+            -e DATABASE_URL=postgresql://postgres:ci-only@127.0.0.1:5432/postgres \
+            -e SUPABASE_URL=https://example.supabase.co \
+            agrosense:ci
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:8000/docs >/dev/null && break; sleep 1; done
           curl -sf -H 'Accept: text/html' http://127.0.0.1:8000/proyectos | grep -q 'id="root"'
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/projects)" = "401"
       - name: Logs del contenedor
