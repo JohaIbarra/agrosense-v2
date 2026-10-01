@@ -20,8 +20,14 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from agrosense.adapters.api.deps import CurrentEngineer, get_session
-from agrosense.adapters.api.schemas import CatalogsResponse, EngineerResponse, EngineerUpdate
+from agrosense.adapters.api.schemas import (
+    CatalogsResponse,
+    EngineerResponse,
+    EngineerUpdate,
+    FeaturesResponse,
+)
 from agrosense.adapters.db.repository import EngineerRepository
+from agrosense.adapters.llm.ollama import ai_reports_enabled
 from agrosense.application.use_cases.engineers import update_profile
 from agrosense.domain.project import (
     DEFAULT_SRID,
@@ -48,6 +54,12 @@ def update_me(
         EngineerRepository(session), engineer.id, **body.model_dump(exclude_unset=True)
     )
     return EngineerResponse(**asdict(dto))
+
+
+@router.get("/features", response_model=FeaturesResponse)
+def get_features(engineer: CurrentEngineer) -> FeaturesResponse:
+    """Que partes opcionales ofrece este servidor; el frontend oculta lo apagado."""
+    return FeaturesResponse(ai_reports=ai_reports_enabled())
 
 
 @router.get("/catalogs", response_model=CatalogsResponse)

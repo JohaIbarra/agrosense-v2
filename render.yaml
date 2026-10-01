@@ -20,6 +20,9 @@ services:
     healthCheckPath: /docs
     autoDeployTrigger: checksPass
     envVars:
+      # Sin Ollama en Render: la IA (E9) se oculta en vez de fallar (ADR-015).
+      - key: AI_REPORTS_ENABLED
+        value: "false"
       - key: DATABASE_URL
         sync: false
       - key: SUPABASE_URL

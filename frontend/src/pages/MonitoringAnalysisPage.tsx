@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
+import { getFeatures } from "../api/features";
 import { downloadReport, getMonitoringAnalysis, getProject } from "../api/projects";
 import type { AnalysisSection, MonitoringAnalysis } from "../api/types";
 import { formatDate, formatSummary } from "../analysis/format";
@@ -73,6 +74,9 @@ export function MonitoringAnalysisPage() {
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const project = useAsync((signal) => getProject(projectId, signal), [projectId]);
+  // La IA local solo existe donde hay Ollama: si el servidor la apaga (o no
+  // responde), el panel no se muestra en vez de fallar en cada intento.
+  const features = useAsync((signal) => getFeatures(signal), []);
   const analysis = useAsync(
     (signal) => getMonitoringAnalysis(projectId, number, signal),
     [projectId, number],
@@ -196,7 +200,9 @@ export function MonitoringAnalysisPage() {
           `generado` del panel anterior (cargado por proyecto+numero, pero
           nunca reiniciado) seguia mostrandose al cambiar de monitoreo con
           los botones M1..Mn, que NO desmontan esta pagina. */}
-      <AIReportPanel key={`${projectId}-${number}`} projectId={projectId} number={number} />
+      {features.data?.ai_reports === true && (
+        <AIReportPanel key={`${projectId}-${number}`} projectId={projectId} number={number} />
+      )}
 
       {/* key: un panel nuevo por monitoreo, como el del borrador de IA. */}
       <StallPanel key={`stall-${projectId}-${number}`} projectId={projectId} number={number} />

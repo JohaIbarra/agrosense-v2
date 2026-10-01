@@ -30,6 +30,17 @@ logger = logging.getLogger(__name__)
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434").rstrip("/")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:3b")
+
+
+def ai_reports_enabled() -> bool:
+    """La IA local esta disponible en este servidor (por defecto si).
+
+    En un host sin Ollama (produccion en Render, ADR-015) se apaga con
+    `AI_REPORTS_ENABLED=false`: el frontend oculta el panel y los endpoints
+    responden 404 en vez de un 503 en cada intento. Se lee en cada llamada
+    para que cambiar la variable no exija tocar el codigo.
+    """
+    return os.environ.get("AI_REPORTS_ENABLED", "true").strip().lower() not in {"false", "0", "no"}
 _TIMEOUT = 180
 _USER_AGENT = "AgroSense/2.0 (+restauracion ecologica)"
 

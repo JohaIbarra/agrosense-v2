@@ -32,14 +32,23 @@ from agrosense.adapters.db.repository import (
     ProjectAnalysisRepository,
     ProjectRepository,
 )
-from agrosense.adapters.llm.ollama import OllamaClient
+from agrosense.adapters.llm.ollama import OllamaClient, ai_reports_enabled
 from agrosense.application.dtos import AIReportDTO
+from agrosense.application.errors import AppError
 from agrosense.application.use_cases.ai_report import generate_ai_report, get_ai_report
 
 router = APIRouter()
 
 SessionDep = Annotated[Session, Depends(get_session)]
 NumberPath = Annotated[int, Path(ge=1, le=1000, description="Numero de monitoreo (M1 = 1).")]
+
+
+def _require_enabled() -> None:
+    if not ai_reports_enabled():
+        raise AppError(
+            "AI_REPORTS_DISABLED",
+            "El borrador de informe con IA no esta disponible en este servidor.",
+        )
 
 
 def _to_response(dto: AIReportDTO) -> AIReportResponse:
@@ -66,6 +75,7 @@ def get_ai_report_endpoint(
     engineer: CurrentEngineer,
 ) -> AIReportResponse:
     try:
+        _require_enabled()
         dto = get_ai_report(
             project_id,
             number,
@@ -91,6 +101,7 @@ def generate_ai_report_endpoint(
     engineer: CurrentEngineer,
 ) -> AIReportResponse:
     try:
+        _require_enabled()
         dto = generate_ai_report(
             project_id,
             number,

@@ -29,7 +29,10 @@
      imagen ni en el repositorio. `SUPABASE_URL` y la clave publicable no son secretos.
 
 - **Consecuencias:**
-  - E9 (IA con Ollama) no tiene un Ollama en el host: el endpoint responde con su error
-    controlado de transporte hasta que se configure `OLLAMA_URL`.
+  - E9 (IA con Ollama) no tiene un Ollama en el host. Se oculta con
+    `AI_REPORTS_ENABLED=false` (fijado en `render.yaml`): `GET /api/v1/features` lo informa, el
+    frontend no muestra el panel y los endpoints de IA responden 404 `AI_REPORTS_DISABLED`. En
+    local sigue activa por defecto. Para encenderla en un host basta `OLLAMA_URL` y quitar la
+    variable (2026-10-01; se descartó borrar E9: funciona y está probado).
   - El modelo de mortalidad y el de estancados viajan dentro del paquete (`ml/artifacts/*.json`).
   - Cambiar de host no exige cambios de código.

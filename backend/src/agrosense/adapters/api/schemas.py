@@ -114,6 +114,12 @@ class EngineerResponse(BaseModel):
     organization: str | None
 
 
+class FeaturesResponse(BaseModel):
+    """Capacidades opcionales de ESTE servidor (no del usuario)."""
+
+    ai_reports: bool = Field(description="Borrador de informe con IA local (Ollama, E9).")
+
+
 class CatalogsResponse(BaseModel):
     """Vocabularios del dominio que el frontend ofrece en sus formularios."""
 

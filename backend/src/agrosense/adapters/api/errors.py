@@ -39,6 +39,7 @@ _CODE_HTTP: dict[str, int] = {
     "SPECIES_NOT_FOUND": 404,
     "REFERENCE_NOT_LOADED": 404,
     "AI_REPORT_NOT_FOUND": 404,
+    "AI_REPORTS_DISABLED": 404,
     # El modelo de IA local es un proceso externo (Ollama): su caida no es
     # un fallo nuestro, y 503 le dice al cliente que reintentar tiene sentido.
     "LLM_UNAVAILABLE": 503,

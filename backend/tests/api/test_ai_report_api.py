@@ -120,3 +120,29 @@ def test_los_numeros_inventados_quedan_marcados(client, proyecto, llm_falso):
     r = client.post(f"/projects/{proyecto}/monitorings/1/ai-report")
     assert r.status_code == 200
     assert "250%" in r.json()["unverified_numbers"]
+
+
+# --- Ocultar la IA donde no hay Ollama (produccion en Render) -------------------
+
+
+def test_features_reporta_la_ia_activa_por_defecto(client, monkeypatch):
+    monkeypatch.delenv("AI_REPORTS_ENABLED", raising=False)
+    r = client.get("/api/v1/features")
+    assert r.status_code == 200
+    assert r.json() == {"ai_reports": True}
+
+
+def test_features_exige_sesion(anon_client):
+    assert anon_client.get("/api/v1/features").status_code == 401
+
+
+@pytest.mark.parametrize("valor", ["false", "0", "no", "FALSE"])
+def test_con_la_ia_desactivada_features_lo_dice_y_los_endpoints_dan_404(
+    client, proyecto, monkeypatch, valor
+):
+    monkeypatch.setenv("AI_REPORTS_ENABLED", valor)
+    assert client.get("/api/v1/features").json() == {"ai_reports": False}
+    for metodo in (client.get, client.post):
+        r = metodo(f"/projects/{proyecto}/monitorings/1/ai-report")
+        assert r.status_code == 404
+        assert r.json()["detail"]["code"] == "AI_REPORTS_DISABLED"

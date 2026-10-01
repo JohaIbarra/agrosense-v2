@@ -111,7 +111,7 @@ const STALL: StallAssessment = {
   ],
 };
 
-function mockApi() {
+function mockApi(features: { ai_reports: boolean } = { ai_reports: true }) {
   const calls: { url: string; method: string; body: unknown }[] = [];
   const spy = vi.fn().mockImplementation((url: string, init: RequestInit = {}) => {
     const method = init.method ?? "GET";
@@ -145,6 +145,7 @@ function mockApi() {
       });
     }
     if (url.startsWith("/projects/7/monitorings/4/stall-assessment")) return json(200, STALL);
+    if (url === "/api/v1/features") return json(200, features);
     return json(404, { detail: { code: "NOT_FOUND", message: "no" } });
   });
   vi.stubGlobal("fetch", spy);
@@ -256,5 +257,23 @@ describe("E2/E3 en la interfaz", () => {
     await waitFor(() =>
       expect(calls.some((c) => c.url === "/projects/7/monitorings/4/stall-assessment")).toBe(true),
     );
+  });
+});
+
+const AI_HEADING = "Borrador de informe (IA)";
+
+describe("IA local opcional (ADR-015)", () => {
+  it("con la IA activa en el servidor muestra el panel del borrador", async () => {
+    mockApi({ ai_reports: true });
+    renderAt("/proyectos/7/monitoreos/4");
+    expect(await screen.findByRole("heading", { name: AI_HEADING })).toBeInTheDocument();
+  });
+
+  it("si el servidor la apaga, el panel no aparece", async () => {
+    mockApi({ ai_reports: false });
+    renderAt("/proyectos/7/monitoreos/4");
+    expect(await screen.findByRole("heading", { name: "Análisis del monitoreo M4" }))
+      .toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: AI_HEADING })).not.toBeInTheDocument();
   });
 });
