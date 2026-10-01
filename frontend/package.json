@@ -11,7 +11,7 @@
     "lint": "eslint src --ext .ts,.tsx",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test"
+    "e2e": "tsc -p tsconfig.e2e.json && playwright test"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.116.0",

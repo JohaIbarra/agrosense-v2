@@ -51,13 +51,13 @@ recuperar incumple la regla de reproducibilidad de `AGENTS.md`.
 |---|---|
 | 1. Tests pasan | ✅ `pytest` (166 locales) + `pytest -m supabase` (4) |
 | 2. Lint pasa | ✅ `ruff check src tests` |
-| 3. Type checking pasa | ❌ no hay mypy ni pyright configurado |
+| 3. Type checking pasa | ✅ `python -m mypy` (backend, 0 errores, 2026-09-30) + `tsc` (frontend `build` y `tsconfig.e2e.json`) |
 | 4. Build pasa | ✅ `pip wheel` en el gate de verificación |
 | 5. Security checks | ✅ `pip-audit -r requirements.lock.txt` sobre el cierre |
 | 6. Arquitectura consistente | ✅ `tests/architecture/` lo verifica en cada corrida |
 | 7. Review | proceso, no herramienta |
 
-Queda **solo el 3**. Los gates 4 y 5 se cerraron en la fase 7 (2026-09-20): el
+**Cerrado el 2026-09-30**: el 3 se cerró con mypy (`[tool.mypy]` en `pyproject.toml`) y los recorridos críticos tienen E2E (`npm run e2e`, Playwright). Los gates 4 y 5 se cerraron en la fase 7 (2026-09-20): el
 5 hizo falta cerrarlo de verdad porque auditar solo las raíces daba limpio
 mientras el entorno traía `anyio 3.7.1` con dos CVE.
 
