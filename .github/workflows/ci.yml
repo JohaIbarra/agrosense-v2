@@ -117,3 +117,27 @@ jobs:
           name: playwright-report
           path: frontend/playwright-report
           retention-days: 7
+
+  docker:
+    # La imagen de despliegue (ADR-015) se construye en cada cambio: un
+    # Dockerfile roto se ve aqui, no el dia del deploy. Sin push a registro.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build de la imagen
+        run: >
+          docker build
+          --build-arg VITE_SUPABASE_URL=https://example.supabase.co
+          --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=ci-placeholder
+          -t agrosense:ci .
+      - name: Arranca y sirve el SPA (sin base de datos)
+        run: |
+          docker run -d --name app -p 8000:8000 agrosense:ci             uvicorn agrosense.adapters.api.app:create_app --factory --host 0.0.0.0 --port 8000
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8000/docs >/dev/null && break; sleep 1; done
+          curl -sf -H 'Accept: text/html' http://127.0.0.1:8000/proyectos | grep -q 'id="root"'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/projects)" = "401"
+          docker rm -f app
