@@ -103,3 +103,28 @@ def artifact_dict(params, coefficients, intercept, *, model_version: str = "stal
         },
         "provenance": {"dataset_file": "anexo1.xlsx", "dataset_sha256": "0" * 64},
     }
+
+
+def mortality_panel(
+    prefix: str, *, n: int = 150, waves: int = 4, signal: bool = True, seed: int = 0
+) -> tuple[list[Tree], list[Observation]]:
+    """Proyecto sintetico de mortalidad (E8): con `signal`, los pequenos mueren mas."""
+    import random
+
+    rng = random.Random(seed)
+    trees: list[Tree] = []
+    observations: list[Observation] = []
+    for i in range(n):
+        tid = f"{prefix}_{i}"
+        trees.append(tree(tid, species=rng.choice(["Senna viarum", "Inga punctata"]),
+                          plot=f"{prefix}U{i % 6}", locality=f"{prefix}L{i % 2}"))
+        h, alive = 0.2 + rng.random() * 0.8, True
+        for c in range(1, waves + 1):
+            if not alive:
+                observations.append(obs(tid, c, None, alive=False, phyto=None))
+                continue
+            observations.append(obs(tid, c, round(h, 3)))
+            p_die = (0.35 if h < 0.45 else 0.04) if signal else 0.12
+            alive = rng.random() >= p_die
+            h += rng.random() * 0.15
+    return trees, observations

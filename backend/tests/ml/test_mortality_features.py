@@ -51,7 +51,8 @@ def test_features_do_not_look_at_the_future():
     a = build_mortality_wave(TREES, _obs(c_next_alive=False), 2, labeled=False)
     b = build_mortality_wave(TREES, _obs(c_next_alive=True), 2, labeled=False)
     assert [r.features for r in a] == [r.features for r in b]
-    assert mortality_fingerprint(TREES, _obs(False), 2) == mortality_fingerprint(TREES, _obs(True), 2)
+    fp = mortality_fingerprint
+    assert fp(TREES, _obs(False), 2) == fp(TREES, _obs(True), 2)
 
 
 def test_history_features_and_categories():

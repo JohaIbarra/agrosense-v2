@@ -56,6 +56,7 @@ FORBIDDEN: dict[str, tuple[str, ...]] = {
     "adapters": (
         "agrosense.ml.train_stall",
         "agrosense.ml.evaluation",
+        "agrosense.ml.train_mortality",
     ),
 }
 
