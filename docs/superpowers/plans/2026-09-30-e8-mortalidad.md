@@ -36,3 +36,46 @@ reentrena con cada monitoreo y solo se sirve si supera al general en el último 
 9. **S9 API:** `GET /projects/{id}/monitorings/{n}/mortality-risk?only_flagged=` (`def`), esquemas pydantic, errores `PROJECT_NOT_FOUND`/`MONITORING_NOT_FOUND`/`MODEL_UNAVAILABLE`; tests de integración (dueño, ajeno 404, M sin siguiente, snapshot reutilizado).
 10. **S10 UI:** `api/mortality.ts` + panel «Árboles en riesgo de morir» en el análisis (modelo usado y por qué, tabla con presupuesto 20 %, aviso de riesgo relativo con el general) + tests vitest; E2E: el panel aparece en M3.
 11. **S11 Cierre:** suite completa, mypy, ruff, pip-audit, lint/test/build/e2e, `docs/verificacion-e8.md`, roadmap; revisión automática; merge.
+
+## Contrato del endpoint (S9) — fuente de verdad para backend y frontend
+
+`GET /projects/{project_id}/monitorings/{number}/mortality-risk?only_flagged=false` — `def`, sesión
+obligatoria (`CurrentEngineer`), `number` 1..1000.
+
+- **200** `MortalityRiskResponse`:
+  ```json
+  {
+    "project_id": 1, "monitoring": 3,
+    "model_kind": "general | project",
+    "score_kind": "relative_risk | probability",
+    "model_version": "mortality-general-2026-09-30.1+mortality-project-2026-09-30.1",
+    "artifact_sha256": "64 hex", "input_hash": "64 hex", "computed_at": "ISO-8601",
+    "decision": {
+      "reason": "sin_intervalos_cerrados | pocos_eventos | general_mejor | propio_mejor",
+      "closed_intervals": 2, "train_events": 31, "holdout_events": 33,
+      "holdout_interval": "M2→M3", "holdout_prevalence": 0.0507,
+      "holdout_lift_project": 2.416, "holdout_lift_general": 1.683
+    },
+    "model": {"model_version": "...", "trained_on": ["Anexo 1", "Werden 2018", "Werden 2020"],
+              "lopo": [{"held_out": "Anexo 1", "median_lift": 1.683}], "gate_passed": true},
+    "alert_budget_pct": 20.0,
+    "summary": {"at_risk": 754, "flagged": 151, "stalled_last_interval": 120, "without_history": 0},
+    "trees": [{"tree_id": "G_1", "species": "Senna viarum", "locality": "Guayabal", "plot": "U1",
+               "height_m": 0.42, "score": 0.083, "risk_percentile": 97.5, "flagged": true,
+               "stalled_last_interval": false}]
+  }
+  ```
+  Todos los campos de `decision` salvo `reason` son opcionales (dependen de la razón).
+  `score_kind = "probability"` solo si `model_kind = "project"`. `risk_percentile` (0–100) es el
+  rango del puntaje dentro de la ola (100 = más riesgo). `trees` ordenado por `score` desc y
+  `tree_id`. `flagged` = presupuesto de alertas del 20 % (`select_alerts`). `stalled_last_interval`
+  = `stalled_previous_interval` de dominio (puede ser `null`). Con `only_flagged=true`, `trees` solo
+  trae los marcados (el `summary` no cambia).
+- **404** `PROJECT_NOT_FOUND` (inexistente o ajeno) · `MONITORING_NOT_FOUND`.
+- **503** `MORTALITY_MODEL_UNAVAILABLE` (artefacto ausente/incompatible), solo después de las
+  comprobaciones de dueño y monitoreo (como E7).
+- **401** sin sesión. Errores con la forma `{"detail": {"code", "message"}}`.
+- Snapshot `mortality_assessments`: UNIQUE(monitoring_id); columnas `project_id`, `monitoring_id`,
+  `model_kind`, `model_version` (String 120), `artifact_sha256`, `input_hash`, `rules_version`
+  (`MORTALITY_RULES_VERSION`), `payload` JSON, `computed_at`. Se reutiliza si `model_version`,
+  `artifact_sha256`, `input_hash` y `rules_version` coinciden.
