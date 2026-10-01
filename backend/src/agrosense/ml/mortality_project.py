@@ -74,7 +74,7 @@ def _closed_waves(observations: Sequence[Observation], t: int) -> list[int]:
     return [u for u in waves if u + 1 in waves]
 
 
-def _group_rare(rows: list[dict], levels: dict[str, set[str]]) -> list[dict]:
+def _group_rare(rows: list[dict], levels: dict[str, set[object]]) -> list[dict]:
     out = []
     for r in rows:
         r = dict(r)
@@ -88,8 +88,10 @@ def _group_rare(rows: list[dict], levels: dict[str, set[str]]) -> list[dict]:
 class _ProjectModel:
     def __init__(self, train: list[WaveRow]):
         counts = {c: Counter(r.features.get(c) for r in train) for c in PROJECT_CATEGORICAL}
-        self.levels = {c: {v for v, n in counts[c].items() if v is not None and n >= MIN_LEVEL_ROWS}
-                       for c in PROJECT_CATEGORICAL}
+        self.levels: dict[str, set[object]] = {
+            c: {v for v, n in counts[c].items() if v is not None and n >= MIN_LEVEL_ROWS}
+            for c in PROJECT_CATEGORICAL
+        }
         feats = _group_rare([dict(r.features) for r in train], self.levels)
         # En el primer intervalo nadie tiene historia (estanco_lag, dh_lag): esas
         # columnas no existen para este ajuste en vez de imputarse de la nada.
@@ -121,7 +123,9 @@ class MortalityScorer:
     def model_card(self) -> dict:
         return dict(self.general.model_card)
 
-    def fingerprint(self, trees: Sequence[Tree], observations: Sequence[Observation], t: int) -> str:
+    def fingerprint(
+        self, trees: Sequence[Tree], observations: Sequence[Observation], t: int
+    ) -> str:
         return mortality_fingerprint(trees, observations, t)
 
     def _general_scores(self, rows: Sequence[WaveRow]) -> list[float]:
