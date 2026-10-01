@@ -30,7 +30,7 @@ dependencies = [
     # abiertos. anyio ademas es el threadpool donde corre el upload.
     # E1 (ADR-006): verificacion de los tokens de Supabase Auth (ES256 via JWKS).
     # `crypto` trae cryptography, necesario para las firmas asimetricas.
-    "PyJWT[crypto]==2.14.0",
+    "PyJWT[crypto]==2.15.0",
     "cryptography==50.0.1",
     "anyio==4.15.1",
     "idna==3.20",
