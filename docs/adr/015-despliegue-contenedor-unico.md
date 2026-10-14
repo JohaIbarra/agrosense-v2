@@ -1,6 +1,10 @@
 # ADR-015 — Despliegue: un contenedor que sirve API y frontend desde el mismo origen
 
-- **Estado:** Aceptado
+- **Estado:** Pospuesto (2026-10-14). Se implementó y publicó en Render; luego se retiró del repo
+  porque por ahora la app solo se usa en local. Esa implementación (Dockerfile con digests,
+  `render.yaml`, `frontend.py`, job `docker` del CI) está en la etiqueta `publicacion-render-v1`.
+  Antes de publicar de nuevo se elegirá el hosting con el usuario (se evaluó Vercel). Sigue
+  vigente: `AI_REPORTS_ENABLED` / `GET /api/v1/features`, que también sirven en local.
 - **Fecha:** 2026-09-30
 - **Contexto:** fase 9 (deploy). `frontend/vite.config.ts` ya asumía que «en producción el
   frontend se sirve desde el mismo origen que la API», pero nada lo implementaba: la API no

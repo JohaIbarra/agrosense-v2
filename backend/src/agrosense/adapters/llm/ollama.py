@@ -35,7 +35,7 @@ OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:3b")
 def ai_reports_enabled() -> bool:
     """La IA local esta disponible en este servidor (por defecto si).
 
-    En un host sin Ollama (produccion en Render, ADR-015) se apaga con
+    En un servidor sin Ollama se apaga con
     `AI_REPORTS_ENABLED=false`: el frontend oculta el panel y los endpoints
     responden 404 en vez de un 503 en cada intento. Se lee en cada llamada
     para que cambiar la variable no exija tocar el codigo.
