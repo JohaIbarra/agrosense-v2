@@ -177,9 +177,9 @@ describe("mapa del predio", () => {
 
     await waitFor(() => expect(dibujado.length).toBe(3));
     const colores = dibujado.map((d) => d.fillColor);
-    expect(colores).toContain("#4b4b4b"); // G_1 murió en M2
-    expect(colores).toContain("#fab219"); // G_2 regular
-    expect(colores).toContain("#0ca30c"); // T_1 bueno
+    expect(colores).toContain("#5f6762"); // G_1 murió en M2
+    expect(colores).toContain("#d4a23c"); // G_2 regular
+    expect(colores).toContain("#2e7d4f"); // T_1 bueno
     expect(dibujado.every((d) => d.kind === "circle")).toBe(true);
   });
 
@@ -197,7 +197,7 @@ describe("mapa del predio", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "M1" }));
     await waitFor(() => expect(dibujado.map((d) => d.fillColor)).toEqual([
-      "#0ca30c", "#0ca30c", "#0ca30c",
+      "#2e7d4f", "#2e7d4f", "#2e7d4f",
     ]));
     expect(llamadas.filter((u) => u.endsWith("/map")).length).toBe(antes);
     expect(capasLimpiadas).toBeGreaterThan(0);

@@ -16,7 +16,7 @@ function descargar(report: AIReport) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `AgroSense_M${report.monitoring}_borrador.md`;
+  a.download = `Dendrova_M${report.monitoring}_borrador.md`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -72,7 +72,7 @@ export function AIReportPanel({ projectId, number }: { projectId: number; number
     <section className="card">
       <h2>Borrador de informe (IA)</h2>
       <p className="muted">
-        Redactado por un modelo de IA local a partir de las cifras que ya calculó AgroSense.
+        Redactado por un modelo de IA local a partir de las cifras que ya calculó Dendrova.
         Borrador generado por IA — revíselo antes de usarlo.
       </p>
 

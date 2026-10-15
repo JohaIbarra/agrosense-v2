@@ -242,7 +242,7 @@ def _write_summary(wb: Workbook, data: ReportData) -> None:
     ws = wb.active
     ws.title = "Resumen"
     a = data.analysis
-    ws["A1"] = f"AgroSense — Análisis del monitoreo M{a.monitoring}"
+    ws["A1"] = f"Dendrova — Análisis del monitoreo M{a.monitoring}"
     ws["A1"].font = _TITLE
     info = [
         ("Proyecto", data.project_name),
@@ -406,4 +406,4 @@ def report_filename(data: ReportData) -> str:
     """Nombre de descarga: codigo del proyecto + monitoreo, solo ASCII seguro."""
     code = data.project_code or "proyecto"
     safe = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in code)
-    return f"AgroSense_{safe}_M{data.analysis.monitoring}.xlsx"
+    return f"Dendrova_{safe}_M{data.analysis.monitoring}.xlsx"

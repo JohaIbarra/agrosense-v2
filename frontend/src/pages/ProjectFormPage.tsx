@@ -18,7 +18,7 @@ export function ProjectFormPage() {
     [id],
   );
 
-  if (catalogs.loading || project.loading) return <p className="state">Cargando…</p>;
+  if (catalogs.loading || project.loading) return <p className="state loading">Cargando…</p>;
   const error = catalogs.error ?? project.error;
   if (error) {
     return (

@@ -10,11 +10,11 @@ import type { MapPlot, MapTree, ProjectMap, TreeState } from "../api/types";
 
 /** Colores de estado reservados (dataviz): nunca se usan como serie. */
 export const STATE_COLORS: Record<TreeState, string> = {
-  bueno: "#0ca30c",
-  regular: "#fab219",
-  malo: "#d03b3b",
-  muerto: "#4b4b4b",
-  sin_dato: "#b9b9b9",
+  bueno: "#2e7d4f",
+  regular: "#d4a23c",
+  malo: "#b42318",
+  muerto: "#5f6762",
+  sin_dato: "#c4cac5",
 };
 
 export const STATE_LABELS: Record<TreeState, string> = {

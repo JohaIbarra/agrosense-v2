@@ -27,35 +27,50 @@ import {
 import type { AnalysisChart, AnalysisTable } from "../api/types";
 import { columnLabel, formatValue } from "../analysis/format";
 
-/** Paleta categórica de referencia (orden fijo, validada: CVD ΔE ≥ 8 entre adyacentes). */
+/**
+ * Paleta categórica de Dendrova (orden fijo): tonos sobrios que se separan por
+ * matiz Y luminosidad, para que dos series adyacentes no se confundan con
+ * daltonismo. Las dos primeras (azul acero / ocre) son «monitoreo anterior» y
+ * «actual» en las gráficas comparativas.
+ */
 export const SERIES_COLORS = [
-  "#2a78d6",
-  "#eb6834",
-  "#1baf7a",
-  "#eda100",
-  "#e87ba4",
-  "#008300",
-  "#4a3aa7",
-  "#e34948",
+  "#3f6f9f",
+  "#d08a2e",
+  "#2e7d5b",
+  "#8a6bb5",
+  "#b5677d",
+  "#7d8f2b",
+  "#4f5f6e",
+  "#5a9aa8",
 ];
 
 /** Estados reservados: nunca se reutilizan como «serie 4». */
 const STATUS_COLORS: Record<string, string> = {
-  pct_good: "#0ca30c",
-  pct_fair: "#fab219",
-  pct_poor: "#d03b3b",
+  pct_good: "#2e7d4f",
+  pct_fair: "#d4a23c",
+  pct_poor: "#b42318",
   // Comparación entre monitoreos (E4): el estado al que llegó cada árbol, y
   // la mortalidad, llevan los mismos colores que en el resto del producto.
-  to_bueno: "#0ca30c",
-  to_regular: "#fab219",
-  to_malo: "#d03b3b",
-  to_muerto: "#4b4b4b",
-  to_sin_dato: "#b9b9b9",
-  mortality: "#d03b3b",
-  stagnant_pct: "#fab219",
+  to_bueno: "#2e7d4f",
+  to_regular: "#d4a23c",
+  to_malo: "#b42318",
+  to_muerto: "#5f6762",
+  to_sin_dato: "#c4cac5",
+  mortality: "#b42318",
+  stagnant_pct: "#d4a23c",
 };
 
 const HORIZONTAL_FROM = 7;
+// Caracteres de etiqueta que caben bajo las columnas de una tarjeta de media
+// pantalla; con más, los nombres (p. ej. de especie) se enciman.
+const MAX_COLUMN_LABEL_CHARS = 40;
+
+/** Barras horizontales cuando hay muchas categorías o sus nombres no caben en columnas. */
+export function isHorizontal(rows: Record<string, unknown>[], key: string): boolean {
+  if (rows.length >= HORIZONTAL_FROM) return true;
+  const chars = rows.reduce((sum, row) => sum + String(row[key] ?? "").length, 0);
+  return chars > MAX_COLUMN_LABEL_CHARS;
+}
 
 export function seriesColor(key: string, index: number): string {
   return STATUS_COLORS[key] ?? SERIES_COLORS[index % SERIES_COLORS.length];
@@ -66,20 +81,20 @@ export function AnalysisBarChart({ chart, table }: { chart: AnalysisChart; table
   const data = table.rows;
   if (data.length === 0) return null;
 
-  const horizontal = data.length >= HORIZONTAL_FROM;
+  const horizontal = isHorizontal(data, chart.x);
   const height = horizontal ? Math.max(220, data.length * (chart.stacked ? 22 : 30) + 70) : 300;
   const valueAxis = {
     type: "number" as const,
     domain: chart.percent ? ([0, 100] as [number, number]) : undefined,
     tickFormatter: (v: number) => (chart.percent ? `${v} %` : v.toLocaleString("es-CO")),
-    tick: { fontSize: 12, fill: "#52514e" },
-    stroke: "#d1d5db",
+    tick: { fontSize: 12, fill: "#55625b" },
+    stroke: "#cbd3cb",
   };
   const categoryAxis = {
     type: "category" as const,
     dataKey: chart.x,
-    tick: { fontSize: 12, fill: "#52514e" },
-    stroke: "#d1d5db",
+    tick: { fontSize: 12, fill: "#55625b" },
+    stroke: "#cbd3cb",
     interval: 0,
   };
 
@@ -94,7 +109,7 @@ export function AnalysisBarChart({ chart, table }: { chart: AnalysisChart; table
           barGap={2}
         >
           <CartesianGrid
-            stroke="#eef0f2"
+            stroke="#eef1ed"
             horizontal={!horizontal}
             vertical={horizontal}
           />

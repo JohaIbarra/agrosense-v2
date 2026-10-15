@@ -2,7 +2,7 @@
  * Ortofoto del proyecto (E6b): elegir cuál se ve, con qué opacidad, y
  * registrar una nueva pegando su dirección de teselas.
  *
- * AgroSense no guarda la imagen, guarda dónde está (ADR-009). Por eso el
+ * Dendrova no guarda la imagen, guarda dónde está (ADR-009). Por eso el
  * formulario pide una plantilla XYZ y no un archivo.
  */
 import { useState } from "react";
@@ -148,7 +148,7 @@ export function ImageryPanel({
             />
           </label>
           <p className="muted small">
-            La imagen se queda donde está: AgroSense solo guarda su dirección, y la carga
+            La imagen se queda donde está: Dendrova solo guarda su dirección, y la carga
             su navegador. Debe empezar por <code>https://</code> e incluir{" "}
             <code>{"{z}/{x}/{y}"}</code>.
           </p>

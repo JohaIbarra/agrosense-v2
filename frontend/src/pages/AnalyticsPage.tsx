@@ -67,7 +67,7 @@ export function AnalyticsPage() {
   );
 
   if (all.loading && speciesAll.length === 0) {
-    return <p className="state">Cargando analítica…</p>;
+    return <p className="state loading">Cargando analítica…</p>;
   }
 
   if (all.error) {

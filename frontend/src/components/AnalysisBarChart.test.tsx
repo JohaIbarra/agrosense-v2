@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { SERIES_COLORS, seriesColor } from "./AnalysisBarChart";
+import { SERIES_COLORS, isHorizontal, seriesColor } from "./AnalysisBarChart";
 
 describe("color de una serie", () => {
   it("una serie cualquiera toma la paleta categórica en orden fijo", () => {
@@ -20,26 +20,43 @@ describe("color de una serie", () => {
   });
 
   it("el estado fitosanitario lleva su color reservado, esté donde esté", () => {
-    expect(seriesColor("pct_good", 3)).toBe("#0ca30c");
-    expect(seriesColor("pct_poor", 0)).toBe("#d03b3b");
+    expect(seriesColor("pct_good", 3)).toBe("#2e7d4f");
+    expect(seriesColor("pct_poor", 0)).toBe("#b42318");
   });
 
   it("la comparación entre monitoreos usa los mismos colores de estado (E4)", () => {
-    expect(seriesColor("to_bueno", 5)).toBe("#0ca30c");
-    expect(seriesColor("to_regular", 6)).toBe("#fab219");
-    expect(seriesColor("to_malo", 7)).toBe("#d03b3b");
-    expect(seriesColor("to_muerto", 1)).toBe("#4b4b4b");
-    expect(seriesColor("to_sin_dato", 2)).toBe("#b9b9b9");
+    expect(seriesColor("to_bueno", 5)).toBe("#2e7d4f");
+    expect(seriesColor("to_regular", 6)).toBe("#d4a23c");
+    expect(seriesColor("to_malo", 7)).toBe("#b42318");
+    expect(seriesColor("to_muerto", 1)).toBe("#5f6762");
+    expect(seriesColor("to_sin_dato", 2)).toBe("#c4cac5");
   });
 
   it("la mortalidad es roja y el estancamiento ámbar, como en el mapa", () => {
-    expect(seriesColor("mortality", 0)).toBe("#d03b3b");
-    expect(seriesColor("stagnant_pct", 1)).toBe("#fab219");
+    expect(seriesColor("mortality", 0)).toBe("#b42318");
+    expect(seriesColor("stagnant_pct", 1)).toBe("#d4a23c");
   });
 
   it("ningún color reservado aparece en la paleta categórica", () => {
-    for (const reservado of ["#0ca30c", "#fab219", "#d03b3b", "#4b4b4b", "#b9b9b9"]) {
+    for (const reservado of ["#2e7d4f", "#d4a23c", "#b42318", "#5f6762", "#c4cac5"]) {
       expect(SERIES_COLORS).not.toContain(reservado);
     }
+  });
+});
+
+describe("orientación de la gráfica", () => {
+  const filas = (nombres: string[]) => nombres.map((especie) => ({ especie }));
+
+  it("pocas categorías de nombre corto van en columnas", () => {
+    expect(isHorizontal(filas(["M1", "M2", "M3"]), "especie")).toBe(false);
+  });
+
+  it("muchas categorías van en barras horizontales", () => {
+    expect(isHorizontal(filas(["a", "b", "c", "d", "e", "f", "g"]), "especie")).toBe(true);
+  });
+
+  it("pocas especies de nombre largo van en barras horizontales para que no se encimen", () => {
+    const especies = ["Cecropia peltata", "Guazuma ulmifolia", "Inga punctata", "Senna reticulata"];
+    expect(isHorizontal(filas(especies), "especie")).toBe(true);
   });
 });

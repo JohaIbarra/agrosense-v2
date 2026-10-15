@@ -131,7 +131,7 @@ def test_column_widths_are_set(workbook):
 
 
 def test_filename_is_safe():
-    assert report_filename(_data()) == "AgroSense_AGS-2026-0001_M2.xlsx"
+    assert report_filename(_data()) == "Dendrova_AGS-2026-0001_M2.xlsx"
 
 
 def test_field_text_never_becomes_an_excel_formula():

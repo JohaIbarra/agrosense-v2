@@ -1,0 +1,27 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "auth-falso",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["frontend/e2e/fake-auth.mjs"],
+      "port": 54321
+    },
+    {
+      "name": "api-sqlite",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["backend/scripts/e2e_server.py"],
+      "port": 8000
+    },
+    {
+      "name": "web-local",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd frontend && npx vite --host 127.0.0.1 --port 5173 --strictPort"],
+      "port": 5173,
+      "env": {
+        "VITE_SUPABASE_URL": "http://127.0.0.1:54321",
+        "VITE_SUPABASE_PUBLISHABLE_KEY": "e2e-publishable-key"
+      }
+    }
+  ]
+}

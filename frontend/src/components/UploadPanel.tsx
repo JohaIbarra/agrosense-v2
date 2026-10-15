@@ -104,9 +104,9 @@ export function UploadPanel({
     <section className="card">
       <h2>Cargar monitoreo</h2>
       <p className="muted">
-        Suba el Excel de campo: una fila por árbol, con las columnas del formato (ID_MUEST,
-        Especie_M1, Altura total (m)_M1…). Puede traer un solo monitoreo o todos los anteriores.
-        AgroSense calcula el análisis a partir de estos datos.
+        El Excel de campo: una fila por árbol, con las columnas del formato (ID_MUEST, Especie_M1,
+        Altura total (m)_M1…). Puede traer un solo monitoreo o todos los anteriores. Dendrova
+        calcula el análisis a partir de estos datos.
       </p>
       <form className="upload-form" onSubmit={submit}>
         <label className="field">
@@ -137,7 +137,7 @@ export function UploadPanel({
         en la tabla de monitoreos.
       </p>
       {busy && (
-        <p className="muted" role="status">
+        <p className="muted loading" role="status">
           Leyendo el archivo, validando los datos y calculando el análisis. Puede tardar hasta un
           minuto con archivos grandes.
         </p>

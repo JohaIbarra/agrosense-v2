@@ -3,7 +3,7 @@
   "private": true,
   "version": "2.0.0",
   "type": "module",
-  "description": "Dashboard de AgroSense v2 — analitica de crecimiento (slice 5)",
+  "description": "Dendrova — frontend de monitoreo de restauracion ecologica",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

@@ -1,5 +1,6 @@
 /**
- * Paleta del dashboard.
+ * Paleta de las gráficas de efectos (forest plot), alineada con el sistema
+ * visual de Dendrova (styles.css).
  *
  * El color codifica una sola cosa: si el intervalo de confianza es
  * concluyente y en que direccion. `inconclusive` es deliberadamente apagado
@@ -12,16 +13,16 @@
  */
 export const COLORS = {
   /** Se estanca o muere mas de lo esperado, con IC concluyente. */
-  risk: "#c2410c",
+  risk: "#b42318",
   /** Efecto protector con IC concluyente. */
-  protective: "#0f766e",
+  protective: "#1e5a40",
   /** IC que cruza 1: no es un hallazgo. */
-  inconclusive: "#9ca3af",
+  inconclusive: "#a3aba5",
   /** Barra del IC 95%. */
-  interval: "#6b7280",
+  interval: "#6b7770",
   /** Linea de referencia en OR = 1. */
-  reference: "#111827",
-  selected: "#1d4ed8",
-  grid: "#e5e7eb",
-  axis: "#4b5563",
+  reference: "#13201a",
+  selected: "#2f5d8c",
+  grid: "#e1e6e0",
+  axis: "#55625b",
 } as const;

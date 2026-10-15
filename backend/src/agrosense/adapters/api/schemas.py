@@ -80,7 +80,7 @@ class ProjectResponse(BaseModel):
     campaigns_count: int
     # E1
     project_code: str | None = Field(
-        default=None, description="Identificador interno asignado por AgroSense (AGS-año-n)."
+        default=None, description="Identificador interno asignado por Dendrova (AGS-año-n)."
     )
     contract_code: str | None = None
     objective: str | None = None

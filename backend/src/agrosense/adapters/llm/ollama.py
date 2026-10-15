@@ -42,7 +42,7 @@ def ai_reports_enabled() -> bool:
     """
     return os.environ.get("AI_REPORTS_ENABLED", "true").strip().lower() not in {"false", "0", "no"}
 _TIMEOUT = 180
-_USER_AGENT = "AgroSense/2.0 (+restauracion ecologica)"
+_USER_AGENT = "Dendrova/2.0 (+restauracion ecologica)"
 
 # Deterministas a proposito (fix wave 2026-09-27, item 7): un borrador es un
 # documento tecnico, no una conversacion creativa -- misma entrada, misma

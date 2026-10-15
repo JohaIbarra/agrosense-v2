@@ -90,12 +90,16 @@ export function MonitoringsCard({
 }) {
   return (
     <section className="card">
-      <h2>Monitoreos</h2>
+      <div className="card-head">
+        <h2>Monitoreos</h2>
+        <p className="muted">Cada carga del Excel actualiza la serie completa.</p>
+      </div>
       {monitorings.length === 0 ? (
         <p className="empty">
           Aún no hay monitoreos cargados. Suba el Excel del primer monitoreo para ver su análisis.
         </p>
       ) : (
+        <div className="table-scroll">
         <table className="comparison">
           <thead>
             <tr>
@@ -124,6 +128,7 @@ export function MonitoringsCard({
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </section>
   );

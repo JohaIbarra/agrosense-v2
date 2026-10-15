@@ -80,13 +80,16 @@ describe("E1 en la interfaz", () => {
   it("la presentación es pública y ofrece entrar", async () => {
     renderAt("/", fakeAuth(null));
     expect(await screen.findByText(/sin hojas de cálculo a mano/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Iniciar sesión" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Iniciar sesión" }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: "Crear cuenta" })).toBeInTheDocument();
   });
 
-  it("la presentación marca lo que aún no existe como en construcción", async () => {
+  it("la presentación solo anuncia lo que ya existe", async () => {
     renderAt("/", fakeAuth(null));
     await screen.findByText(/sin hojas de cálculo a mano/);
-    expect(screen.getAllByText("En construcción").length).toBeGreaterThan(0);
+    // Todas las capacidades listadas están implementadas: nada «en construcción».
+    expect(screen.queryByText(/en construcción/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Carga del Excel de campo")).toBeInTheDocument();
   });
 
   it("iniciar sesión lleva a mis proyectos y la API recibe el token", async () => {
@@ -153,7 +156,7 @@ describe("E1 en la interfaz", () => {
     mockApi({ "/projects": [] });
     const user = userEvent.setup();
     renderAt("/proyectos", fakeAuth({ accessToken: "tok", email: "ana@example.com" }));
-    await user.click(await screen.findByRole("button", { name: "Salir" }));
+    await user.click(await screen.findByRole("button", { name: "Cerrar sesión" }));
     await waitFor(() => expect(screen.getByText(/sin hojas de cálculo a mano/)).toBeInTheDocument());
   });
 

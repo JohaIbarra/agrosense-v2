@@ -23,7 +23,7 @@ export function ProfilePage() {
     }
   }, [me.data]);
 
-  if (me.loading) return <p className="state">Cargando perfil…</p>;
+  if (me.loading) return <p className="state loading">Cargando perfil…</p>;
   if (me.error) {
     return (
       <p className="state form-error" role="alert">

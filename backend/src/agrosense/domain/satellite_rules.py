@@ -54,7 +54,7 @@ def validate_index(index: str) -> str:
     if limpio not in SPECTRAL_INDICES:
         conocidos = ", ".join(SPECTRAL_INDICES)
         raise InvalidIndexRequestError(
-            f"AgroSense no calcula «{index}». Índices disponibles: {conocidos}."
+            f"Dendrova no calcula «{index}». Índices disponibles: {conocidos}."
         )
     return limpio
 

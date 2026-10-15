@@ -41,7 +41,7 @@ _EXPRESSIONS = {"NDVI": "(B08-B04)/(B08+B04)"}
 
 _TIMEOUT = 45
 _RETRIES = 2
-_USER_AGENT = "AgroSense/2.0 (+restauracion ecologica)"
+_USER_AGENT = "Dendrova/2.0 (+restauracion ecologica)"
 
 
 def _post(url: str, body: dict, timeout: int = _TIMEOUT) -> dict:

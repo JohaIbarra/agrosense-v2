@@ -35,7 +35,7 @@ import {
 const SATELITE_URL =
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const SATELITE_ATTR =
-  "Imagen: Esri, Maxar, Earthstar Geographics · Datos: AgroSense";
+  "Imagen: Esri, Maxar, Earthstar Geographics · Datos: Dendrova";
 
 type Layer = "trees" | "plots";
 
@@ -214,7 +214,7 @@ export function MapPage() {
     <Link to={`/proyectos/${projectId}`}>{project.data?.name ?? "Volver al proyecto"}</Link>
   );
 
-  if (map.loading && !data) return <p className="state">Ubicando los árboles…</p>;
+  if (map.loading && !data) return <p className="state loading">Ubicando los árboles…</p>;
   if (map.error) {
     return (
       <div className="state">
@@ -242,9 +242,13 @@ export function MapPage() {
   return (
     <div className="page page-wide">
       <header className="page-head">
-        <p className="muted">
-          <Link to="/proyectos">Mis proyectos</Link> / {volver} / Mapa
-        </p>
+        <nav className="crumbs" aria-label="Ruta">
+          <Link to="/proyectos">Mis proyectos</Link>
+          <span aria-hidden="true">/</span>
+          {volver}
+          <span aria-hidden="true">/</span>
+          <span aria-current="page">Mapa</span>
+        </nav>
         <h1>Mapa del predio</h1>
         <p className="subtitle">
           {d.trees.length} árboles ubicados en {d.plots.length} parcelas

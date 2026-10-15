@@ -56,7 +56,7 @@ def validate_tile_template(template: str) -> str:
     sobran = [p for p in _REJECTED_PLACEHOLDERS if p in limpia]
     if sobran:
         raise InvalidImageryLayerError(
-            f"AgroSense no admite {', '.join(sobran)} en la plantilla: use una "
+            f"Dendrova no admite {', '.join(sobran)} en la plantilla: use una "
             "dirección con un solo servidor."
         )
     return limpia

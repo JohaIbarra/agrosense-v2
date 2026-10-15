@@ -81,9 +81,9 @@ describe("qué se dibuja", () => {
 
 describe("colores", () => {
   it("cada estado lleva el suyo, y muerto no es un color de serie", () => {
-    expect(STATE_COLORS.bueno).toBe("#0ca30c");
-    expect(STATE_COLORS.malo).toBe("#d03b3b");
-    expect(STATE_COLORS.muerto).toBe("#4b4b4b");
+    expect(STATE_COLORS.bueno).toBe("#2e7d4f");
+    expect(STATE_COLORS.malo).toBe("#b42318");
+    expect(STATE_COLORS.muerto).toBe("#5f6762");
   });
 
   it("la supervivencia usa una sola tinta, de claro a oscuro", () => {

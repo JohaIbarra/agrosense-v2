@@ -92,7 +92,7 @@ export async function downloadReport(projectId: number, number: number): Promise
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = filename ?? `AgroSense_M${number}.xlsx`;
+  a.download = filename ?? `Dendrova_M${number}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();

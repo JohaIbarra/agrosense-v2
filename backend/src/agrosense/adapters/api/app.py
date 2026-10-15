@@ -15,9 +15,9 @@ from agrosense.domain.errors import DomainError
 def create_app() -> FastAPI:
     """Construye y configura la aplicacion FastAPI."""
     app = FastAPI(
-        title="AgroSense API",
+        title="Dendrova API",
         version="2.0.0",
-        description="Plataforma de análisis de restauración ecológica — AgroSense v2",
+        description="Dendrova — plataforma de análisis de restauración ecológica",
     )
 
     # Mapeo global: DomainError → 422 con contexto accionable

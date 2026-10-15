@@ -1,6 +1,7 @@
-# AgroSense Engineering Rules
+# Dendrova (antes AgroSense) — Engineering Rules
 
-Proyecto: AgroSense AI v2 — plataforma de análisis de restauración ecológica
+Proyecto: Dendrova (antes AgroSense AI v2; identificadores técnicos como el
+paquete `agrosense` se conservan) — plataforma de análisis de restauración ecológica
 (predicción de riesgo de mortalidad, detección de árboles estancados/anómalos,
 analítica de crecimiento por especie y sitio).
 

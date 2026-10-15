@@ -139,7 +139,7 @@ function mockApi(features: { ai_reports: boolean } = { ai_reports: true }) {
       return Promise.resolve({
         ok: true, status: 200,
         headers: new Headers({
-          "Content-Disposition": 'attachment; filename="AgroSense_AGS-2026-0007_M4.xlsx"',
+          "Content-Disposition": 'attachment; filename="Dendrova_AGS-2026-0007_M4.xlsx"',
         }),
         blob: async () => new Blob(["xlsx"]),
       });

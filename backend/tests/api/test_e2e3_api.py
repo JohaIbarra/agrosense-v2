@@ -158,7 +158,7 @@ def test_report_download_is_an_xlsx_with_the_page_numbers(client):
     r = client.get(f"/projects/{pid}/monitorings/2/report.xlsx")
     assert r.status_code == 200
     assert r.headers["content-type"] == XLSX
-    assert 'filename="AgroSense_AGS-' in r.headers["content-disposition"]
+    assert 'filename="Dendrova_AGS-' in r.headers["content-disposition"]
     wb = load_workbook(io.BytesIO(r.content))
     assert "Datos crudos" in wb.sheetnames and "Supervivencia" in wb.sheetnames
 

@@ -126,7 +126,7 @@ export function IndexPage() {
     <Link to={`/proyectos/${projectId}`}>{project.data?.name ?? "Volver al proyecto"}</Link>
   );
 
-  if (indice.loading && !indice.data) return <p className="state">Cargando el NDVI…</p>;
+  if (indice.loading && !indice.data) return <p className="state loading">Cargando el NDVI…</p>;
   if (indice.error) {
     return (
       <div className="state">
@@ -147,9 +147,13 @@ export function IndexPage() {
     <div className="page page-wide">
       <header className="page-head page-head-row">
         <div>
-          <p className="muted">
-            <Link to="/proyectos">Mis proyectos</Link> / {volver} / NDVI
-          </p>
+          <nav className="crumbs" aria-label="Ruta">
+            <Link to="/proyectos">Mis proyectos</Link>
+            <span aria-hidden="true">/</span>
+            {volver}
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">NDVI</span>
+          </nav>
           <h1>Verdor del predio (NDVI)</h1>
           <p className="subtitle">
             Índice de vegetación de Sentinel-2 (10 m por píxel), medido sobre el polígono de

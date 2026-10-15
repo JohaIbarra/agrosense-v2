@@ -1,4 +1,9 @@
-# AgroSense AI v2
+# Dendrova
+
+> Antes **AgroSense v2**. El nombre visible cambió el 2026-10-15 (ver `PRODUCT.md`);
+> los identificadores técnicos se conservan a propósito: el paquete Python
+> `agrosense`, el repositorio `agrosense-v2`, el esquema y las tablas de la base,
+> las variables de entorno y el prefijo `AGS-` de los códigos de proyecto.
 
 Plataforma de análisis de restauración ecológica para ingenieros de campo:
 riesgo de mortalidad por árbol, detección de estancados/anómalos y analítica

@@ -8,6 +8,7 @@ import { useState } from "react";
 import { getMortalityRisk } from "../api/mortality";
 import type { MortalityDecision, MortalityRisk } from "../api/types";
 import { useAsync } from "../hooks/useAsync";
+import { IconAlert } from "./icons";
 
 const nf = (value: number, digits: number) =>
   value.toLocaleString("es-CO", { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -40,14 +41,21 @@ export function MortalityPanel({ projectId, number }: { projectId: number; numbe
   const r = estado.data;
 
   return (
-    <section className="card">
-      <h2>Árboles en riesgo de morir</h2>
+    <section className="card risk-card">
+      <div className="panel-head">
+        <h2>
+          <span className="ico-risk">
+            <IconAlert />
+          </span>
+          Árboles en riesgo de morir
+        </h2>
+      </div>
       <p className="muted">
         Qué árboles vivos tienen más riesgo de morir hasta el próximo monitoreo. Se marcan para
         revisión en campo los de mayor riesgo, hasta el presupuesto de alertas.
       </p>
 
-      {estado.loading && !r && <p className="muted">Calculando…</p>}
+      {estado.loading && !r && <p className="muted loading">Calculando…</p>}
       {estado.error && (
         <p className="form-error" role="alert">
           {estado.error.message}

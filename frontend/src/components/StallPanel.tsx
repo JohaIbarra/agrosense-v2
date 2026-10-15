@@ -8,6 +8,7 @@ import { useState } from "react";
 import { getStallAssessment } from "../api/stall";
 import type { StallTree } from "../api/types";
 import { useAsync } from "../hooks/useAsync";
+import { IconTrend } from "./icons";
 
 const nf = (value: number, digits: number) =>
   value.toLocaleString("es-CO", { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -45,15 +46,22 @@ export function StallPanel({ projectId, number }: { projectId: number; number: n
   const a = estado.data;
 
   return (
-    <section className="card">
-      <h2>Árboles en riesgo de estancarse</h2>
+    <section className="card risk-card">
+      <div className="panel-head">
+        <h2>
+          <span className="ico-warn">
+            <IconTrend />
+          </span>
+          Árboles en riesgo de estancarse
+        </h2>
+      </div>
       <p className="muted">
         Probabilidad de que la altura no cambie hasta el próximo monitoreo, si el árbol sigue
         vivo. Se marcan para revisión en campo los árboles con mayor probabilidad, hasta el
         presupuesto de alertas.
       </p>
 
-      {estado.loading && !a && <p className="muted">Calculando…</p>}
+      {estado.loading && !a && <p className="muted loading">Calculando…</p>}
       {estado.error && (
         <p className="form-error" role="alert">
           {estado.error.message}

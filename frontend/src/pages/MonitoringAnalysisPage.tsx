@@ -15,6 +15,7 @@ import { formatDate, formatSummary } from "../analysis/format";
 import { AIReportPanel } from "../components/AIReportPanel";
 import { AnalysisBarChart } from "../components/AnalysisBarChart";
 import { DataTable } from "../components/DataTable";
+import { IconDownload } from "../components/icons";
 import { MortalityPanel } from "../components/MortalityPanel";
 import { StallPanel } from "../components/StallPanel";
 import { useAsync } from "../hooks/useAsync";
@@ -99,7 +100,7 @@ export function MonitoringAnalysisPage() {
   );
 
   if (analysis.loading && !analysis.data) {
-    return <p className="state">Calculando el análisis del monitoreo M{number}…</p>;
+    return <p className="state loading">Calculando el análisis del monitoreo M{number}…</p>;
   }
   if (analysis.error) {
     return (
@@ -117,9 +118,13 @@ export function MonitoringAnalysisPage() {
     <div className="page page-wide">
       <header className="page-head page-head-row">
         <div>
-          <p className="muted">
-            <Link to="/proyectos">Mis proyectos</Link> / {back} / M{a.monitoring}
-          </p>
+          <nav className="crumbs" aria-label="Ruta">
+            <Link to="/proyectos">Mis proyectos</Link>
+            <span aria-hidden="true">/</span>
+            {back}
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">M{a.monitoring}</span>
+          </nav>
           <h1>Análisis del monitoreo M{a.monitoring}</h1>
           <p className="subtitle">
             {a.monitoring_date ? `Fecha: ${formatDate(a.monitoring_date)}` : "Sin fecha registrada"}
@@ -129,14 +134,30 @@ export function MonitoringAnalysisPage() {
           </p>
         </div>
         <div className="head-actions">
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={download}
-            disabled={downloading}
-          >
-            {downloading ? "Generando…" : "Descargar reporte (.xlsx)"}
-          </button>
+          <div className="head-actions-row head-actions">
+            <div className="segmented" role="group" aria-label="Monitoreo">
+              {a.monitorings.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  aria-pressed={n === a.monitoring}
+                  onClick={() => navigate(`/proyectos/${projectId}/monitoreos/${n}`)}
+                >
+                  M{n}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={download}
+              disabled={downloading}
+              aria-busy={downloading}
+            >
+              <IconDownload />
+              {downloading ? "Generando…" : "Descargar reporte (.xlsx)"}
+            </button>
+          </div>
           {downloadError && (
             <p className="form-error" role="alert">
               {downloadError}
@@ -145,54 +166,41 @@ export function MonitoringAnalysisPage() {
         </div>
       </header>
 
-      <nav className="filter" aria-label="Monitoreo">
-        <span className="filter-label">Monitoreo</span>
-        {a.monitorings.map((n) => (
-          <button
-            key={n}
-            type="button"
-            className={n === a.monitoring ? "chip chip-on" : "chip"}
-            aria-pressed={n === a.monitoring}
-            onClick={() => navigate(`/proyectos/${projectId}/monitoreos/${n}`)}
-          >
-            M{n}
-          </button>
-        ))}
-      </nav>
-
       <Summary analysis={a} />
 
-      <div className="tabs" role="tablist" aria-label="Análisis">
-        {a.sections.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            role="tab"
-            aria-selected={s.id === section.id}
-            className={s.id === section.id ? "tab tab-on" : "tab"}
-            onClick={() => setSectionId(s.id)}
-          >
-            {s.title}
-          </button>
-        ))}
-      </div>
-
-      {a.properties.length > 1 && (
-        <div className="filter" role="group" aria-label="Predio">
-          <span className="filter-label">Predio</span>
-          {[ALL, ...a.properties].map((p) => (
+      <div className="toolbar">
+        <div className="tabs" role="tablist" aria-label="Análisis">
+          {a.sections.map((s) => (
             <button
-              key={p}
+              key={s.id}
               type="button"
-              className={p === property ? "chip chip-on" : "chip"}
-              aria-pressed={p === property}
-              onClick={() => setProperty(p)}
+              role="tab"
+              aria-selected={s.id === section.id}
+              className={s.id === section.id ? "tab tab-on" : "tab"}
+              onClick={() => setSectionId(s.id)}
             >
-              {p === ALL ? "Todos" : p}
+              {s.title}
             </button>
           ))}
         </div>
-      )}
+
+        {a.properties.length > 1 && (
+          <div className="filter" role="group" aria-label="Predio">
+            <span className="filter-label">Predio</span>
+            {[ALL, ...a.properties].map((p) => (
+              <button
+                key={p}
+                type="button"
+                className={p === property ? "chip chip-on" : "chip"}
+                aria-pressed={p === property}
+                onClick={() => setProperty(p)}
+              >
+                {p === ALL ? "Todos" : p}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       <Section section={section} property={property} />
 

@@ -55,7 +55,7 @@ export function ContrastPage() {
   );
 
   if (contraste.loading && !contraste.data) {
-    return <p className="state">Cargando el contraste…</p>;
+    return <p className="state loading">Cargando las especies…</p>;
   }
   if (contraste.error) {
     return (
@@ -72,13 +72,17 @@ export function ContrastPage() {
   return (
     <div className="page page-wide">
       <header className="page-head">
-        <p className="muted">
-          <Link to="/proyectos">Mis proyectos</Link> / {volver} / Contraste con el referente
-        </p>
-        <h1>Contraste con el Referente científico</h1>
+        <nav className="crumbs" aria-label="Ruta">
+          <Link to="/proyectos">Mis proyectos</Link>
+          <span aria-hidden="true">/</span>
+          {volver}
+          <span aria-hidden="true">/</span>
+          <span aria-current="page">Especies</span>
+        </nav>
+        <h1>Especies del proyecto</h1>
         <p className="subtitle">
-          Las especies plantadas en este proyecto, frente a los efectos estimados sobre el
-          dataset de referencia.
+          Cómo se estanca y cuánto muere cada especie plantada, frente al promedio estimado sobre
+          el dataset de referencia.
         </p>
       </header>
 
@@ -88,7 +92,11 @@ export function ContrastPage() {
           <p className="muted">Cargue un monitoreo con árboles para ver el contraste.</p>
         </div>
       ) : (
-        items.map((item) => <ContrastCard key={item.species} item={item} />)
+        <div className="plots">
+          {items.map((item) => (
+            <ContrastCard key={item.species} item={item} />
+          ))}
+        </div>
       )}
     </div>
   );
